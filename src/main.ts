@@ -14,7 +14,7 @@ const DEFAULT_DATA: PluginData = {
   columnConfigs: {},
 };
 
-export default class BasesKanbanPlugin extends Plugin {
+export default class BaseBoardPlugin extends Plugin {
   data_: PluginData = DEFAULT_DATA;
 
   async onload() {

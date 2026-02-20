@@ -1,16 +1,16 @@
 /* ============================================================
-   Bases Kanban — Styles
+   Base Board — Styles
    ============================================================ */
 
 /* ---- Container / Board ---- */
 
-.bases-kanban-container {
+.base-board-container {
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.bases-kanban-board {
+.base-board-board {
   display: flex;
   gap: 12px;
   padding: 12px;
@@ -22,7 +22,7 @@
 
 /* ---- Placeholder (no groupBy set) ---- */
 
-.bases-kanban-placeholder {
+.base-board-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -33,13 +33,13 @@
   font-size: var(--font-ui-small);
 }
 
-.bases-kanban-placeholder-icon {
+.base-board-placeholder-icon {
   opacity: 0.4;
 }
 
 /* ---- Column ---- */
 
-.bases-kanban-column {
+.base-board-column {
   flex: 0 0 280px;
   max-height: 100%;
   display: flex;
@@ -52,14 +52,14 @@
     transform 0.15s ease;
 }
 
-.bases-kanban-column--dragging {
+.base-board-column--dragging {
   opacity: 0.3;
   transform: scale(0.95);
 }
 
 /* ---- Column drag placeholder ---- */
 
-.bases-kanban-column-placeholder {
+.base-board-column-placeholder {
   flex: 0 0 280px;
   border: 2px dashed var(--interactive-accent);
   border-radius: var(--radius-m);
@@ -73,7 +73,7 @@
 
 /* ---- Column header ---- */
 
-.bases-kanban-column-header {
+.base-board-column-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -82,7 +82,7 @@
   user-select: none;
 }
 
-.bases-kanban-column-drag-handle {
+.base-board-column-drag-handle {
   flex-shrink: 0;
   cursor: grab;
   color: var(--text-faint);
@@ -92,15 +92,15 @@
   align-items: center;
 }
 
-.bases-kanban-column-drag-handle:active {
+.base-board-column-drag-handle:active {
   cursor: grabbing;
 }
 
-.bases-kanban-column-header:hover .bases-kanban-column-drag-handle {
+.base-board-column-header:hover .base-board-column-drag-handle {
   opacity: 1;
 }
 
-.bases-kanban-column-title {
+.base-board-column-title {
   flex: 1 1 auto;
   font-weight: var(--font-semibold);
   font-size: var(--font-ui-small);
@@ -109,19 +109,19 @@
   text-overflow: ellipsis;
 }
 
-.bases-kanban-no-value-title {
+.base-board-no-value-title {
   color: var(--text-muted);
   font-style: italic;
 }
 
-.bases-kanban-header-right {
+.base-board-header-right {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
 
-.bases-kanban-column-count {
+.base-board-column-count {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   background-color: var(--background-modifier-hover);
@@ -129,7 +129,7 @@
   padding: 1px 7px;
 }
 
-.bases-kanban-column-delete {
+.base-board-column-delete {
   cursor: pointer;
   color: var(--text-faint);
   display: flex;
@@ -140,17 +140,17 @@
     color 0.15s ease;
 }
 
-.bases-kanban-column-header:hover .bases-kanban-column-delete {
+.base-board-column-header:hover .base-board-column-delete {
   opacity: 1;
 }
 
-.bases-kanban-column-delete:hover {
+.base-board-column-delete:hover {
   color: var(--text-error);
 }
 
 /* ---- Cards container (scrollable) ---- */
 
-.bases-kanban-cards {
+.base-board-cards {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 8px;
@@ -162,7 +162,7 @@
 
 /* ---- Card ---- */
 
-.bases-kanban-card {
+.base-board-card {
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -175,23 +175,23 @@
   user-select: none;
 }
 
-.bases-kanban-card:hover {
+.base-board-card:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border-color: var(--interactive-accent);
 }
 
-.bases-kanban-card:active {
+.base-board-card:active {
   cursor: grabbing;
 }
 
-.bases-kanban-card--dragging {
+.base-board-card--dragging {
   opacity: 0.25;
   transform: scale(0.96);
 }
 
 /* ---- Card title ---- */
 
-.bases-kanban-card-title {
+.base-board-card-title {
   font-size: var(--font-ui-small);
   font-weight: var(--font-medium);
   line-height: 1.35;
@@ -200,13 +200,13 @@
 
 /* ---- Card property chips ---- */
 
-.bases-kanban-card-props {
+.base-board-card-props {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 
-.bases-kanban-card-chip {
+.base-board-card-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -219,12 +219,12 @@
   overflow: hidden;
 }
 
-.bases-kanban-chip-label {
+.base-board-chip-label {
   opacity: 0.6;
   white-space: nowrap;
 }
 
-.bases-kanban-chip-value {
+.base-board-chip-value {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -232,7 +232,7 @@
 
 /* ---- Card drop placeholder ---- */
 
-.bases-kanban-card-placeholder {
+.base-board-card-placeholder {
   border: 2px dashed var(--interactive-accent);
   border-radius: var(--radius-s);
   height: 40px;
@@ -247,7 +247,7 @@
 
 /* ---- Add column button ---- */
 
-.bases-kanban-add-column-btn {
+.base-board-add-column-btn {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -266,7 +266,7 @@
   align-self: flex-start;
 }
 
-.bases-kanban-add-column-btn:hover {
+.base-board-add-column-btn:hover {
   background-color: var(--background-secondary);
   color: var(--text-normal);
   border-color: var(--interactive-accent);

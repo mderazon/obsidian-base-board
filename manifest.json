@@ -1,9 +1,9 @@
 {
-  "id": "bases-kanban",
-  "name": "Bases Kanban",
+  "id": "obsidian-base-board",
+  "name": "Base Board",
   "version": "0.1.0",
   "minAppVersion": "1.9.0",
   "description": "Kanban board view for Obsidian Bases. Drag and drop cards between columns organized by any property.",
-  "author": "Michael",
+  "author": "Michael DeRazon",
   "isDesktopOnly": false
 }

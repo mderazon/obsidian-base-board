@@ -10,7 +10,7 @@ import {
   App,
   Setting,
 } from "obsidian";
-import type BasesKanbanPlugin from "./main";
+import type BaseBoardPlugin from "./main";
 import { DragDropManager } from "./drag-drop";
 
 const NO_VALUE_COLUMN = "(No value)";
@@ -86,7 +86,7 @@ export class KanbanView extends BasesView {
   type = "kanban";
   scrollEl: HTMLElement;
   containerEl: HTMLElement;
-  plugin: BasesKanbanPlugin;
+  plugin: BaseBoardPlugin;
 
   private dragDropManager: DragDropManager;
   private currentGroups: BasesEntryGroup[] = [];
@@ -99,12 +99,12 @@ export class KanbanView extends BasesView {
   constructor(
     controller: QueryController,
     scrollEl: HTMLElement,
-    plugin: BasesKanbanPlugin,
+    plugin: BaseBoardPlugin,
   ) {
     super(controller);
     this.scrollEl = scrollEl;
     this.plugin = plugin;
-    this.containerEl = scrollEl.createDiv({ cls: "bases-kanban-container" });
+    this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
 
     this.dragDropManager = new DragDropManager(this.app, {
       onCardDrop: (
@@ -238,10 +238,10 @@ export class KanbanView extends BasesView {
 
     if (!hasGroupBy && groupedData.length <= 1) {
       const msgEl = this.containerEl.createDiv({
-        cls: "bases-kanban-placeholder",
+        cls: "base-board-placeholder",
       });
       setIcon(
-        msgEl.createSpan({ cls: "bases-kanban-placeholder-icon" }),
+        msgEl.createSpan({ cls: "base-board-placeholder-icon" }),
         "lucide-kanban",
       );
       msgEl.createEl("p", {
@@ -252,7 +252,7 @@ export class KanbanView extends BasesView {
 
     this.currentGroups = groupedData;
     const columns = this.getColumns();
-    const boardEl = this.containerEl.createDiv({ cls: "bases-kanban-board" });
+    const boardEl = this.containerEl.createDiv({ cls: "base-board-board" });
 
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);
@@ -272,37 +272,37 @@ export class KanbanView extends BasesView {
     const isNoValue = columnName === NO_VALUE_COLUMN;
     const entries = group ? group.entries : [];
 
-    const columnEl = boardEl.createDiv({ cls: "bases-kanban-column" });
+    const columnEl = boardEl.createDiv({ cls: "base-board-column" });
     columnEl.dataset.columnName = columnName;
     columnEl.dataset.columnIndex = String(columnIndex);
 
     // ---- Header ----
-    const headerEl = columnEl.createDiv({ cls: "bases-kanban-column-header" });
+    const headerEl = columnEl.createDiv({ cls: "base-board-column-header" });
 
     const dragHandle = headerEl.createDiv({
-      cls: "bases-kanban-column-drag-handle",
+      cls: "base-board-column-drag-handle",
     });
     dragHandle.setAttr("draggable", "true");
     setIcon(dragHandle, "grip-vertical");
 
     const titleEl = headerEl.createEl("span", {
       text: columnName,
-      cls: "bases-kanban-column-title",
+      cls: "base-board-column-title",
     });
-    if (isNoValue) titleEl.addClass("bases-kanban-no-value-title");
+    if (isNoValue) titleEl.addClass("base-board-no-value-title");
 
     const headerRight = headerEl.createDiv({
-      cls: "bases-kanban-header-right",
+      cls: "base-board-header-right",
     });
 
     headerRight.createEl("span", {
       text: String(entries.length),
-      cls: "bases-kanban-column-count",
+      cls: "base-board-column-count",
     });
 
     if (entries.length === 0 && !isNoValue) {
       const deleteBtn = headerRight.createDiv({
-        cls: "bases-kanban-column-delete",
+        cls: "base-board-column-delete",
       });
       setIcon(deleteBtn, "x");
       deleteBtn.addEventListener("click", () => {
@@ -311,7 +311,7 @@ export class KanbanView extends BasesView {
     }
 
     // ---- Cards container ----
-    const cardsEl = columnEl.createDiv({ cls: "bases-kanban-cards" });
+    const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
 
     // Sort entries by kanban_order (read from metadataCache for reliability)
     const sorted = [...entries].sort((a: any, b: any) => {
@@ -330,15 +330,15 @@ export class KanbanView extends BasesView {
     entry: any,
     columnName: string,
   ): void {
-    const cardEl = cardsEl.createDiv({ cls: "bases-kanban-card" });
+    const cardEl = cardsEl.createDiv({ cls: "base-board-card" });
     cardEl.setAttr("draggable", "true");
     cardEl.dataset.filePath = entry.file?.path ?? "";
     cardEl.dataset.columnName = columnName;
 
-    const titleEl = cardEl.createDiv({ cls: "bases-kanban-card-title" });
+    const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
     titleEl.createEl("span", { text: entry.file?.basename ?? "Untitled" });
 
-    const propsEl = cardEl.createDiv({ cls: "bases-kanban-card-props" });
+    const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
     const props = (entry as any).values;
     if (props && typeof props === "object") {
       let shown = 0;
@@ -356,12 +356,12 @@ export class KanbanView extends BasesView {
         const display = this.displayValue(val);
         if (!display) continue;
         const chip = propsEl.createEl("span", {
-          cls: "bases-kanban-card-chip",
+          cls: "base-board-card-chip",
         });
-        chip.createEl("span", { text: key, cls: "bases-kanban-chip-label" });
+        chip.createEl("span", { text: key, cls: "base-board-chip-label" });
         chip.createEl("span", {
           text: display,
-          cls: "bases-kanban-chip-value",
+          cls: "base-board-chip-value",
         });
         shown++;
       }
@@ -369,7 +369,7 @@ export class KanbanView extends BasesView {
   }
 
   private renderAddColumnButton(boardEl: HTMLElement): void {
-    const addBtn = boardEl.createDiv({ cls: "bases-kanban-add-column-btn" });
+    const addBtn = boardEl.createDiv({ cls: "base-board-add-column-btn" });
     setIcon(addBtn.createSpan(), "plus");
     addBtn.createEl("span", { text: "Add column" });
     addBtn.addEventListener("click", () => this.promptAddColumn());

@@ -1,0 +1,325 @@
+import { App } from "obsidian";
+
+// We use dataTransfer types to distinguish card vs column drags
+const CARD_MIME = "application/x-kanban-card";
+const COLUMN_MIME = "application/x-kanban-column";
+
+export interface DragDropCallbacks {
+  /** Card dropped (same or different column). orderedPaths = new card order in target column. */
+  onCardDrop: (
+    filePath: string,
+    targetColumnName: string,
+    orderedFilePaths: string[],
+  ) => Promise<void>;
+  /** Column header was dragged to a new position. */
+  onColumnReorder: (orderedColumnNames: string[]) => void;
+}
+
+export class DragDropManager {
+  private app: App;
+  private callbacks: DragDropCallbacks;
+  private boardEl: HTMLElement | null = null;
+  private draggedEl: HTMLElement | null = null;
+  private placeholderEl: HTMLElement | null = null;
+  private dragType: "card" | "column" | null = null;
+
+  private boundHandlers: {
+    dragStart: (e: DragEvent) => void;
+    dragOver: (e: DragEvent) => void;
+    dragEnd: (e: DragEvent) => void;
+    drop: (e: DragEvent) => void;
+  };
+
+  constructor(app: App, callbacks: DragDropCallbacks) {
+    this.app = app;
+    this.callbacks = callbacks;
+
+    this.boundHandlers = {
+      dragStart: this.onDragStart.bind(this),
+      dragOver: this.onDragOver.bind(this),
+      dragEnd: this.onDragEnd.bind(this),
+      drop: this.onDrop.bind(this),
+    };
+  }
+
+  initBoard(boardEl: HTMLElement): void {
+    this.teardownBoard();
+    this.boardEl = boardEl;
+    boardEl.addEventListener("dragstart", this.boundHandlers.dragStart);
+    boardEl.addEventListener("dragover", this.boundHandlers.dragOver);
+    boardEl.addEventListener("dragend", this.boundHandlers.dragEnd);
+    boardEl.addEventListener("drop", this.boundHandlers.drop);
+  }
+
+  destroy(): void {
+    this.teardownBoard();
+  }
+
+  private teardownBoard(): void {
+    if (!this.boardEl) return;
+    this.boardEl.removeEventListener("dragstart", this.boundHandlers.dragStart);
+    this.boardEl.removeEventListener("dragover", this.boundHandlers.dragOver);
+    this.boardEl.removeEventListener("dragend", this.boundHandlers.dragEnd);
+    this.boardEl.removeEventListener("drop", this.boundHandlers.drop);
+    this.removePlaceholder();
+    this.boardEl = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Drag Start
+  // ---------------------------------------------------------------------------
+
+  private onDragStart(e: DragEvent): void {
+    if (!e.dataTransfer) return;
+
+    // Check if dragging a column header (via the drag handle)
+    const handle = (e.target as HTMLElement).closest(
+      ".bases-kanban-column-drag-handle",
+    );
+    if (handle) {
+      const columnEl = handle.closest(
+        ".bases-kanban-column",
+      ) as HTMLElement | null;
+      if (!columnEl) return;
+      this.dragType = "column";
+      this.draggedEl = columnEl;
+      columnEl.addClass("bases-kanban-column--dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData(COLUMN_MIME, columnEl.dataset.columnName ?? "");
+      return;
+    }
+
+    // Otherwise check for card drag
+    const cardEl = (e.target as HTMLElement).closest(
+      ".bases-kanban-card",
+    ) as HTMLElement | null;
+    if (!cardEl) return;
+    this.dragType = "card";
+    this.draggedEl = cardEl;
+    cardEl.addClass("bases-kanban-card--dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Drag Over
+  // ---------------------------------------------------------------------------
+
+  private onDragOver(e: DragEvent): void {
+    e.preventDefault();
+    if (!e.dataTransfer) return;
+    e.dataTransfer.dropEffect = "move";
+
+    if (this.dragType === "column") {
+      this.handleColumnDragOver(e);
+    } else if (this.dragType === "card") {
+      this.handleCardDragOver(e);
+    }
+  }
+
+  private handleCardDragOver(e: DragEvent): void {
+    // Find the cards container we're hovering over
+    let cardsContainer = (e.target as HTMLElement).closest(
+      ".bases-kanban-cards",
+    ) as HTMLElement | null;
+
+    if (!cardsContainer) {
+      const columnEl = (e.target as HTMLElement).closest(
+        ".bases-kanban-column",
+      ) as HTMLElement | null;
+      if (columnEl) {
+        cardsContainer = columnEl.querySelector(".bases-kanban-cards");
+      }
+    }
+
+    if (!cardsContainer) {
+      this.removePlaceholder();
+      return;
+    }
+
+    if (!this.placeholderEl) {
+      this.placeholderEl = document.createElement("div");
+      this.placeholderEl.className = "bases-kanban-card-placeholder";
+    }
+
+    const afterElement = this.getDragAfterElement(
+      cardsContainer,
+      ".bases-kanban-card:not(.bases-kanban-card--dragging)",
+      e.clientY,
+      "vertical",
+    );
+    if (afterElement) {
+      cardsContainer.insertBefore(this.placeholderEl, afterElement);
+    } else {
+      cardsContainer.appendChild(this.placeholderEl);
+    }
+  }
+
+  private handleColumnDragOver(e: DragEvent): void {
+    if (!this.boardEl) return;
+
+    if (!this.placeholderEl) {
+      this.placeholderEl = document.createElement("div");
+      this.placeholderEl.className = "bases-kanban-column-placeholder";
+    }
+
+    const afterElement = this.getDragAfterElement(
+      this.boardEl,
+      ".bases-kanban-column:not(.bases-kanban-column--dragging)",
+      e.clientX,
+      "horizontal",
+    );
+    if (afterElement) {
+      this.boardEl.insertBefore(this.placeholderEl, afterElement);
+    } else {
+      // Insert before the add-column button (last child)
+      const addBtn = this.boardEl.querySelector(".bases-kanban-add-column-btn");
+      if (addBtn) {
+        this.boardEl.insertBefore(this.placeholderEl, addBtn);
+      } else {
+        this.boardEl.appendChild(this.placeholderEl);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Drag End
+  // ---------------------------------------------------------------------------
+
+  private onDragEnd(_e: DragEvent): void {
+    if (this.draggedEl) {
+      this.draggedEl.removeClass("bases-kanban-card--dragging");
+      this.draggedEl.removeClass("bases-kanban-column--dragging");
+      this.draggedEl = null;
+    }
+    this.removePlaceholder();
+    this.dragType = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Drop
+  // ---------------------------------------------------------------------------
+
+  private async onDrop(e: DragEvent): Promise<void> {
+    e.preventDefault();
+
+    if (this.dragType === "column") {
+      this.handleColumnDrop(e);
+    } else if (this.dragType === "card") {
+      await this.handleCardDrop(e);
+    }
+
+    this.onDragEnd(e);
+  }
+
+  private handleColumnDrop(e: DragEvent): void {
+    if (!this.boardEl) return;
+    const draggedColumnName = e.dataTransfer?.getData(COLUMN_MIME);
+    if (!draggedColumnName) return;
+
+    // Collect column names in DOM order (placeholder marks the new position)
+    const orderedNames: string[] = [];
+    for (const child of Array.from(this.boardEl.children)) {
+      if (child === this.placeholderEl) {
+        orderedNames.push(draggedColumnName);
+      } else if (
+        child.classList.contains("bases-kanban-column") &&
+        !child.classList.contains("bases-kanban-column--dragging")
+      ) {
+        const name = (child as HTMLElement).dataset.columnName;
+        if (name && name !== draggedColumnName) {
+          orderedNames.push(name);
+        }
+      }
+    }
+
+    if (!orderedNames.includes(draggedColumnName)) {
+      orderedNames.push(draggedColumnName);
+    }
+
+    this.callbacks.onColumnReorder(orderedNames);
+  }
+
+  private async handleCardDrop(e: DragEvent): Promise<void> {
+    const filePath = e.dataTransfer?.getData(CARD_MIME);
+    if (!filePath) return;
+
+    const columnEl = (e.target as HTMLElement).closest(
+      ".bases-kanban-column",
+    ) as HTMLElement | null;
+    if (!columnEl) return;
+
+    const targetColumnName = columnEl.dataset.columnName;
+    if (!targetColumnName) return;
+
+    let cardsContainer = columnEl.querySelector(
+      ".bases-kanban-cards",
+    ) as HTMLElement | null;
+
+    // Build ordered file paths from DOM
+    const orderedPaths: string[] = [];
+    if (cardsContainer) {
+      for (const child of Array.from(cardsContainer.children)) {
+        if (child === this.placeholderEl) {
+          orderedPaths.push(filePath);
+        } else if (
+          child.classList.contains("bases-kanban-card") &&
+          !child.classList.contains("bases-kanban-card--dragging")
+        ) {
+          const path = (child as HTMLElement).dataset.filePath;
+          if (path && path !== filePath) {
+            orderedPaths.push(path);
+          }
+        }
+      }
+      if (!orderedPaths.includes(filePath)) {
+        orderedPaths.push(filePath);
+      }
+    }
+
+    await this.callbacks.onCardDrop(filePath, targetColumnName, orderedPaths);
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Utilities
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Find the child in `container` matching `selector` that the dragged
+   * element should be inserted *before*.
+   */
+  private getDragAfterElement(
+    container: HTMLElement,
+    selector: string,
+    cursorPos: number,
+    axis: "vertical" | "horizontal",
+  ): HTMLElement | null {
+    const els = Array.from(
+      container.querySelectorAll(selector),
+    ) as HTMLElement[];
+
+    let closest: HTMLElement | null = null;
+    let closestOffset = Number.NEGATIVE_INFINITY;
+
+    for (const child of els) {
+      const box = child.getBoundingClientRect();
+      const offset =
+        axis === "vertical"
+          ? cursorPos - box.top - box.height / 2
+          : cursorPos - box.left - box.width / 2;
+      if (offset < 0 && offset > closestOffset) {
+        closestOffset = offset;
+        closest = child;
+      }
+    }
+
+    return closest;
+  }
+
+  private removePlaceholder(): void {
+    if (this.placeholderEl) {
+      this.placeholderEl.remove();
+      this.placeholderEl = null;
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# Obsidian vault for testing
+kanban-base/
+
+# npm
+node_modules/
+
+# Build output
+main.js
+
+# IDE
+.idea/
+*.swp
+*.swo

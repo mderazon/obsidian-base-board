@@ -264,11 +264,67 @@
 
 /* ---- Card title ---- */
 
+.base-board-card {
+  position: relative;
+}
+
 .base-board-card-title {
   font-size: var(--font-ui-small);
   font-weight: var(--font-medium);
   line-height: 1.35;
   margin-bottom: 4px;
+  padding-right: 24px; /* leave room for the edit button */
+}
+
+/* ---- Card edit button ---- */
+
+.base-board-card-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+  color: var(--text-muted);
+}
+
+.base-board-card-edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-card:hover .base-board-card-edit-btn {
+  opacity: 1;
+}
+
+.base-board-card-edit-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ---- Card rename input ---- */
+
+.base-board-card-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  padding: 1px 2px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  outline: none;
 }
 
 /* ---- Card property chips ---- */

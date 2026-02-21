@@ -416,6 +416,14 @@ export class KanbanView extends BasesView {
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
     titleEl.createEl("span", { text: entry.file?.basename ?? "Untitled" });
 
+    // ---- Edit button (visible on hover) ----
+    const editBtn = cardEl.createDiv({ cls: "base-board-card-edit-btn" });
+    setIcon(editBtn, "lucide-pencil");
+    editBtn.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation(); // Don't open the note
+      this.showCardActionMenu(editBtn, filePath, titleEl);
+    });
+
     const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
     const props = (entry as any).values;
     if (props && typeof props === "object") {
@@ -444,6 +452,105 @@ export class KanbanView extends BasesView {
         shown++;
       }
     }
+  }
+
+  private showCardActionMenu(
+    anchorEl: HTMLElement,
+    filePath: string,
+    titleEl: HTMLElement,
+  ): void {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!file || !(file instanceof TFile)) return;
+
+    const menu = new Menu();
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Open")
+        .setIcon("lucide-file-text")
+        .onClick(() => {
+          this.app.workspace.getLeaf(false).openFile(file);
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Open in new tab")
+        .setIcon("lucide-file-plus")
+        .onClick(() => {
+          this.app.workspace.getLeaf("tab").openFile(file);
+        });
+    });
+
+    menu.addSeparator();
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Rename")
+        .setIcon("lucide-pencil")
+        .onClick(() => {
+          this.startCardRename(titleEl, file);
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Delete")
+        .setIcon("lucide-trash-2")
+        .onClick(async () => {
+          await this.app.vault.trash(file, true);
+          new Notice(`Moved "${file.basename}" to trash`);
+        });
+    });
+
+    const rect = anchorEl.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.right, y: rect.bottom });
+  }
+
+  private startCardRename(titleEl: HTMLElement, file: TFile): void {
+    const titleSpan = titleEl.querySelector("span");
+    if (!titleSpan) return;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = file.basename;
+    input.className = "base-board-card-rename-input";
+
+    titleSpan.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let committed = false;
+    const commit = async () => {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim();
+      if (newName && newName !== file.basename) {
+        const newPath = file.path.replace(
+          /[^/]+\.md$/,
+          `${newName.replace(/[\\/:*?"<>|]/g, "")}.md`,
+        );
+        try {
+          await this.app.fileManager.renameFile(file, newPath);
+        } catch (err) {
+          new Notice(`Rename failed: ${err}`);
+        }
+      }
+      // Re-render will pick up the new name via onDataUpdated
+      this.scheduleRender();
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        committed = true;
+        this.scheduleRender();
+      }
+    });
+    input.addEventListener("blur", () => commit());
   }
 
   private renderAddColumnButton(boardEl: HTMLElement): void {

@@ -158,9 +158,55 @@
   flex-direction: column;
   gap: 6px;
   min-height: 40px;
+  transition: background-color 0.2s ease;
+}
+
+/* ---- Empty column drop zone ---- */
+/* Compact by default — just enough to remain visible */
+
+.base-board-cards:empty {
+  min-height: 0;
+  padding: 4px 8px;
+  transition:
+    min-height 0.3s ease,
+    padding 0.3s ease,
+    border-color 0.3s ease,
+    background-color 0.3s ease;
+}
+
+/* Expand smoothly when a card is being dragged over */
+.base-board-column--drag-over > .base-board-cards {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 4%,
+    transparent
+  );
+}
+
+.base-board-column--drag-over > .base-board-cards:empty {
+  min-height: 100px;
+  padding: 8px;
+  border: 2px dashed var(--interactive-accent);
+  border-radius: var(--radius-s);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 8%,
+    transparent
+  );
 }
 
 /* ---- Card ---- */
+
+@keyframes base-board-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 .base-board-card {
   position: relative;
@@ -170,10 +216,16 @@
   padding: 10px 12px;
   cursor: pointer;
   transition:
-    box-shadow 0.15s ease,
-    transform 0.1s ease,
-    opacity 0.15s ease;
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    border-color 0.15s ease;
   user-select: none;
+}
+
+/* Only animate cards on initial board mount */
+.base-board-board--animate .base-board-card {
+  animation: base-board-card-enter 0.25s ease both;
 }
 
 .base-board-card:hover {
@@ -186,9 +238,15 @@
 }
 
 .base-board-card--dragging {
-  opacity: 0.25;
-  transform: scale(0.96);
-  cursor: grabbing;
+  opacity: 0;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  border-width: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* ---- Card title ---- */
@@ -234,17 +292,28 @@
 
 /* ---- Card drop placeholder ---- */
 
+@keyframes base-board-placeholder-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .base-board-card-placeholder {
   border: 2px dashed var(--interactive-accent);
   border-radius: var(--radius-s);
-  height: 40px;
+  height: 44px;
   background-color: color-mix(
     in srgb,
     var(--interactive-accent) 8%,
     transparent
   );
-  transition: height 0.1s ease;
+  transition: height 0.15s ease;
   flex-shrink: 0;
+  animation: base-board-placeholder-pulse 1.5s ease-in-out infinite;
 }
 
 /* ---- Add column button ---- */

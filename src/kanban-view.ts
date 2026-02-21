@@ -96,6 +96,8 @@ export class KanbanView extends BasesView {
   private isUpdating = false;
   /** Track if Bases fired onDataUpdated while we were updating. */
   private pendingRender = false;
+  /** True until the first successful render completes. */
+  private isFirstRender = true;
 
   constructor(
     controller: QueryController,
@@ -255,6 +257,12 @@ export class KanbanView extends BasesView {
     const columns = this.getColumns();
     const boardEl = this.containerEl.createDiv({ cls: "base-board-board" });
 
+    // Only animate cards on the very first render
+    if (this.isFirstRender) {
+      boardEl.addClass("base-board-board--animate");
+      this.isFirstRender = false;
+    }
+
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);
       this.renderColumn(boardEl, columnName, group, idx);
@@ -321,8 +329,8 @@ export class KanbanView extends BasesView {
       return this.getFileOrder(pathA) - this.getFileOrder(pathB);
     });
 
-    sorted.forEach((entry) => {
-      this.renderCard(cardsEl, entry, columnName);
+    sorted.forEach((entry, cardIndex) => {
+      this.renderCard(cardsEl, entry, columnName, cardIndex);
     });
   }
 
@@ -330,6 +338,7 @@ export class KanbanView extends BasesView {
     cardsEl: HTMLElement,
     entry: any,
     columnName: string,
+    cardIndex: number = 0,
   ): void {
     const filePath = entry.file?.path ?? "";
     const cardEl = cardsEl.createDiv({ cls: "base-board-card" });

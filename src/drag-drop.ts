@@ -22,6 +22,8 @@ export class DragDropManager {
   private draggedEl: HTMLElement | null = null;
   private placeholderEl: HTMLElement | null = null;
   private dragType: "card" | "column" | null = null;
+  /** True after a successful card drop — prevents visual cleanup before re-render */
+  private cardDropped = false;
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -96,9 +98,12 @@ export class DragDropManager {
     if (!cardEl) return;
     this.dragType = "card";
     this.draggedEl = cardEl;
-    cardEl.addClass("base-board-card--dragging");
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
+    // Delay the collapse so the browser captures the drag ghost first
+    requestAnimationFrame(() => {
+      cardEl.addClass("base-board-card--dragging");
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -130,6 +135,22 @@ export class DragDropManager {
       if (columnEl) {
         cardsContainer = columnEl.querySelector(".base-board-cards");
       }
+    }
+
+    // Update column drag-over highlight
+    const hoveredColumn = cardsContainer?.closest(
+      ".base-board-column",
+    ) as HTMLElement | null;
+
+    if (this.boardEl) {
+      const allColumns = this.boardEl.querySelectorAll(".base-board-column");
+      allColumns.forEach((col) => {
+        if (col === hoveredColumn) {
+          col.classList.add("base-board-column--drag-over");
+        } else {
+          col.classList.remove("base-board-column--drag-over");
+        }
+      });
     }
 
     if (!cardsContainer) {
@@ -187,12 +208,23 @@ export class DragDropManager {
   // ---------------------------------------------------------------------------
 
   private onDragEnd(_e: DragEvent): void {
-    if (this.draggedEl) {
+    if (this.cardDropped) {
+      // Successful card drop — don't restore the card or remove the placeholder.
+      // The re-render will replace the entire DOM with the correct order.
+      this.cardDropped = false;
+    } else if (this.draggedEl) {
+      // Cancelled drag (e.g. dropped outside) — restore original state
       this.draggedEl.removeClass("base-board-card--dragging");
       this.draggedEl.removeClass("base-board-column--dragging");
-      this.draggedEl = null;
+      this.removePlaceholder();
     }
-    this.removePlaceholder();
+    this.draggedEl = null;
+    // Remove all column drag-over highlights
+    if (this.boardEl) {
+      this.boardEl
+        .querySelectorAll(".base-board-column--drag-over")
+        .forEach((col) => col.classList.remove("base-board-column--drag-over"));
+    }
     this.dragType = null;
   }
 
@@ -205,11 +237,13 @@ export class DragDropManager {
 
     if (this.dragType === "column") {
       this.handleColumnDrop(e);
+      this.onDragEnd(e);
     } else if (this.dragType === "card") {
+      this.cardDropped = true;
       await this.handleCardDrop(e);
+      // Don't call onDragEnd here — the browser fires dragend automatically,
+      // and our flag ensures we skip visual cleanup.
     }
-
-    this.onDragEnd(e);
   }
 
   private handleColumnDrop(e: DragEvent): void {

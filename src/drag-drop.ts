@@ -103,8 +103,13 @@ export class DragDropManager {
     this.draggedCardHeight = cardEl.getBoundingClientRect().height;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
-    // Delay the collapse so the browser captures the drag ghost first
+    // Delay the collapse so the browser captures the drag ghost first.
+    // Insert the placeholder in the SAME frame as the collapse to avoid any layout shift.
     requestAnimationFrame(() => {
+      this.placeholderEl = document.createElement("div");
+      this.placeholderEl.className = "base-board-card-placeholder";
+      this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
+      cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
       cardEl.addClass("base-board-card--dragging");
     });
   }

@@ -330,10 +330,38 @@ export class KanbanView extends BasesView {
     entry: any,
     columnName: string,
   ): void {
+    const filePath = entry.file?.path ?? "";
     const cardEl = cardsEl.createDiv({ cls: "base-board-card" });
     cardEl.setAttr("draggable", "true");
-    cardEl.dataset.filePath = entry.file?.path ?? "";
+    cardEl.dataset.filePath = filePath;
     cardEl.dataset.columnName = columnName;
+
+    // Open the note on click; guard against accidental clicks after a drag
+    let dragging = false;
+    cardEl.addEventListener("dragstart", () => {
+      dragging = true;
+    });
+    cardEl.addEventListener("dragend", () => {
+      setTimeout(() => {
+        dragging = false;
+      }, 0);
+    });
+
+    cardEl.addEventListener("click", (e: MouseEvent) => {
+      if (dragging) return;
+      const file = this.app.vault.getAbstractFileByPath(filePath);
+      if (!(file instanceof TFile)) return;
+      const newTab = e.ctrlKey || e.metaKey;
+      this.app.workspace.getLeaf(newTab ? "tab" : false).openFile(file);
+    });
+
+    // Middle-click → always open in new tab
+    cardEl.addEventListener("auxclick", (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      const file = this.app.vault.getAbstractFileByPath(filePath);
+      if (!(file instanceof TFile)) return;
+      this.app.workspace.getLeaf("tab").openFile(file);
+    });
 
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
     titleEl.createEl("span", { text: entry.file?.basename ?? "Untitled" });

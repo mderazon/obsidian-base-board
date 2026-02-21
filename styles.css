@@ -107,6 +107,27 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: default;
+  border-radius: var(--radius-s);
+  padding: 2px 4px;
+}
+
+.base-board-column-title:not(.base-board-no-value-title):hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-column-title-input {
+  flex: 1 1 auto;
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
+  font-family: inherit;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  padding: 2px 4px;
+  outline: none;
+  min-width: 0;
 }
 
 .base-board-no-value-title {

@@ -300,7 +300,14 @@ export class KanbanView extends BasesView {
       text: columnName,
       cls: "base-board-column-title",
     });
-    if (isNoValue) titleEl.addClass("base-board-no-value-title");
+    if (isNoValue) {
+      titleEl.addClass("base-board-no-value-title");
+    } else {
+      // Double-click to rename
+      titleEl.addEventListener("dblclick", () => {
+        this.startColumnRename(titleEl, columnName, entries);
+      });
+    }
 
     const headerRight = headerEl.createDiv({
       cls: "base-board-header-right",
@@ -471,6 +478,94 @@ export class KanbanView extends BasesView {
   private handleColumnReorder(orderedNames: string[]): void {
     this.plugin.saveColumnConfig(this.getBaseId(), { columns: orderedNames });
     this.render();
+  }
+
+  private startColumnRename(
+    titleEl: HTMLElement,
+    oldName: string,
+    entries: any[],
+  ): void {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = oldName;
+    input.className = "base-board-column-title-input";
+
+    // Replace the span with the input
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim();
+      if (newName && newName !== oldName) {
+        this.handleRenameColumn(oldName, newName, entries);
+      } else {
+        // Revert — just re-render to restore the span
+        this.render();
+      }
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        committed = true;
+        this.render();
+      }
+    });
+    input.addEventListener("blur", commit);
+  }
+
+  private async handleRenameColumn(
+    oldName: string,
+    newName: string,
+    entries: any[],
+  ): Promise<void> {
+    const columns = this.getColumns();
+    if (columns.includes(newName)) {
+      new Notice(`Column "${newName}" already exists.`);
+      this.render();
+      return;
+    }
+
+    const groupByProp = this.getGroupByProperty();
+
+    // Block re-renders during batch update
+    this.isUpdating = true;
+    this.pendingRender = false;
+
+    try {
+      // 1. Update column config
+      const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
+      this.plugin.saveColumnConfig(this.getBaseId(), {
+        columns: updatedColumns,
+      });
+
+      // 2. Update frontmatter for all cards in this column
+      if (groupByProp) {
+        for (const entry of entries) {
+          const filePath = entry.file?.path;
+          if (!filePath) continue;
+          const file = this.app.vault.getAbstractFileByPath(filePath);
+          if (!file || !(file instanceof TFile)) continue;
+          await this.app.fileManager.processFrontMatter(file, (fm) => {
+            fm[groupByProp] = newName;
+          });
+        }
+      }
+    } finally {
+      this.isUpdating = false;
+    }
+
+    if (this.pendingRender) {
+      this.pendingRender = false;
+      this.scheduleRender();
+    }
   }
 
   // ---------------------------------------------------------------------------

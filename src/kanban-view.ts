@@ -98,6 +98,8 @@ export class KanbanView extends BasesView {
   private pendingRender = false;
   /** True until the first successful render completes. */
   private isFirstRender = true;
+  /** Debounce timer for render calls. */
+  private renderTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     controller: QueryController,
@@ -124,6 +126,7 @@ export class KanbanView extends BasesView {
 
   onunload(): void {
     this.dragDropManager.destroy();
+    if (this.renderTimer) clearTimeout(this.renderTimer);
   }
 
   public focus(): void {
@@ -132,11 +135,10 @@ export class KanbanView extends BasesView {
 
   public onDataUpdated(): void {
     if (this.isUpdating) {
-      // Remember that fresh data arrived — we'll render after the batch
       this.pendingRender = true;
       return;
     }
-    this.render();
+    this.scheduleRender();
   }
 
   static getViewOptions(): any[] {
@@ -516,18 +518,21 @@ export class KanbanView extends BasesView {
       this.isUpdating = false;
     }
 
-    // If Bases fired onDataUpdated during our batch, render now with fresh data
+    // If Bases fired onDataUpdated during our batch, schedule a debounced render.
+    // Otherwise, Bases will fire onDataUpdated soon and the debouncer handles it.
     if (this.pendingRender) {
       this.pendingRender = false;
-      this.render();
-    } else {
-      // Bases hasn't updated yet — it will fire onDataUpdated soon
-      // and since isUpdating is now false, it will render automatically.
-      // But just in case, schedule a fallback render.
-      setTimeout(() => {
-        if (!this.isUpdating) this.render();
-      }, 200);
+      this.scheduleRender();
     }
+  }
+
+  /** Debounced render — coalesces multiple calls into one. */
+  private scheduleRender(): void {
+    if (this.renderTimer) clearTimeout(this.renderTimer);
+    this.renderTimer = setTimeout(() => {
+      this.renderTimer = null;
+      this.render();
+    }, 50);
   }
 
   private getCardSourceColumn(filePath: string): string | null {

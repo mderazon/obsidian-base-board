@@ -100,12 +100,42 @@ export class DragDropManager {
     if (!cardEl) return;
     this.dragType = "card";
     this.draggedEl = cardEl;
-    this.draggedCardHeight = cardEl.getBoundingClientRect().height;
+    const cardRect = cardEl.getBoundingClientRect();
+    this.draggedCardHeight = cardRect.height;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
-    // Delay the collapse so the browser captures the drag ghost first.
-    // Insert the placeholder in the SAME frame as the collapse to avoid any layout shift.
+
+    // Create a tilted clone for the drag ghost (Trello-style)
+    const PAD = 20; // extra space so rotation isn't clipped
+    const ghostWrapper = document.createElement("div");
+    ghostWrapper.style.cssText = `
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      padding: ${PAD}px;
+      pointer-events: none;
+      z-index: 9999;
+    `;
+    const ghost = cardEl.cloneNode(true) as HTMLElement;
+    ghost.style.cssText = `
+      width: ${cardRect.width}px;
+      transform: rotate(3deg);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      opacity: 0.85;
+      border-radius: var(--radius-s);
+    `;
+    ghostWrapper.appendChild(ghost);
+    document.body.appendChild(ghostWrapper);
+    // Offset accounts for the padding so cursor stays at grab point
+    e.dataTransfer.setDragImage(
+      ghostWrapper,
+      e.clientX - cardRect.left + PAD,
+      e.clientY - cardRect.top + PAD,
+    );
+    // Clean up the ghost after the browser has captured it
     requestAnimationFrame(() => {
+      ghostWrapper.remove();
+      // Collapse the card and insert placeholder in the same frame
       this.placeholderEl = document.createElement("div");
       this.placeholderEl.className = "base-board-card-placeholder";
       this.placeholderEl.style.height = `${this.draggedCardHeight}px`;

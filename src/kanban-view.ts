@@ -341,6 +341,21 @@ export class KanbanView extends BasesView {
     sorted.forEach((entry, cardIndex) => {
       this.renderCard(cardsEl, entry, columnName, cardIndex);
     });
+
+    // ---- Add card button ----
+    if (!isNoValue) {
+      const addCardBtn = columnEl.createDiv({
+        cls: "base-board-add-card-btn",
+      });
+      setIcon(
+        addCardBtn.createSpan({ cls: "base-board-add-card-icon" }),
+        "plus",
+      );
+      addCardBtn.createSpan({ text: "Add card" });
+      addCardBtn.addEventListener("click", () => {
+        this.startInlineCardCreation(addCardBtn, columnName, sorted.length);
+      });
+    }
   }
 
   private renderCard(
@@ -639,5 +654,117 @@ export class KanbanView extends BasesView {
       }
     }
     return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Card creation
+  // ---------------------------------------------------------------------------
+
+  private startInlineCardCreation(
+    btnEl: HTMLElement,
+    columnName: string,
+    existingCount: number,
+  ): void {
+    // Hide the button and show an input
+    btnEl.style.display = "none";
+
+    const inputWrapper = btnEl.parentElement!.createDiv({
+      cls: "base-board-add-card-input-wrapper",
+    });
+    const input = inputWrapper.createEl("input", {
+      cls: "base-board-add-card-input",
+      attr: { type: "text", placeholder: "Card title…" },
+    });
+    input.focus();
+
+    let committed = false;
+    const commit = async () => {
+      if (committed) return;
+      committed = true;
+      const name = input.value.trim();
+      inputWrapper.remove();
+      btnEl.style.display = "";
+      if (name) {
+        await this.createNewCard(name, columnName, existingCount);
+      }
+    };
+
+    const cancel = () => {
+      committed = true;
+      inputWrapper.remove();
+      btnEl.style.display = "";
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    });
+    input.addEventListener("blur", () => commit());
+  }
+
+  private async createNewCard(
+    title: string,
+    columnName: string,
+    orderIndex: number,
+  ): Promise<void> {
+    const groupByProp = this.getGroupByProperty();
+    if (!groupByProp) {
+      new Notice("Cannot create card: no groupBy property configured.");
+      return;
+    }
+
+    const folder = this.getTargetFolder();
+    const safeName = title.replace(/[\\/:*?"<>|]/g, "");
+    let filePath = `${folder}/${safeName}.md`;
+
+    // Avoid overwriting existing files
+    let counter = 1;
+    while (this.app.vault.getAbstractFileByPath(filePath)) {
+      filePath = `${folder}/${safeName} ${counter}.md`;
+      counter++;
+    }
+
+    const frontmatter = [
+      "---",
+      `${groupByProp}: ${columnName}`,
+      `${ORDER_PROPERTY}: ${orderIndex}`,
+      "---",
+      "",
+      `# ${title}`,
+      "",
+    ].join("\n");
+
+    await this.app.vault.create(filePath, frontmatter);
+    new Notice(`Created "${safeName}"`);
+  }
+
+  /**
+   * Determine the folder for new cards by looking at existing entries.
+   * Falls back to the Base file's parent folder.
+   */
+  private getTargetFolder(): string {
+    // Check existing cards for a common folder
+    for (const group of this.currentGroups) {
+      for (const entry of group.entries) {
+        const path = (entry as any).file?.path;
+        if (path) {
+          const lastSlash = path.lastIndexOf("/");
+          if (lastSlash > 0) return path.substring(0, lastSlash);
+        }
+      }
+    }
+
+    // Fallback: use the Base file's parent folder
+    const data = (this as any).data;
+    const basePath =
+      data?.file?.path ?? data?.filePath ?? data?.config?.filePath ?? "";
+    const lastSlash = basePath.lastIndexOf("/");
+    if (lastSlash > 0) return basePath.substring(0, lastSlash);
+    return "";
   }
 }

@@ -355,3 +355,56 @@
   color: var(--text-normal);
   border-color: var(--interactive-accent);
 }
+
+/* ---- Add card button ---- */
+
+.base-board-add-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 4px 8px 8px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.base-board-add-card-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.base-board-add-card-icon {
+  display: flex;
+  align-items: center;
+}
+
+.base-board-add-card-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-add-card-input-wrapper {
+  padding: 4px 8px 8px;
+}
+
+.base-board-add-card-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  padding: 8px 10px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  outline: none;
+}
+
+.base-board-add-card-input::placeholder {
+  color: var(--text-faint);
+}

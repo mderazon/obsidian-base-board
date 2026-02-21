@@ -238,13 +238,10 @@
 }
 
 .base-board-card--dragging {
+  position: absolute;
   opacity: 0;
-  height: 0 !important;
-  min-height: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  margin: 0 !important;
-  border-width: 0 !important;
+  width: 0;
+  height: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -305,7 +302,7 @@
 .base-board-card-placeholder {
   border: 2px dashed var(--interactive-accent);
   border-radius: var(--radius-s);
-  height: 44px;
+  box-sizing: border-box;
   background-color: color-mix(
     in srgb,
     var(--interactive-accent) 8%,

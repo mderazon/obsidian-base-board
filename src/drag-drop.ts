@@ -24,6 +24,8 @@ export class DragDropManager {
   private dragType: "card" | "column" | null = null;
   /** True after a successful card drop — prevents visual cleanup before re-render */
   private cardDropped = false;
+  /** Height of the dragged card, used to size the placeholder */
+  private draggedCardHeight = 0;
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -98,6 +100,7 @@ export class DragDropManager {
     if (!cardEl) return;
     this.dragType = "card";
     this.draggedEl = cardEl;
+    this.draggedCardHeight = cardEl.getBoundingClientRect().height;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
     // Delay the collapse so the browser captures the drag ghost first
@@ -161,6 +164,7 @@ export class DragDropManager {
     if (!this.placeholderEl) {
       this.placeholderEl = document.createElement("div");
       this.placeholderEl.className = "base-board-card-placeholder";
+      this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
     }
 
     const afterElement = this.getDragAfterElement(

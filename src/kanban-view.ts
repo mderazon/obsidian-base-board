@@ -7,6 +7,7 @@ import {
   TFile,
   Notice,
   Modal,
+  Menu,
   App,
   Setting,
 } from "obsidian";
@@ -361,6 +362,22 @@ export class KanbanView extends BasesView {
       const file = this.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
       this.app.workspace.getLeaf("tab").openFile(file);
+    });
+
+    // Right-click → standard Obsidian file context menu
+    cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+      const file = this.app.vault.getAbstractFileByPath(filePath);
+      if (!(file instanceof TFile)) return;
+      const menu = new Menu();
+      this.app.workspace.trigger(
+        "file-menu",
+        menu,
+        file,
+        "base-board-card",
+        this.app.workspace.getMostRecentLeaf(),
+      );
+      menu.showAtMouseEvent(e);
     });
 
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });

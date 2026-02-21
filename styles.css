@@ -163,11 +163,12 @@
 /* ---- Card ---- */
 
 .base-board-card {
+  position: relative;
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
   padding: 10px 12px;
-  cursor: grab;
+  cursor: pointer;
   transition:
     box-shadow 0.15s ease,
     transform 0.1s ease,
@@ -187,6 +188,7 @@
 .base-board-card--dragging {
   opacity: 0.25;
   transform: scale(0.96);
+  cursor: grabbing;
 }
 
 /* ---- Card title ---- */

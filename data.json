@@ -1,0 +1,12 @@
+{
+  "columnConfigs": {
+    "::note.status": {
+      "columns": [
+        "Backlog",
+        "Ready to work",
+        "In Progress",
+        "Done"
+      ]
+    }
+  }
+}

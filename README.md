@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="logo.svg" alt="Base Board Logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo-dark.svg">
+    <img alt="Base Board Logo" src="logo-light.svg">
+  </picture>
 </p>
 
 # Kanban Plugin For Obsidian

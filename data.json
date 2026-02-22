@@ -34,6 +34,13 @@
         "In progress",
         "Done"
       ]
+    },
+    "My board/Tasks::My board::status": {
+      "columns": [
+        "To Do",
+        "In Progress",
+        "Done"
+      ]
     }
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "obsidian-base-board",
   "version": "1.0.0",
-  "description": "Kanban board view for Obsidian Bases with drag and drop",
+  "description": "Kanban board view for Bases with drag and drop",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

@@ -20,29 +20,35 @@ Standard Kanban plugins often require specialized formatting or keep data locked
 
 ## Usage
 
-### 1. Enable Bases
+### Quick Start
+
+Open the **Command palette** (`Ctrl/Cmd + P`) and run **"Base Board: Create new board"**. Enter a name, choose a folder, and the plugin will scaffold everything for you — a `.base` file, a tasks folder, and sample task notes. The board opens automatically.
+
+### Manual Setup
+
+#### 1. Enable Bases
 
 Ensure the **Bases** core plugin is enabled in Obsidian (**Settings > Core plugins > Bases**).
 
-### 2. Set Up a Base
+#### 2. Set Up a Base
 
 Create a `.base` file or open an existing Base. Bases allow you to define which notes should appear in a view (e.g., all notes in a `Projects` folder).
 
-### 3. Switch to Kanban View
+#### 3. Switch to Kanban View
 
 In the layout selector at the top right of the Base view, select **Kanban**.
 
-### 4. Group Your Data
+#### 4. Group Your Data
 
 Open the Sort/Group menu and select a property under **"Group by"**. For example, choosing `status` will create a column for every unique status value found in your notes.
 
-### 5. Customize
+#### 5. Customize
 
 - **Add Column**: Use the "Add column" button to create a new category.
 - **Reorder**: Drag column headers to change their horizontal order.
 - **Edit**: Hover over a card and click the pencil icon to rename, open, or delete the note.
 
-### 6. Multiple Boards
+#### 6. Multiple Boards
 
 Each `.base` file acts as an independent board. Create separate boards for different projects or workflows:
 

@@ -20,6 +20,10 @@ https://github.com/user-attachments/assets/9ae6e1b7-729f-4891-b853-d1f5d2ebe755
 - **One-Click Creation**: Add new notes directly to a specific column without leaving the board view.
 - **Data First**: All changes are written directly to your Markdown files.
 
+## 🤖 AI / Coding Agents
+
+Because Base Board relies purely on standard markdown frontmatter instead of proprietary formats, it pairs perfectly with AI coding assistants. Simply copy our [AI Instructions Template](AI-INSTRUCTIONS-TEMPLATE.md) into your project's `AGENTS.md` file to instantly teach any LLM how to create and move tasks on your board.
+
 ## Usage
 
 Open the **Command palette** (`Ctrl/Cmd + P`) and run **"Base Board: Create new board"**. Enter a name, choose a folder, and the plugin will scaffold everything for you — a `.base` file, a tasks folder, and sample task notes. The board opens automatically.

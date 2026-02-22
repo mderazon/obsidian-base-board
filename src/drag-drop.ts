@@ -105,7 +105,7 @@ export class DragDropManager {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
 
-    // Create a tilted clone for the drag ghost (Trello-style)
+    // Create a tilted clone for the drag ghost
     const PAD = 20; // extra space so rotation isn't clipped
     const ghostWrapper = document.createElement("div");
     ghostWrapper.style.cssText = `

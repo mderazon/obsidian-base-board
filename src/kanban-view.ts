@@ -7,82 +7,19 @@ import {
   NullValue,
   setIcon,
   TFile,
-  Notice,
-  Modal,
-  Menu,
   App,
-  Setting,
 } from "obsidian";
 import type BaseBoardPlugin from "./main";
 import { DragDropManager } from "./drag-drop";
-
-const NO_VALUE_COLUMN = "(No value)";
-const ORDER_PROPERTY = "kanban_order";
-
-/** Key used by BasesViewConfig.set/get to persist column order in the .base file. */
-const CONFIG_KEY_COLUMNS = "boardColumns";
-
-// ---------------------------------------------------------------------------
-//  Simple input modal (since window.prompt doesn't work in Obsidian)
-// ---------------------------------------------------------------------------
-
-class InputModal extends Modal {
-  private value = "";
-  private onSubmit: (value: string) => void;
-  private title: string;
-  private placeholder: string;
-
-  constructor(
-    app: App,
-    title: string,
-    placeholder: string,
-    onSubmit: (value: string) => void,
-  ) {
-    super(app);
-    this.title = title;
-    this.placeholder = placeholder;
-    this.onSubmit = onSubmit;
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.title });
-
-    new Setting(contentEl).setName("Name").addText((text) => {
-      text.setPlaceholder(this.placeholder);
-      text.onChange((v) => (this.value = v));
-      // Focus and handle Enter key
-      setTimeout(() => {
-        text.inputEl.focus();
-        text.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            this.submit();
-          }
-        });
-      }, 50);
-    });
-
-    new Setting(contentEl).addButton((btn) => {
-      btn
-        .setButtonText("Add")
-        .setCta()
-        .onClick(() => this.submit());
-    });
-  }
-
-  private submit(): void {
-    const trimmed = this.value.trim();
-    if (trimmed) {
-      this.onSubmit(trimmed);
-    }
-    this.close();
-  }
-
-  onClose(): void {
-    this.contentEl.empty();
-  }
-}
+import { ColumnManager } from "./column";
+import { CardManager } from "./card";
+import {
+  NO_VALUE_COLUMN,
+  ORDER_PROPERTY,
+  CONFIG_KEY_COLUMNS,
+  sanitizeFilename,
+} from "./constants";
+import { InputModal } from "./modals";
 
 // ---------------------------------------------------------------------------
 //  Kanban View
@@ -95,12 +32,14 @@ export class KanbanView extends BasesView {
   plugin: BaseBoardPlugin;
 
   private dragDropManager: DragDropManager;
-  private currentGroups: BasesEntryGroup[] = [];
+  private columnManager: ColumnManager;
+  public currentGroups: BasesEntryGroup[] = [];
+  public cardManager: CardManager;
 
   /** Prevent re-renders while we batch-update frontmatter. */
-  private isUpdating = false;
+  public isUpdating = false;
   /** Track if Bases fired onDataUpdated while we were updating. */
-  private pendingRender = false;
+  public pendingRender = false;
   /** True until the first successful render completes. */
   private isFirstRender = true;
   /** Debounce timer for render calls. */
@@ -115,6 +54,9 @@ export class KanbanView extends BasesView {
     this.scrollEl = scrollEl;
     this.plugin = plugin;
     this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
+
+    this.cardManager = new CardManager(this);
+    this.columnManager = new ColumnManager(this);
 
     this.dragDropManager = new DragDropManager(this.app, {
       onCardDrop: (
@@ -197,8 +139,11 @@ export class KanbanView extends BasesView {
    * built-in structural property on the config object, so we access it
    * directly from the config's internal representation.
    */
-  private getGroupByProperty(): string | null {
-    const cfg = this.config as any;
+  public getGroupByProperty(): string | null {
+    const cfg = this.config as {
+      groupBy?: { property?: string };
+      get?: (key: string) => any;
+    };
 
     // 1. Direct access to the built-in groupBy config property
     const groupBy = cfg?.groupBy;
@@ -232,7 +177,7 @@ export class KanbanView extends BasesView {
    * Read kanban_order from metadataCache (more reliable than entry.values
    * since the Bases engine may not expose all properties).
    */
-  private getFileOrder(filePath: string): number {
+  public getFileOrder(filePath: string): number {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (!file || !(file instanceof TFile)) return Infinity;
     const cache = this.app.metadataCache.getFileCache(file);
@@ -256,7 +201,7 @@ export class KanbanView extends BasesView {
    * Any columns present in the live data but missing from the stored list
    * are appended at the end so they are never silently hidden.
    */
-  private getColumns(): string[] {
+  public getColumns(): string[] {
     // 1. Try .base file config first (new preferred storage)
     const fromConfig = this.config?.get(CONFIG_KEY_COLUMNS) as
       | string[]
@@ -301,7 +246,7 @@ export class KanbanView extends BasesView {
   //  Rendering
   // ---------------------------------------------------------------------------
 
-  private render(): void {
+  public render(): void {
     this.containerEl.empty();
 
     // Use the official API: this.data is a BasesQueryResult
@@ -339,326 +284,16 @@ export class KanbanView extends BasesView {
 
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);
-      this.renderColumn(boardEl, columnName, group, idx);
+      this.columnManager.renderColumn(boardEl, columnName, group, idx);
     });
 
-    this.renderAddColumnButton(boardEl);
+    this.columnManager.renderAddColumnButton(boardEl);
     this.dragDropManager.initBoard(boardEl);
   }
 
-  private renderColumn(
-    boardEl: HTMLElement,
-    columnName: string,
-    group: BasesEntryGroup | null,
-    columnIndex: number,
-  ): void {
-    const isNoValue = columnName === NO_VALUE_COLUMN;
-    const entries = group ? group.entries : [];
-
-    const columnEl = boardEl.createDiv({ cls: "base-board-column" });
-    columnEl.dataset.columnName = columnName;
-    columnEl.dataset.columnIndex = String(columnIndex);
-
-    // ---- Header ----
-    const headerEl = columnEl.createDiv({ cls: "base-board-column-header" });
-
-    const dragHandle = headerEl.createDiv({
-      cls: "base-board-column-drag-handle",
-    });
-    dragHandle.setAttr("draggable", "true");
-    setIcon(dragHandle, "grip-vertical");
-
-    const titleEl = headerEl.createEl("span", {
-      text: columnName,
-      cls: "base-board-column-title",
-    });
-    if (isNoValue) {
-      titleEl.addClass("base-board-no-value-title");
-    } else {
-      // Double-click to rename
-      titleEl.addEventListener("dblclick", () => {
-        this.startColumnRename(titleEl, columnName, entries);
-      });
-    }
-
-    const headerRight = headerEl.createDiv({
-      cls: "base-board-header-right",
-    });
-
-    headerRight.createEl("span", {
-      text: String(entries.length),
-      cls: "base-board-column-count",
-    });
-
-    if (entries.length === 0 && !isNoValue) {
-      const deleteBtn = headerRight.createDiv({
-        cls: "base-board-column-delete",
-      });
-      setIcon(deleteBtn, "x");
-      deleteBtn.addEventListener("click", () => {
-        this.handleDeleteColumn(columnName);
-      });
-    }
-
-    // ---- Cards container ----
-    const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
-
-    // Sort entries by kanban_order (read from metadataCache for reliability)
-    const sorted = [...entries].sort((a: any, b: any) => {
-      const pathA = a.file?.path ?? "";
-      const pathB = b.file?.path ?? "";
-      return this.getFileOrder(pathA) - this.getFileOrder(pathB);
-    });
-
-    sorted.forEach((entry, cardIndex) => {
-      this.renderCard(cardsEl, entry, columnName, cardIndex);
-    });
-
-    // ---- Add card button ----
-    if (!isNoValue) {
-      const addCardBtn = columnEl.createDiv({
-        cls: "base-board-add-card-btn",
-      });
-      setIcon(
-        addCardBtn.createSpan({ cls: "base-board-add-card-icon" }),
-        "plus",
-      );
-      addCardBtn.createSpan({ text: "Add card" });
-      addCardBtn.addEventListener("click", () => {
-        this.startInlineCardCreation(addCardBtn, columnName, sorted.length);
-      });
-    }
-  }
-
-  private renderCard(
-    cardsEl: HTMLElement,
-    entry: BasesEntry,
-    columnName: string,
-    cardIndex: number = 0,
-  ): void {
-    const filePath = entry.file?.path ?? "";
-    const cardEl = cardsEl.createDiv({ cls: "base-board-card" });
-    cardEl.setAttr("draggable", "true");
-    cardEl.dataset.filePath = filePath;
-    cardEl.dataset.columnName = columnName;
-
-    // Open the note on click; guard against accidental clicks after a drag
-    let dragging = false;
-    cardEl.addEventListener("dragstart", () => {
-      dragging = true;
-    });
-    cardEl.addEventListener("dragend", () => {
-      setTimeout(() => {
-        dragging = false;
-      }, 0);
-    });
-
-    cardEl.addEventListener("click", (e: MouseEvent) => {
-      if (dragging) return;
-      const file = this.app.vault.getAbstractFileByPath(filePath);
-      if (!(file instanceof TFile)) return;
-      const newTab = e.ctrlKey || e.metaKey;
-      this.app.workspace.getLeaf(newTab ? "tab" : false).openFile(file);
-    });
-
-    // Middle-click → always open in new tab
-    cardEl.addEventListener("auxclick", (e: MouseEvent) => {
-      if (e.button !== 1) return;
-      const file = this.app.vault.getAbstractFileByPath(filePath);
-      if (!(file instanceof TFile)) return;
-      this.app.workspace.getLeaf("tab").openFile(file);
-    });
-
-    // Right-click → standard Obsidian file context menu
-    cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
-      e.preventDefault();
-      const file = this.app.vault.getAbstractFileByPath(filePath);
-      if (!(file instanceof TFile)) return;
-      const menu = new Menu();
-      this.app.workspace.trigger(
-        "file-menu",
-        menu,
-        file,
-        "base-board-card",
-        this.app.workspace.getMostRecentLeaf(),
-      );
-      menu.showAtMouseEvent(e);
-    });
-
-    const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
-    titleEl.createEl("span", { text: entry.file?.basename ?? "Untitled" });
-
-    // ---- Edit button (visible on hover) ----
-    const editBtn = cardEl.createDiv({ cls: "base-board-card-edit-btn" });
-    setIcon(editBtn, "lucide-pencil");
-    editBtn.addEventListener("click", (e: MouseEvent) => {
-      e.stopPropagation(); // Don't open the note
-      this.showCardActionMenu(editBtn, filePath, titleEl);
-    });
-
-    // ---- Property chips ----
-    const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
-    const groupByProp = this.getGroupByProperty();
-    const visibleProps: BasesPropertyId[] =
-      this.data?.properties ?? this.allProperties ?? [];
-    let shown = 0;
-    for (const propId of visibleProps) {
-      if (shown >= 3) break;
-      // Skip file-level, formula, groupBy, and order properties
-      if (propId.startsWith("file.") || propId.startsWith("formula.")) continue;
-      const propName = propId.startsWith("note.") ? propId.slice(5) : propId;
-      if (groupByProp && propName === groupByProp) continue;
-      if (propName === ORDER_PROPERTY) continue;
-
-      const val = entry.getValue(propId);
-      if (!val || val instanceof NullValue || !val.isTruthy()) continue;
-      const display = val.toString();
-      if (!display) continue;
-
-      const chip = propsEl.createEl("span", {
-        cls: "base-board-card-chip",
-      });
-      const displayName = this.config?.getDisplayName(propId) ?? propName;
-      chip.createEl("span", {
-        text: displayName,
-        cls: "base-board-chip-label",
-      });
-      chip.createEl("span", {
-        text: display,
-        cls: "base-board-chip-value",
-      });
-      shown++;
-    }
-  }
-
-  private showCardActionMenu(
-    anchorEl: HTMLElement,
-    filePath: string,
-    titleEl: HTMLElement,
-  ): void {
-    const file = this.app.vault.getAbstractFileByPath(filePath);
-    if (!file || !(file instanceof TFile)) return;
-
-    const menu = new Menu();
-
-    menu.addItem((item) => {
-      item
-        .setTitle("Open")
-        .setIcon("lucide-file-text")
-        .onClick(() => {
-          this.app.workspace.getLeaf(false).openFile(file);
-        });
-    });
-
-    menu.addItem((item) => {
-      item
-        .setTitle("Open in new tab")
-        .setIcon("lucide-file-plus")
-        .onClick(() => {
-          this.app.workspace.getLeaf("tab").openFile(file);
-        });
-    });
-
-    menu.addSeparator();
-
-    menu.addItem((item) => {
-      item
-        .setTitle("Rename")
-        .setIcon("lucide-pencil")
-        .onClick(() => {
-          this.startCardRename(titleEl, file);
-        });
-    });
-
-    menu.addItem((item) => {
-      item
-        .setTitle("Delete")
-        .setIcon("lucide-trash-2")
-        .onClick(async () => {
-          await this.app.vault.trash(file, true);
-          new Notice(`Moved "${file.basename}" to trash`);
-        });
-    });
-
-    const rect = anchorEl.getBoundingClientRect();
-    menu.showAtPosition({ x: rect.right, y: rect.bottom });
-  }
-
-  private startCardRename(titleEl: HTMLElement, file: TFile): void {
-    const titleSpan = titleEl.querySelector("span");
-    if (!titleSpan) return;
-
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = file.basename;
-    input.className = "base-board-card-rename-input";
-
-    titleSpan.replaceWith(input);
-    input.focus();
-    input.select();
-
-    let committed = false;
-    const commit = async () => {
-      if (committed) return;
-      committed = true;
-      const newName = input.value.trim();
-      if (newName && newName !== file.basename) {
-        const newPath = file.path.replace(
-          /[^/]+\.md$/,
-          `${newName.replace(/[\\/:*?"<>|]/g, "")}.md`,
-        );
-        try {
-          await this.app.fileManager.renameFile(file, newPath);
-        } catch (err) {
-          new Notice(`Rename failed: ${err}`);
-        }
-      }
-      // Re-render will pick up the new name via onDataUpdated
-      this.scheduleRender();
-    };
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        commit();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        committed = true;
-        this.scheduleRender();
-      }
-    });
-    input.addEventListener("blur", () => commit());
-  }
-
-  private renderAddColumnButton(boardEl: HTMLElement): void {
-    const addBtn = boardEl.createDiv({ cls: "base-board-add-column-btn" });
-    setIcon(addBtn.createSpan(), "plus");
-    addBtn.createEl("span", { text: "Add column" });
-    addBtn.addEventListener("click", () => this.promptAddColumn());
-  }
-
   // ---------------------------------------------------------------------------
-  //  Column management
+  //  Column management helpers
   // ---------------------------------------------------------------------------
-
-  private promptAddColumn(): void {
-    new InputModal(this.app, "Add column", "Column name…", (name: string) => {
-      const columns = this.getColumns();
-      if (columns.includes(name)) {
-        new Notice(`Column "${name}" already exists.`);
-        return;
-      }
-      columns.push(name);
-      this.saveColumns(columns);
-      this.render();
-    }).open();
-  }
-
-  private handleDeleteColumn(columnName: string): void {
-    const columns = this.getColumns().filter((c) => c !== columnName);
-    this.saveColumns(columns);
-    this.render();
-  }
 
   private handleColumnReorder(orderedNames: string[]): void {
     this.saveColumns(orderedNames);
@@ -672,98 +307,12 @@ export class KanbanView extends BasesView {
    *  - BasesViewConfig (stored inside the .base file itself — portable)
    *  - Plugin data.json (legacy, kept so older board setups still work)
    */
-  private saveColumns(columns: string[]): void {
+  public saveColumns(columns: string[]): void {
     // Primary: persist in .base file via the official config API
     this.config?.set(CONFIG_KEY_COLUMNS, columns);
 
     // Legacy fallback: also write to plugin data.json
     this.plugin.saveColumnConfig(this.getBaseId(), { columns });
-  }
-
-  private startColumnRename(
-    titleEl: HTMLElement,
-    oldName: string,
-    entries: any[],
-  ): void {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = oldName;
-    input.className = "base-board-column-title-input";
-
-    // Replace the span with the input
-    titleEl.replaceWith(input);
-    input.focus();
-    input.select();
-
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      const newName = input.value.trim();
-      if (newName && newName !== oldName) {
-        this.handleRenameColumn(oldName, newName, entries);
-      } else {
-        // Revert — just re-render to restore the span
-        this.render();
-      }
-    };
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        commit();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        committed = true;
-        this.render();
-      }
-    });
-    input.addEventListener("blur", commit);
-  }
-
-  private async handleRenameColumn(
-    oldName: string,
-    newName: string,
-    entries: any[],
-  ): Promise<void> {
-    const columns = this.getColumns();
-    if (columns.includes(newName)) {
-      new Notice(`Column "${newName}" already exists.`);
-      this.render();
-      return;
-    }
-
-    const groupByProp = this.getGroupByProperty();
-
-    // Block re-renders during batch update
-    this.isUpdating = true;
-    this.pendingRender = false;
-
-    try {
-      // 1. Update column config
-      const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
-      this.saveColumns(updatedColumns);
-
-      // 2. Update frontmatter for all cards in this column
-      if (groupByProp) {
-        for (const entry of entries) {
-          const filePath = entry.file?.path;
-          if (!filePath) continue;
-          const file = this.app.vault.getAbstractFileByPath(filePath);
-          if (!file || !(file instanceof TFile)) continue;
-          await this.app.fileManager.processFrontMatter(file, (fm) => {
-            fm[groupByProp] = newName;
-          });
-        }
-      }
-    } finally {
-      this.isUpdating = false;
-    }
-
-    if (this.pendingRender) {
-      this.pendingRender = false;
-      this.scheduleRender();
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -820,7 +369,7 @@ export class KanbanView extends BasesView {
   }
 
   /** Debounced render — coalesces multiple calls into one. */
-  private scheduleRender(): void {
+  public scheduleRender(): void {
     if (this.renderTimer) clearTimeout(this.renderTimer);
     this.renderTimer = setTimeout(() => {
       this.renderTimer = null;
@@ -837,123 +386,5 @@ export class KanbanView extends BasesView {
       }
     }
     return null;
-  }
-
-  // ---------------------------------------------------------------------------
-  //  Card creation
-  // ---------------------------------------------------------------------------
-
-  private startInlineCardCreation(
-    btnEl: HTMLElement,
-    columnName: string,
-    existingCount: number,
-  ): void {
-    // Hide the button and show an input
-    btnEl.style.display = "none";
-
-    const inputWrapper = btnEl.parentElement!.createDiv({
-      cls: "base-board-add-card-input-wrapper",
-    });
-    const input = inputWrapper.createEl("input", {
-      cls: "base-board-add-card-input",
-      attr: { type: "text", placeholder: "Card title…" },
-    });
-    input.focus();
-
-    let committed = false;
-    const commit = async () => {
-      if (committed) return;
-      committed = true;
-      const name = input.value.trim();
-      inputWrapper.remove();
-      btnEl.style.display = "";
-      if (name) {
-        await this.createNewCard(name, columnName, existingCount);
-      }
-    };
-
-    const cancel = () => {
-      committed = true;
-      inputWrapper.remove();
-      btnEl.style.display = "";
-    };
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        commit();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        cancel();
-      }
-    });
-    input.addEventListener("blur", () => commit());
-  }
-
-  private async createNewCard(
-    title: string,
-    columnName: string,
-    orderIndex: number,
-  ): Promise<void> {
-    const groupByProp = this.getGroupByProperty();
-    if (!groupByProp) {
-      new Notice("Cannot create card: no groupBy property configured.");
-      return;
-    }
-
-    const folder = this.getTargetFolder();
-    const safeName = title.replace(/[\\/:*?"<>|]/g, "");
-    let filePath = `${folder}/${safeName}.md`;
-
-    // Avoid overwriting existing files
-    let counter = 1;
-    while (this.app.vault.getAbstractFileByPath(filePath)) {
-      filePath = `${folder}/${safeName} ${counter}.md`;
-      counter++;
-    }
-
-    const frontmatter = [
-      "---",
-      `${groupByProp}: ${columnName}`,
-      `${ORDER_PROPERTY}: ${orderIndex}`,
-      "---",
-      "",
-      `# ${title}`,
-      "",
-    ].join("\n");
-
-    await this.app.vault.create(filePath, frontmatter);
-    new Notice(`Created "${safeName}"`);
-  }
-
-  /**
-   * Determine the folder for new cards by looking at existing entries.
-   * Falls back to the vault root.
-   *
-   * Uses the official BasesEntry.file property (TFile) which is
-   * guaranteed by the Obsidian API.
-   */
-  private getTargetFolder(): string {
-    // All entries in this board share the same .base query, so the first
-    // entry's parent folder is a good default for new cards.
-    for (const group of this.currentGroups) {
-      for (const entry of group.entries) {
-        const path = entry.file?.path;
-        if (path) {
-          const lastSlash = path.lastIndexOf("/");
-          if (lastSlash > 0) return path.substring(0, lastSlash);
-        }
-      }
-    }
-
-    // Fallback: try to infer from the first entry in the raw data list
-    const entries: BasesEntry[] = this.data?.data ?? [];
-    if (entries.length > 0) {
-      const path = entries[0].file?.path ?? "";
-      const lastSlash = path.lastIndexOf("/");
-      if (lastSlash > 0) return path.substring(0, lastSlash);
-    }
-
-    return "";
   }
 }

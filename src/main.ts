@@ -1,5 +1,7 @@
-import { Plugin, Modal, App, Setting, TFolder, Notice } from "obsidian";
+import { Plugin, Notice } from "obsidian";
 import { KanbanView } from "./kanban-view";
+import { sanitizeFilename } from "./constants";
+import { CreateBoardModal, BoardConfig } from "./modals";
 
 /** Per-base column configuration */
 export interface ColumnConfig {
@@ -13,107 +15,6 @@ export interface PluginData {
 const DEFAULT_DATA: PluginData = {
   columnConfigs: {},
 };
-
-// ---------------------------------------------------------------------------
-//  "Create new board" modal
-// ---------------------------------------------------------------------------
-
-interface BoardConfig {
-  name: string;
-  folder: string;
-  groupBy: string;
-}
-
-class CreateBoardModal extends Modal {
-  private config: BoardConfig = {
-    name: "",
-    folder: "",
-    groupBy: "status",
-  };
-  private onSubmit: (config: BoardConfig) => void;
-
-  constructor(app: App, onSubmit: (config: BoardConfig) => void) {
-    super(app);
-    this.onSubmit = onSubmit;
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Create new board" });
-
-    // --- Board name ---
-    new Setting(contentEl).setName("Board name").addText((text) => {
-      text.setPlaceholder("e.g. Project Alpha");
-      text.onChange((v) => {
-        this.config.name = v;
-        // Auto-fill the folder field from the board name
-        if (!folderManuallyEdited) {
-          folderInput.setValue(v);
-          this.config.folder = v;
-        }
-      });
-      setTimeout(() => text.inputEl.focus(), 50);
-    });
-
-    // --- Folder ---
-    let folderManuallyEdited = false;
-    let folderInput: any;
-    new Setting(contentEl)
-      .setName("Folder")
-      .setDesc("Where to create the board and its task files")
-      .addText((text) => {
-        folderInput = text;
-        text.setPlaceholder("e.g. Projects/Alpha");
-        text.onChange((v) => {
-          this.config.folder = v;
-          folderManuallyEdited = true;
-        });
-      });
-
-    // --- GroupBy property ---
-    new Setting(contentEl)
-      .setName("Group by property")
-      .setDesc("The frontmatter property used for columns")
-      .addText((text) => {
-        text.setValue("status");
-        text.setPlaceholder("status");
-        text.onChange((v) => (this.config.groupBy = v || "status"));
-      });
-
-    // --- Submit ---
-    new Setting(contentEl).addButton((btn) => {
-      btn
-        .setButtonText("Create")
-        .setCta()
-        .onClick(() => this.submit());
-    });
-
-    // Handle Enter key on the modal
-    contentEl.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        this.submit();
-      }
-    });
-  }
-
-  private submit(): void {
-    const name = this.config.name.trim();
-    if (!name) {
-      new Notice("Please enter a board name.");
-      return;
-    }
-    this.config.name = name;
-    this.config.folder = this.config.folder.trim() || name;
-    this.config.groupBy = this.config.groupBy.trim() || "status";
-    this.close();
-    this.onSubmit(this.config);
-  }
-
-  onClose(): void {
-    this.contentEl.empty();
-  }
-}
 
 // ---------------------------------------------------------------------------
 //  Plugin
@@ -205,7 +106,7 @@ export default class BaseBoardPlugin extends Plugin {
     ];
 
     for (const task of sampleTasks) {
-      const safeName = task.title.replace(/[\\/:*?"<>|]/g, "");
+      const safeName = sanitizeFilename(task.title);
       const taskPath = `${tasksFolder}/${safeName}.md`;
       if (!vault.getAbstractFileByPath(taskPath)) {
         const content = [

@@ -10,7 +10,7 @@
 **Base Board** is an interactive, property-driven Kanban board view for [Obsidian Bases](https://obsidian.md). It allows you to organize your notes into visual columns based on any property in your frontmatter, providing a seamless drag-and-drop experience for managing tasks and structured data.
 
 <p align="center">
-  <!-- TODO: Drag & drop your "demo.webm" video right here in the GitHub Web Editor to generate the final URL! -->
+  [demo.webm](https://github.com/user-attachments/assets/9ae6e1b7-729f-4891-b853-d1f5d2ebe755)
 </p>
 
 ## Key Features

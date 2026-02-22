@@ -7,6 +7,33 @@
         "In Progress",
         "Done"
       ]
+    },
+    "Tasks::Task Board::": {
+      "columns": [
+        "Backlog",
+        "Done"
+      ]
+    },
+    "Tasks::Task Board::status": {
+      "columns": [
+        "Backlog",
+        "Read to work",
+        "Done"
+      ]
+    },
+    "My temp board/Tasks::My temp board::status": {
+      "columns": [
+        "To Do",
+        "In Progress",
+        "Done"
+      ]
+    },
+    "Code quality/Tasks::Code quality::status": {
+      "columns": [
+        "To Do",
+        "In progress",
+        "Done"
+      ]
     }
   }
 }

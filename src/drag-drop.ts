@@ -42,7 +42,9 @@ export class DragDropManager {
       dragStart: this.onDragStart.bind(this),
       dragOver: this.onDragOver.bind(this),
       dragEnd: this.onDragEnd.bind(this),
-      drop: this.onDrop.bind(this),
+      drop: (e: DragEvent) => {
+        void this.onDrop(e);
+      },
     };
   }
 
@@ -81,10 +83,8 @@ export class DragDropManager {
       ".base-board-column-drag-handle",
     );
     if (handle) {
-      const columnEl = handle.closest(
-        ".base-board-column",
-      ) as HTMLElement | null;
-      if (!columnEl) return;
+      const columnEl = handle.closest(".base-board-column");
+      if (!(columnEl instanceof HTMLElement)) return;
       this.dragType = "column";
       this.draggedEl = columnEl;
       columnEl.addClass("base-board-column--dragging");
@@ -94,10 +94,8 @@ export class DragDropManager {
     }
 
     // Otherwise check for card drag
-    const cardEl = (e.target as HTMLElement).closest(
-      ".base-board-card",
-    ) as HTMLElement | null;
-    if (!cardEl) return;
+    const cardEl = (e.target as HTMLElement).closest(".base-board-card");
+    if (!(cardEl instanceof HTMLElement)) return;
     this.dragType = "card";
     this.draggedEl = cardEl;
     const cardRect = cardEl.getBoundingClientRect();
@@ -162,16 +160,21 @@ export class DragDropManager {
 
   private handleCardDragOver(e: DragEvent): void {
     // Find the cards container we're hovering over
-    let cardsContainer = (e.target as HTMLElement).closest(
+    const closestCardsContainer = (e.target as HTMLElement).closest(
       ".base-board-cards",
-    ) as HTMLElement | null;
+    );
+    let cardsContainer =
+      closestCardsContainer instanceof HTMLElement
+        ? closestCardsContainer
+        : null;
 
     if (!cardsContainer) {
-      const columnEl = (e.target as HTMLElement).closest(
-        ".base-board-column",
-      ) as HTMLElement | null;
-      if (columnEl) {
-        cardsContainer = columnEl.querySelector(".base-board-cards");
+      const columnEl = (e.target as HTMLElement).closest(".base-board-column");
+      if (columnEl instanceof HTMLElement) {
+        const qc = columnEl.querySelector(".base-board-cards");
+        if (qc instanceof HTMLElement) {
+          cardsContainer = qc;
+        }
       }
     }
 
@@ -246,7 +249,7 @@ export class DragDropManager {
   //  Drag End
   // ---------------------------------------------------------------------------
 
-  private onDragEnd(_e: DragEvent): void {
+  private onDragEnd(): void {
     if (this.cardDropped) {
       // Successful card drop — don't restore the card or remove the placeholder.
       // The re-render will replace the entire DOM with the correct order.
@@ -276,7 +279,7 @@ export class DragDropManager {
 
     if (this.dragType === "column") {
       this.handleColumnDrop(e);
-      this.onDragEnd(e);
+      this.onDragEnd();
     } else if (this.dragType === "card") {
       this.cardDropped = true;
       await this.handleCardDrop(e);
@@ -317,17 +320,13 @@ export class DragDropManager {
     const filePath = e.dataTransfer?.getData(CARD_MIME);
     if (!filePath) return;
 
-    const columnEl = (e.target as HTMLElement).closest(
-      ".base-board-column",
-    ) as HTMLElement | null;
-    if (!columnEl) return;
+    const columnEl = (e.target as HTMLElement).closest(".base-board-column");
+    if (!(columnEl instanceof HTMLElement)) return;
 
     const targetColumnName = columnEl.dataset.columnName;
     if (!targetColumnName) return;
 
-    let cardsContainer = columnEl.querySelector(
-      ".base-board-cards",
-    ) as HTMLElement | null;
+    const cardsContainer = columnEl.querySelector(".base-board-cards");
 
     // Build ordered file paths from DOM
     const orderedPaths: string[] = [];
@@ -367,9 +366,7 @@ export class DragDropManager {
     cursorPos: number,
     axis: "vertical" | "horizontal",
   ): HTMLElement | null {
-    const els = Array.from(
-      container.querySelectorAll(selector),
-    ) as HTMLElement[];
+    const els = Array.from(container.querySelectorAll<HTMLElement>(selector));
 
     let closest: HTMLElement | null = null;
     let closestOffset = Number.NEGATIVE_INFINITY;

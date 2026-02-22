@@ -74,8 +74,8 @@ export class ColumnManager {
       return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
     });
 
-    sorted.forEach((entry, cardIndex) => {
-      this.view.cardManager.renderCard(cardsEl, entry, columnName, cardIndex);
+    sorted.forEach((entry) => {
+      this.view.cardManager.renderCard(cardsEl, entry, columnName);
     });
 
     // ---- Add card button ----
@@ -150,7 +150,7 @@ export class ColumnManager {
       committed = true;
       const newName = input.value.trim();
       if (newName && newName !== oldName) {
-        this.handleRenameColumn(oldName, newName, entries);
+        void this.handleRenameColumn(oldName, newName, entries);
       } else {
         // Revert — just re-render to restore the span
         this.view.render();
@@ -196,9 +196,12 @@ export class ColumnManager {
           if (!filePath) return Promise.resolve();
           const file = this.view.app.vault.getAbstractFileByPath(filePath);
           if (!file || !(file instanceof TFile)) return Promise.resolve();
-          return this.view.app.fileManager.processFrontMatter(file, (fm) => {
-            fm[groupByProp] = newName;
-          });
+          return this.view.app.fileManager.processFrontMatter(
+            file,
+            (fm: Record<string, unknown>) => {
+              fm[groupByProp] = newName;
+            },
+          );
         });
         await Promise.all(updatePromises);
       }

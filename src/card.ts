@@ -21,7 +21,6 @@ export class CardManager {
     cardsEl: HTMLElement,
     entry: BasesEntry,
     columnName: string,
-    cardIndex: number = 0,
   ): void {
     const filePath = entry.file?.path ?? "";
     const cardEl = cardsEl.createDiv({ cls: "base-board-card" });
@@ -45,7 +44,9 @@ export class CardManager {
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
       const newTab = e.ctrlKey || e.metaKey;
-      this.view.app.workspace.getLeaf(newTab ? "tab" : false).openFile(file);
+      void this.view.app.workspace
+        .getLeaf(newTab ? "tab" : false)
+        .openFile(file);
     });
 
     // Middle-click → always open in new tab
@@ -53,7 +54,7 @@ export class CardManager {
       if (e.button !== 1) return;
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
-      this.view.app.workspace.getLeaf("tab").openFile(file);
+      void this.view.app.workspace.getLeaf("tab").openFile(file);
     });
 
     // Right-click → standard Obsidian file context menu
@@ -86,10 +87,12 @@ export class CardManager {
     // ---- Property chips ----
     const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
     const groupByProp = this.view.getGroupByProperty();
+    const viewData = this.view as unknown as {
+      data?: { properties?: BasesPropertyId[] };
+      allProperties?: BasesPropertyId[];
+    };
     const visibleProps: BasesPropertyId[] =
-      (this.view as any).data?.properties ??
-      (this.view as any).allProperties ??
-      [];
+      viewData.data?.properties ?? viewData.allProperties ?? [];
     let shown = 0;
     for (const propId of visibleProps) {
       if (shown >= 3) break;
@@ -107,8 +110,10 @@ export class CardManager {
       const chip = propsEl.createEl("span", {
         cls: "base-board-card-chip",
       });
-      const displayName =
-        (this.view as any).config?.getDisplayName(propId) ?? propName;
+      const viewConfig = this.view as unknown as {
+        config?: { getDisplayName: (id: string) => string };
+      };
+      const displayName = viewConfig.config?.getDisplayName(propId) ?? propName;
       chip.createEl("span", {
         text: displayName,
         cls: "base-board-chip-label",
@@ -136,7 +141,7 @@ export class CardManager {
         .setTitle("Open")
         .setIcon("lucide-file-text")
         .onClick(() => {
-          this.view.app.workspace.getLeaf(false).openFile(file);
+          void this.view.app.workspace.getLeaf(false).openFile(file);
         });
     });
 
@@ -145,7 +150,7 @@ export class CardManager {
         .setTitle("Open in new tab")
         .setIcon("lucide-file-plus")
         .onClick(() => {
-          this.view.app.workspace.getLeaf("tab").openFile(file);
+          void this.view.app.workspace.getLeaf("tab").openFile(file);
         });
     });
 
@@ -200,7 +205,7 @@ export class CardManager {
         try {
           await this.view.app.fileManager.renameFile(file, newPath);
         } catch (err) {
-          new Notice(`Rename failed: ${err}`);
+          new Notice(`Rename failed: ${String(err)}`);
         }
       }
       // Re-render will pick up the new name via onDataUpdated
@@ -210,14 +215,16 @@ export class CardManager {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        commit();
+        void commit();
       } else if (e.key === "Escape") {
         e.preventDefault();
         committed = true;
         this.view.scheduleRender();
       }
     });
-    input.addEventListener("blur", () => commit());
+    input.addEventListener("blur", () => {
+      void commit();
+    });
   }
 
   public startInlineCardCreation(
@@ -258,13 +265,15 @@ export class CardManager {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        commit();
+        void commit();
       } else if (e.key === "Escape") {
         e.preventDefault();
         cancel();
       }
     });
-    input.addEventListener("blur", () => commit());
+    input.addEventListener("blur", () => {
+      void commit();
+    });
   }
 
   private async createNewCard(
@@ -324,7 +333,10 @@ export class CardManager {
     }
 
     // Fallback: try to infer from the first entry in the raw data list
-    const entries: BasesEntry[] = (this.view as any).data?.data ?? [];
+    const viewData = (
+      this.view as unknown as { data?: { data?: BasesEntry[] } }
+    ).data;
+    const entries: BasesEntry[] = viewData?.data ?? [];
     if (entries.length > 0) {
       const path = entries[0].file?.path ?? "";
       const lastSlash = path.lastIndexOf("/");

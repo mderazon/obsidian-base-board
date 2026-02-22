@@ -2,12 +2,10 @@ import {
   BasesView,
   BasesEntry,
   BasesEntryGroup,
-  BasesPropertyId,
   QueryController,
   NullValue,
   setIcon,
   TFile,
-  App,
 } from "obsidian";
 import type BaseBoardPlugin from "./main";
 import { DragDropManager } from "./drag-drop";
@@ -17,9 +15,7 @@ import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
-  sanitizeFilename,
 } from "./constants";
-import { InputModal } from "./modals";
 
 // ---------------------------------------------------------------------------
 //  Kanban View
@@ -111,7 +107,7 @@ export class KanbanView extends BasesView {
     }
   }
 
-  static getViewOptions(): any[] {
+  static getViewOptions(): never[] {
     return [];
   }
 
@@ -165,7 +161,7 @@ export class KanbanView extends BasesView {
   public getGroupByProperty(): string | null {
     const cfg = this.config as {
       groupBy?: { property?: string };
-      get?: (key: string) => any;
+      get?: (key: string) => unknown;
     };
 
     // 1. Direct access to the built-in groupBy config property
@@ -186,14 +182,15 @@ export class KanbanView extends BasesView {
     return null;
   }
 
-  private getColumnName(key: any): string {
+  private getColumnName(key: unknown): string {
     if (key === undefined || key === null || key instanceof NullValue) {
       return NO_VALUE_COLUMN;
     }
-    if (typeof key === "object" && "value" in key) {
-      return String(key.value);
+    if (typeof key === "object" && key !== null && "value" in key) {
+      const val = (key as Record<string, unknown>).value;
+      return String(val as { toString(): string });
     }
-    return String(key);
+    return String(key as { toString(): string });
   }
 
   /**
@@ -204,7 +201,7 @@ export class KanbanView extends BasesView {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (!file || !(file instanceof TFile)) return Infinity;
     const cache = this.app.metadataCache.getFileCache(file);
-    const order = cache?.frontmatter?.[ORDER_PROPERTY];
+    const order: unknown = cache?.frontmatter?.[ORDER_PROPERTY];
     if (typeof order === "number") return order;
     return Infinity;
   }
@@ -335,7 +332,7 @@ export class KanbanView extends BasesView {
     this.config?.set(CONFIG_KEY_COLUMNS, columns);
 
     // Legacy fallback: also write to plugin data.json
-    this.plugin.saveColumnConfig(this.getBaseId(), { columns });
+    void this.plugin.saveColumnConfig(this.getBaseId(), { columns });
   }
 
   // ---------------------------------------------------------------------------
@@ -356,13 +353,16 @@ export class KanbanView extends BasesView {
       if (draggedFile && draggedFile instanceof TFile) {
         const sourceColumn = this.getCardSourceColumn(filePath);
         if (sourceColumn !== targetColumnName) {
-          await this.app.fileManager.processFrontMatter(draggedFile, (fm) => {
-            if (targetColumnName === NO_VALUE_COLUMN) {
-              delete fm[groupByProp];
-            } else {
-              fm[groupByProp] = targetColumnName;
-            }
-          });
+          await this.app.fileManager.processFrontMatter(
+            draggedFile,
+            (fm: Record<string, unknown>) => {
+              if (targetColumnName === NO_VALUE_COLUMN) {
+                delete fm[groupByProp];
+              } else {
+                fm[groupByProp] = targetColumnName;
+              }
+            },
+          );
         }
       }
 
@@ -370,9 +370,12 @@ export class KanbanView extends BasesView {
       const updatePromises = orderedPaths.map((cardPath, i) => {
         const file = this.app.vault.getAbstractFileByPath(cardPath);
         if (!file || !(file instanceof TFile)) return Promise.resolve();
-        return this.app.fileManager.processFrontMatter(file, (fm) => {
-          fm[ORDER_PROPERTY] = i;
-        });
+        return this.app.fileManager.processFrontMatter(
+          file,
+          (fm: Record<string, unknown>) => {
+            fm[ORDER_PROPERTY] = i;
+          },
+        );
       });
       await Promise.all(updatePromises);
     });

@@ -1,4 +1,4 @@
-import { Plugin, Notice, QueryController } from "obsidian";
+import { Plugin, Notice, QueryController, TFile } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { sanitizeFilename } from "./constants";
 import { CreateBoardModal, BoardConfig } from "./modals";
@@ -39,9 +39,9 @@ export default class BaseBoardPlugin extends Plugin {
       id: "create-board",
       name: "Create new board",
       callback: () => {
-        new CreateBoardModal(this.app, (config) =>
-          this.createBoard(config),
-        ).open();
+        new CreateBoardModal(this.app, (config) => {
+          void this.createBoard(config);
+        }).open();
       },
     });
   }
@@ -124,8 +124,8 @@ export default class BaseBoardPlugin extends Plugin {
 
     // 4. Open the board
     const file = vault.getAbstractFileByPath(basePath);
-    if (file) {
-      await this.app.workspace.getLeaf(false).openFile(file as any);
+    if (file instanceof TFile) {
+      void this.app.workspace.getLeaf(false).openFile(file);
       new Notice(`Board "${name}" created!`);
     }
   }
@@ -144,7 +144,7 @@ export default class BaseBoardPlugin extends Plugin {
   // -- Persistence ------------------------------------------------------------
 
   async loadPluginData(): Promise<void> {
-    const saved = await this.loadData();
+    const saved = (await this.loadData()) as PluginData | null | undefined;
     this.data_ = Object.assign({}, DEFAULT_DATA, saved ?? {});
     if (!this.data_.columnConfigs) this.data_.columnConfigs = {};
   }

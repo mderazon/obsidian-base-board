@@ -1,6 +1,6 @@
 {
   "name": "obsidian-base-board",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Kanban board view for Obsidian Bases with drag and drop",
   "main": "main.js",
   "scripts": {
@@ -10,7 +10,15 @@
     "lint": "tsc -noEmit -skipLibCheck && eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\""
   },
-  "keywords": [],
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "obsidian-md",
+    "kanban",
+    "board",
+    "bases",
+    "task-management"
+  ],
   "author": "Michael DeRazon",
   "license": "MIT",
   "devDependencies": {

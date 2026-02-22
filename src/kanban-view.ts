@@ -37,9 +37,9 @@ export class KanbanView extends BasesView {
   public cardManager: CardManager;
 
   /** Prevent re-renders while we batch-update frontmatter. */
-  public isUpdating = false;
+  private isUpdating = false;
   /** Track if Bases fired onDataUpdated while we were updating. */
-  public pendingRender = false;
+  private pendingRender = false;
   /** True until the first successful render completes. */
   private isFirstRender = true;
   /** Debounce timer for render calls. */
@@ -86,6 +86,29 @@ export class KanbanView extends BasesView {
       return;
     }
     this.scheduleRender();
+  }
+
+  /**
+   * Run a batch of state updates without triggering intermediate re-renders.
+   * Defers rendering until the entire batch is complete.
+   */
+  public async applyBatchUpdate(
+    updateFn: () => Promise<void> | void,
+  ): Promise<void> {
+    this.isUpdating = true;
+    this.pendingRender = false;
+
+    try {
+      await updateFn();
+    } finally {
+      this.isUpdating = false;
+    }
+
+    // If Bases fired onDataUpdated during our batch, schedule a debounced render.
+    if (this.pendingRender) {
+      this.pendingRender = false;
+      this.scheduleRender();
+    }
   }
 
   static getViewOptions(): any[] {
@@ -327,11 +350,7 @@ export class KanbanView extends BasesView {
     const groupByProp = this.getGroupByProperty();
     if (!groupByProp) return;
 
-    // Block re-renders during batch update
-    this.isUpdating = true;
-    this.pendingRender = false;
-
-    try {
+    await this.applyBatchUpdate(async () => {
       // 1. Move card to new column if needed
       const draggedFile = this.app.vault.getAbstractFileByPath(filePath);
       if (draggedFile && draggedFile instanceof TFile) {
@@ -348,24 +367,15 @@ export class KanbanView extends BasesView {
       }
 
       // 2. Update kanban_order for all cards in the target column
-      for (let i = 0; i < orderedPaths.length; i++) {
-        const cardPath = orderedPaths[i];
+      const updatePromises = orderedPaths.map((cardPath, i) => {
         const file = this.app.vault.getAbstractFileByPath(cardPath);
-        if (!file || !(file instanceof TFile)) continue;
-        await this.app.fileManager.processFrontMatter(file, (fm) => {
+        if (!file || !(file instanceof TFile)) return Promise.resolve();
+        return this.app.fileManager.processFrontMatter(file, (fm) => {
           fm[ORDER_PROPERTY] = i;
         });
-      }
-    } finally {
-      this.isUpdating = false;
-    }
-
-    // If Bases fired onDataUpdated during our batch, schedule a debounced render.
-    // Otherwise, Bases will fire onDataUpdated soon and the debouncer handles it.
-    if (this.pendingRender) {
-      this.pendingRender = false;
-      this.scheduleRender();
-    }
+      });
+      await Promise.all(updatePromises);
+    });
   }
 
   /** Debounced render — coalesces multiple calls into one. */

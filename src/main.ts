@@ -1,4 +1,4 @@
-import { Plugin, Notice } from "obsidian";
+import { Plugin, Notice, QueryController } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { sanitizeFilename } from "./constants";
 import { CreateBoardModal, BoardConfig } from "./modals";
@@ -29,7 +29,7 @@ export default class BaseBoardPlugin extends Plugin {
     this.registerBasesView("kanban", {
       name: "Kanban",
       icon: "lucide-kanban",
-      factory: (controller: any, containerEl: HTMLElement) =>
+      factory: (controller: QueryController, containerEl: HTMLElement) =>
         new KanbanView(controller, containerEl, this),
       options: () => KanbanView.getViewOptions(),
     });

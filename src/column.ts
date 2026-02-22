@@ -184,34 +184,24 @@ export class ColumnManager {
 
     const groupByProp = this.view.getGroupByProperty();
 
-    // Block re-renders during batch update
-    this.view.isUpdating = true;
-    this.view.pendingRender = false;
-
-    try {
+    await this.view.applyBatchUpdate(async () => {
       // 1. Update column config
       const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
       this.view.saveColumns(updatedColumns);
 
       // 2. Update frontmatter for all cards in this column
       if (groupByProp) {
-        for (const entry of entries) {
+        const updatePromises = entries.map((entry) => {
           const filePath = entry.file?.path;
-          if (!filePath) continue;
+          if (!filePath) return Promise.resolve();
           const file = this.view.app.vault.getAbstractFileByPath(filePath);
-          if (!file || !(file instanceof TFile)) continue;
-          await this.view.app.fileManager.processFrontMatter(file, (fm) => {
+          if (!file || !(file instanceof TFile)) return Promise.resolve();
+          return this.view.app.fileManager.processFrontMatter(file, (fm) => {
             fm[groupByProp] = newName;
           });
-        }
+        });
+        await Promise.all(updatePromises);
       }
-    } finally {
-      this.view.isUpdating = false;
-    }
-
-    if (this.view.pendingRender) {
-      this.view.pendingRender = false;
-      this.view.scheduleRender();
-    }
+    });
   }
 }

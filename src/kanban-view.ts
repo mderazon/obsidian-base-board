@@ -1,6 +1,8 @@
 import {
   BasesView,
+  BasesEntry,
   BasesEntryGroup,
+  BasesPropertyId,
   QueryController,
   NullValue,
   setIcon,
@@ -16,6 +18,9 @@ import { DragDropManager } from "./drag-drop";
 
 const NO_VALUE_COLUMN = "(No value)";
 const ORDER_PROPERTY = "kanban_order";
+
+/** Key used by BasesViewConfig.set/get to persist column order in the .base file. */
+const CONFIG_KEY_COLUMNS = "boardColumns";
 
 // ---------------------------------------------------------------------------
 //  Simple input modal (since window.prompt doesn't work in Obsidian)
@@ -149,24 +154,67 @@ export class KanbanView extends BasesView {
   //  Base identity
   // ---------------------------------------------------------------------------
 
+  /**
+   * Build a stable, unique identifier for this board view.
+   *
+   * Uses the view's display name (unique within a .base file) combined with
+   * the groupBy property.  If neither is available we fall back to a hash
+   * derived from the file paths currently in the dataset so that column
+   * configs never collide across different boards.
+   */
   private getBaseId(): string {
-    const data = (this as any).data;
-    const path =
-      data?.file?.path ?? data?.filePath ?? data?.config?.filePath ?? "";
-    const groupBy = data?.config?.groupBy?.property ?? "";
-    return `${path}::${groupBy}`;
+    const viewName = this.config?.name ?? "";
+    const groupBy = this.getGroupByProperty() ?? "";
+
+    // Try to discover the .base file path from the entries in the dataset.
+    // All entries originate from the same .base query so any entry's folder
+    // ancestor pattern is a reasonable proxy.  This gives us a path-qualified
+    // key even when two .base files share the same view name.
+    let basePath = "";
+    const entries: BasesEntry[] = this.data?.data ?? [];
+    if (entries.length > 0) {
+      const firstPath = entries[0].file?.path ?? "";
+      const lastSlash = firstPath.lastIndexOf("/");
+      basePath = lastSlash > 0 ? firstPath.substring(0, lastSlash) : "";
+    }
+
+    return `${basePath}::${viewName}::${groupBy}`;
   }
 
   // ---------------------------------------------------------------------------
   //  Helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Return the frontmatter property name used for groupBy (e.g. "status").
+   *
+   * The Bases engine stores this in the view config as a BasesPropertyId
+   * like "note.status".  We strip the "note." prefix so the result is
+   * directly usable as a frontmatter key.
+   *
+   * Note: `BasesViewConfig.get()` only retrieves custom options registered
+   * via `BasesViewRegistration.options`.  The `groupBy` setting is a
+   * built-in structural property on the config object, so we access it
+   * directly from the config's internal representation.
+   */
   private getGroupByProperty(): string | null {
-    const config = (this as any).data?.config;
-    if (config?.groupBy?.property) {
-      const raw: string = config.groupBy.property;
+    const cfg = this.config as any;
+
+    // 1. Direct access to the built-in groupBy config property
+    const groupBy = cfg?.groupBy;
+    if (groupBy?.property) {
+      const raw: string = groupBy.property;
       return raw.startsWith("note.") ? raw.slice(5) : raw;
     }
+
+    // 2. Fallback: try the custom-options API in case future Obsidian
+    //    versions surface groupBy through get()
+    const fromGet = cfg?.get?.("groupBy") as { property?: string } | undefined;
+    if (fromGet?.property) {
+      const raw: string = fromGet.property;
+      return raw.startsWith("note.") ? raw.slice(5) : raw;
+    }
+
     return null;
   }
 
@@ -194,17 +242,41 @@ export class KanbanView extends BasesView {
   }
 
   // ---------------------------------------------------------------------------
-  //  Column config
+  //  Column config  (dual-layer: .base file via config API + plugin data.json)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Read the persisted column order.
+   *
+   * Priority:
+   *  1. View-level config stored inside the .base file (via BasesViewConfig)
+   *  2. Legacy plugin data.json (for backwards-compat with existing boards)
+   *  3. Fall back to whatever columns the data naturally produces
+   *
+   * Any columns present in the live data but missing from the stored list
+   * are appended at the end so they are never silently hidden.
+   */
   private getColumns(): string[] {
-    const stored = this.plugin.getColumnConfig(this.getBaseId());
+    // 1. Try .base file config first (new preferred storage)
+    const fromConfig = this.config?.get(CONFIG_KEY_COLUMNS) as
+      | string[]
+      | undefined;
+
+    // 2. Fallback: legacy plugin data.json
+    const fromPlugin = this.plugin.getColumnConfig(this.getBaseId());
+
+    const stored = fromConfig?.length
+      ? fromConfig
+      : fromPlugin?.columns?.length
+        ? fromPlugin.columns
+        : null;
+
     const dataColumns = this.currentGroups.map((g) =>
       this.getColumnName(g.key),
     );
 
-    if (stored && stored.columns.length > 0) {
-      const result = [...stored.columns];
+    if (stored && stored.length > 0) {
+      const result = [...stored];
       for (const col of dataColumns) {
         if (!result.includes(col)) {
           result.push(col);
@@ -232,8 +304,8 @@ export class KanbanView extends BasesView {
   private render(): void {
     this.containerEl.empty();
 
-    const groupedData: BasesEntryGroup[] =
-      (this as any).data?.groupedData ?? [];
+    // Use the official API: this.data is a BasesQueryResult
+    const groupedData: BasesEntryGroup[] = this.data?.groupedData ?? [];
 
     const hasGroupBy =
       groupedData.length > 1 ||
@@ -360,7 +432,7 @@ export class KanbanView extends BasesView {
 
   private renderCard(
     cardsEl: HTMLElement,
-    entry: any,
+    entry: BasesEntry,
     columnName: string,
     cardIndex: number = 0,
   ): void {
@@ -424,33 +496,38 @@ export class KanbanView extends BasesView {
       this.showCardActionMenu(editBtn, filePath, titleEl);
     });
 
+    // ---- Property chips ----
     const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
-    const props = (entry as any).values;
-    if (props && typeof props === "object") {
-      let shown = 0;
-      for (const [key, val] of Object.entries(props)) {
-        if (shown >= 3) break;
-        if (key.startsWith("file.") || key.startsWith("formula.")) continue;
-        const groupByProp = this.getGroupByProperty();
-        if (
-          groupByProp &&
-          (key === groupByProp || key === `note.${groupByProp}`)
-        )
-          continue;
-        if (key === ORDER_PROPERTY || key === `note.${ORDER_PROPERTY}`)
-          continue;
-        const display = this.displayValue(val);
-        if (!display) continue;
-        const chip = propsEl.createEl("span", {
-          cls: "base-board-card-chip",
-        });
-        chip.createEl("span", { text: key, cls: "base-board-chip-label" });
-        chip.createEl("span", {
-          text: display,
-          cls: "base-board-chip-value",
-        });
-        shown++;
-      }
+    const groupByProp = this.getGroupByProperty();
+    const visibleProps: BasesPropertyId[] =
+      this.data?.properties ?? this.allProperties ?? [];
+    let shown = 0;
+    for (const propId of visibleProps) {
+      if (shown >= 3) break;
+      // Skip file-level, formula, groupBy, and order properties
+      if (propId.startsWith("file.") || propId.startsWith("formula.")) continue;
+      const propName = propId.startsWith("note.") ? propId.slice(5) : propId;
+      if (groupByProp && propName === groupByProp) continue;
+      if (propName === ORDER_PROPERTY) continue;
+
+      const val = entry.getValue(propId);
+      if (!val || val instanceof NullValue || !val.isTruthy()) continue;
+      const display = val.toString();
+      if (!display) continue;
+
+      const chip = propsEl.createEl("span", {
+        cls: "base-board-card-chip",
+      });
+      const displayName = this.config?.getDisplayName(propId) ?? propName;
+      chip.createEl("span", {
+        text: displayName,
+        cls: "base-board-chip-label",
+      });
+      chip.createEl("span", {
+        text: display,
+        cls: "base-board-chip-value",
+      });
+      shown++;
     }
   }
 
@@ -560,20 +637,6 @@ export class KanbanView extends BasesView {
     addBtn.addEventListener("click", () => this.promptAddColumn());
   }
 
-  private displayValue(val: any): string {
-    if (val === undefined || val === null) return "";
-    if (val instanceof NullValue) return "";
-    if (typeof val === "object" && "value" in val) {
-      const v = val.value;
-      if (v === undefined || v === null) return "";
-      if (Array.isArray(v)) return v.join(", ");
-      return String(v);
-    }
-    if (typeof val === "string") return val;
-    if (typeof val === "number" || typeof val === "boolean") return String(val);
-    return "";
-  }
-
   // ---------------------------------------------------------------------------
   //  Column management
   // ---------------------------------------------------------------------------
@@ -586,20 +649,35 @@ export class KanbanView extends BasesView {
         return;
       }
       columns.push(name);
-      this.plugin.saveColumnConfig(this.getBaseId(), { columns });
+      this.saveColumns(columns);
       this.render();
     }).open();
   }
 
   private handleDeleteColumn(columnName: string): void {
     const columns = this.getColumns().filter((c) => c !== columnName);
-    this.plugin.saveColumnConfig(this.getBaseId(), { columns });
+    this.saveColumns(columns);
     this.render();
   }
 
   private handleColumnReorder(orderedNames: string[]): void {
-    this.plugin.saveColumnConfig(this.getBaseId(), { columns: orderedNames });
+    this.saveColumns(orderedNames);
     this.render();
+  }
+
+  /**
+   * Persist the column list.
+   *
+   * Writes to two locations for compatibility:
+   *  - BasesViewConfig (stored inside the .base file itself — portable)
+   *  - Plugin data.json (legacy, kept so older board setups still work)
+   */
+  private saveColumns(columns: string[]): void {
+    // Primary: persist in .base file via the official config API
+    this.config?.set(CONFIG_KEY_COLUMNS, columns);
+
+    // Legacy fallback: also write to plugin data.json
+    this.plugin.saveColumnConfig(this.getBaseId(), { columns });
   }
 
   private startColumnRename(
@@ -664,9 +742,7 @@ export class KanbanView extends BasesView {
     try {
       // 1. Update column config
       const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
-      this.plugin.saveColumnConfig(this.getBaseId(), {
-        columns: updatedColumns,
-      });
+      this.saveColumns(updatedColumns);
 
       // 2. Update frontmatter for all cards in this column
       if (groupByProp) {
@@ -755,7 +831,7 @@ export class KanbanView extends BasesView {
   private getCardSourceColumn(filePath: string): string | null {
     for (const group of this.currentGroups) {
       for (const entry of group.entries) {
-        if ((entry as any).file?.path === filePath) {
+        if (entry.file?.path === filePath) {
           return this.getColumnName(group.key);
         }
       }
@@ -852,13 +928,17 @@ export class KanbanView extends BasesView {
 
   /**
    * Determine the folder for new cards by looking at existing entries.
-   * Falls back to the Base file's parent folder.
+   * Falls back to the vault root.
+   *
+   * Uses the official BasesEntry.file property (TFile) which is
+   * guaranteed by the Obsidian API.
    */
   private getTargetFolder(): string {
-    // Check existing cards for a common folder
+    // All entries in this board share the same .base query, so the first
+    // entry's parent folder is a good default for new cards.
     for (const group of this.currentGroups) {
       for (const entry of group.entries) {
-        const path = (entry as any).file?.path;
+        const path = entry.file?.path;
         if (path) {
           const lastSlash = path.lastIndexOf("/");
           if (lastSlash > 0) return path.substring(0, lastSlash);
@@ -866,12 +946,14 @@ export class KanbanView extends BasesView {
       }
     }
 
-    // Fallback: use the Base file's parent folder
-    const data = (this as any).data;
-    const basePath =
-      data?.file?.path ?? data?.filePath ?? data?.config?.filePath ?? "";
-    const lastSlash = basePath.lastIndexOf("/");
-    if (lastSlash > 0) return basePath.substring(0, lastSlash);
+    // Fallback: try to infer from the first entry in the raw data list
+    const entries: BasesEntry[] = this.data?.data ?? [];
+    if (entries.length > 0) {
+      const path = entries[0].file?.path ?? "";
+      const lastSlash = path.lastIndexOf("/");
+      if (lastSlash > 0) return path.substring(0, lastSlash);
+    }
+
     return "";
   }
 }

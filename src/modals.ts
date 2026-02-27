@@ -91,7 +91,7 @@ export class CreateBoardModal extends Modal {
 
     // --- Board name ---
     new Setting(contentEl).setName("Board name").addText((text) => {
-      text.setPlaceholder("e.g. Project Alpha");
+      text.setPlaceholder("My new board");
       text.onChange((v) => {
         this.config.name = v;
         // Auto-fill the folder field from the board name
@@ -111,7 +111,7 @@ export class CreateBoardModal extends Modal {
       .setDesc("Where to create the board and its task files")
       .addText((text) => {
         folderInput = text;
-        text.setPlaceholder("e.g. Projects/Alpha");
+        text.setPlaceholder("Projects/alpha");
         text.onChange((v) => {
           this.config.folder = v;
           folderManuallyEdited = true;
@@ -124,7 +124,7 @@ export class CreateBoardModal extends Modal {
       .setDesc("The frontmatter property used for columns")
       .addText((text) => {
         text.setValue("status");
-        text.setPlaceholder("status");
+        text.setPlaceholder("Status");
         text.onChange((v) => (this.config.groupBy = v || "status"));
       });
 

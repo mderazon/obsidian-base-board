@@ -287,7 +287,7 @@ export class KanbanView extends BasesView {
         "lucide-kanban",
       );
       msgEl.createEl("p", {
-        text: 'Set "Group by" in the sort menu to organize cards into columns.',
+        text: 'Set "group by" in the sort menu to organize cards into columns.',
       });
       return;
     }

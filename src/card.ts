@@ -170,7 +170,7 @@ export class CardManager {
         .setTitle("Delete")
         .setIcon("lucide-trash-2")
         .onClick(async () => {
-          await this.view.app.vault.trash(file, true);
+          await this.view.app.fileManager.trashFile(file);
           new Notice(`Moved "${file.basename}" to trash`);
         });
     });
@@ -233,7 +233,7 @@ export class CardManager {
     existingCount: number,
   ): void {
     // Hide the button and show an input
-    btnEl.style.display = "none";
+    btnEl.classList.add("base-board-hidden");
 
     const inputWrapper = btnEl.parentElement!.createDiv({
       cls: "base-board-add-card-input-wrapper",
@@ -250,7 +250,7 @@ export class CardManager {
       committed = true;
       const name = input.value.trim();
       inputWrapper.remove();
-      btnEl.style.display = "";
+      btnEl.classList.remove("base-board-hidden");
       if (name) {
         await this.createNewCard(name, columnName, existingCount);
       }
@@ -259,7 +259,7 @@ export class CardManager {
     const cancel = () => {
       committed = true;
       inputWrapper.remove();
-      btnEl.style.display = "";
+      btnEl.classList.remove("base-board-hidden");
     };
 
     input.addEventListener("keydown", (e) => {
@@ -283,7 +283,7 @@ export class CardManager {
   ): Promise<void> {
     const groupByProp = this.view.getGroupByProperty();
     if (!groupByProp) {
-      new Notice("Cannot create card: no groupBy property configured.");
+      new Notice("Cannot create card: No group by property configured.");
       return;
     }
 

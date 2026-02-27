@@ -283,7 +283,7 @@ export class CardManager {
   ): Promise<void> {
     const groupByProp = this.view.getGroupByProperty();
     if (!groupByProp) {
-      new Notice("Cannot create card: No group by property configured.");
+      new Notice("Cannot create card: no group by property configured.");
       return;
     }
 

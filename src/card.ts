@@ -12,6 +12,23 @@ import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
 
+// File properties that are redundant (shown as the card title) or are
+// complex list types that don't render usefully as a short chip value.
+const FILE_PROPS_TO_SKIP = new Set([
+  "name",
+  "basename",
+  "fullname",
+  "ext",
+  "extension",
+  "path",
+  "links",
+  "backlinks",
+  "inlinks",
+  "outlinks",
+  "embeds",
+  "tags",
+]);
+
 export class CardManager {
   private view: KanbanView;
 
@@ -124,22 +141,7 @@ export class CardManager {
       // variants already shown as the card title) or complex list types that
       // don't render well as a short chip value.
       if (propId.startsWith("file.")) {
-        const fileProp = propId.slice(5); // strip "file."
-        const FILE_PROPS_TO_SKIP = new Set([
-          "name",
-          "basename",
-          "fullname",
-          "ext",
-          "extension",
-          "path",
-          "links",
-          "backlinks",
-          "inlinks",
-          "outlinks",
-          "embeds",
-          "tags",
-        ]);
-        if (FILE_PROPS_TO_SKIP.has(fileProp)) continue;
+        if (FILE_PROPS_TO_SKIP.has(propId.slice(5))) continue;
         // file.ctime, file.mtime, file.size, file.folder, etc. pass through.
       }
       const propName = propId.startsWith("note.") ? propId.slice(5) : propId;

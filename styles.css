@@ -550,14 +550,9 @@
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
 }
 
-.base-board-color-picker-close {
-  margin-top: 8px;
-  width: 100%;
-}
-
 .base-board-filter-pill-light {
   color: #ffffff !important;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .base-board-filter-pill-dark {
@@ -567,7 +562,7 @@
 
 .base-board-card-tag-light {
   color: #ffffff !important;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .base-board-card-tag-dark {

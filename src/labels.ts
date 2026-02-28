@@ -1,6 +1,6 @@
 import { KanbanView } from "./kanban-view";
 import { CONFIG_KEY_TAG_COLORS } from "./constants";
-import { TFile, setIcon, Setting } from "obsidian";
+import { App, Modal, TFile, setIcon, setTooltip, Setting } from "obsidian";
 import { InputModal } from "./modals";
 import { relativeLuminance } from "./color-utils";
 
@@ -156,9 +156,13 @@ export class Labels {
         pill.addClass("is-active");
       }
 
+      setTooltip(pill, "Click to filter · Right-click to change color");
+
       pill.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        this.showColorPicker(e, tag, tagColor);
+        new ColorPickerModal(this.view.app, tag, tagColor, (color) =>
+          this.setColor(tag, color),
+        ).open();
       });
 
       pill.addEventListener("click", () => {
@@ -182,53 +186,50 @@ export class Labels {
       });
     }
   }
+}
 
-  private showColorPicker(
-    e: MouseEvent,
+// ---------------------------------------------------------------------------
+//  Color picker modal — uses Obsidian Modal for proper focus/Escape handling
+// ---------------------------------------------------------------------------
+
+export class ColorPickerModal extends Modal {
+  private tag: string;
+  private currentColor: string;
+  private onChange: (color: string) => void;
+
+  constructor(
+    app: App,
     tag: string,
     currentColor: string,
-  ): void {
-    const modalEl = document.createElement("div");
-    modalEl.addClass("base-board-color-picker-modal");
-    Object.assign(modalEl.style, {
-      position: "fixed",
-      left: `${e.clientX}px`,
-      top: `${e.clientY}px`,
-      background: "var(--background-secondary)",
-      border: "1px solid var(--background-modifier-border)",
-      borderRadius: "var(--radius-s)",
-      padding: "10px",
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-      zIndex: "1000",
-    });
+    onChange: (color: string) => void,
+  ) {
+    super(app);
+    this.tag = tag;
+    this.currentColor = currentColor;
+    this.onChange = onChange;
+  }
 
-    new Setting(modalEl).setName(`Color for ${tag}`).addColorPicker((color) => {
-      color.setValue(currentColor);
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: `Color for "${this.tag}"` });
+
+    new Setting(contentEl).setName("Label color").addColorPicker((color) => {
+      color.setValue(this.currentColor);
       color.onChange((value) => {
-        this.setColor(tag, value);
+        this.currentColor = value;
+        this.onChange(value);
       });
     });
 
-    // Add close button via a separate span to not conflict with `Setting` API
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent = "Done";
-    closeBtn.className = "base-board-color-picker-close";
-    closeBtn.addEventListener("click", () => {
-      modalEl.remove();
+    new Setting(contentEl).addButton((btn) => {
+      btn
+        .setButtonText("Done")
+        .setCta()
+        .onClick(() => this.close());
     });
-    modalEl.appendChild(closeBtn);
+  }
 
-    const cleanup = (ev: MouseEvent) => {
-      if (!modalEl.contains(ev.target as Node)) {
-        modalEl.remove();
-        document.removeEventListener("mousedown", cleanup);
-      }
-    };
-    document.body.appendChild(modalEl);
-
-    // Defer the event listener so we don't immediately trigger on current click
-    setTimeout(() => {
-      document.addEventListener("mousedown", cleanup);
-    }, 0);
+  onClose(): void {
+    this.contentEl.empty();
   }
 }

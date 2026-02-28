@@ -78,18 +78,41 @@ export class DragDropManager {
   private onDragStart(e: DragEvent): void {
     if (!e.dataTransfer) return;
 
-    // Check if dragging a column header (via the drag handle)
-    const handle = (e.target as HTMLElement).closest(
-      ".base-board-column-drag-handle",
+    // Check if dragging a column header
+    const headerEl = (e.target as HTMLElement).closest(
+      ".base-board-column-header",
     );
-    if (handle) {
-      const columnEl = handle.closest(".base-board-column");
+    if (headerEl) {
+      // Don't initiate a column drag when the user clicks interactive children
+      // (title span for renaming, count badge, delete button, etc.)
+      const target = e.target as HTMLElement;
+      const isInteractive = target.closest(
+        ".base-board-column-title, .base-board-column-count, .base-board-column-delete, input, button",
+      );
+      if (isInteractive) return;
+
+      const columnEl = headerEl.closest(".base-board-column");
       if (!(columnEl instanceof HTMLElement)) return;
       this.dragType = "column";
       this.draggedEl = columnEl;
-      columnEl.addClass("base-board-column--dragging");
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData(COLUMN_MIME, columnEl.dataset.columnName ?? "");
+
+      // Use the header itself as drag ghost — much smaller and cleaner than the full column
+      const headerRect = (headerEl as HTMLElement).getBoundingClientRect();
+      e.dataTransfer.setDragImage(
+        headerEl as HTMLElement,
+        e.clientX - headerRect.left,
+        e.clientY - headerRect.top,
+      );
+
+      requestAnimationFrame(() => {
+        // Insert placeholder before hiding so layout doesn't shift
+        this.placeholderEl = document.createElement("div");
+        this.placeholderEl.className = "base-board-column-placeholder";
+        columnEl.parentElement?.insertBefore(this.placeholderEl, columnEl);
+        columnEl.addClass("base-board-column--dragging");
+      });
       return;
     }
 
@@ -232,10 +255,22 @@ export class DragDropManager {
       e.clientX,
       "horizontal",
     );
+
+    // Skip DOM mutation if placeholder is already in the right spot
+    const desiredNext =
+      afterElement ??
+      this.boardEl.querySelector(".base-board-add-column-btn") ??
+      null;
+    if (
+      this.placeholderEl.nextElementSibling === desiredNext &&
+      this.placeholderEl.parentElement === this.boardEl
+    ) {
+      return;
+    }
+
     if (afterElement) {
       this.boardEl.insertBefore(this.placeholderEl, afterElement);
     } else {
-      // Insert before the add-column button (last child)
       const addBtn = this.boardEl.querySelector(".base-board-add-column-btn");
       if (addBtn) {
         this.boardEl.insertBefore(this.placeholderEl, addBtn);

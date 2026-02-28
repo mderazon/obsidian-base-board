@@ -25,11 +25,11 @@ export class ColumnManager {
 
     // ---- Header ----
     const headerEl = columnEl.createDiv({ cls: "base-board-column-header" });
+    headerEl.setAttr("draggable", "true");
 
     const dragHandle = headerEl.createDiv({
       cls: "base-board-column-drag-handle",
     });
-    dragHandle.setAttr("draggable", "true");
     setIcon(dragHandle, "grip-vertical");
 
     const titleEl = headerEl.createEl("span", {

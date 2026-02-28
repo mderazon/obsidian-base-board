@@ -53,22 +53,44 @@
 }
 
 .base-board-column--dragging {
-  opacity: 0.3;
-  transform: scale(0.95);
+  /* Collapse to zero so it doesn't occupy space alongside the placeholder.
+     Can't use display:none — that cancels the browser drag event.
+     Negative margin eats the parent's flex gap so no extra space remains. */
+  opacity: 0;
+  pointer-events: none;
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden;
+  padding: 0 !important;
+  margin: 0 0 0 -12px !important;
+  border: none !important;
 }
 
 /* ---- Column drag placeholder ---- */
 
 .base-board-column-placeholder {
   flex: 0 0 280px;
-  border: 2px dashed var(--interactive-accent);
+  border: 1px dashed var(--interactive-accent);
   border-radius: var(--radius-m);
   background-color: color-mix(
     in srgb,
-    var(--interactive-accent) 6%,
+    var(--interactive-accent) 8%,
     transparent
   );
-  min-height: 120px;
+  min-height: 80px;
+  animation: placeholder-appear 0.12s ease;
+}
+
+@keyframes placeholder-appear {
+  from {
+    opacity: 0;
+    transform: scaleY(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
 }
 
 /* ---- Column header ---- */
@@ -80,20 +102,23 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--background-modifier-border);
   user-select: none;
+  cursor: grab;
+}
+
+.base-board-column-header:active {
+  cursor: grabbing;
 }
 
 .base-board-column-drag-handle {
   flex-shrink: 0;
-  cursor: grab;
   color: var(--text-faint);
-  opacity: 0;
+  opacity: 0.3;
   transition: opacity 0.15s ease;
   display: flex;
   align-items: center;
-}
-
-.base-board-column-drag-handle:active {
-  cursor: grabbing;
+  /* Larger hit area */
+  padding: 2px 4px;
+  margin: -2px -4px;
 }
 
 .base-board-column-header:hover .base-board-column-drag-handle {

@@ -94,14 +94,34 @@ export default class BaseBoardPlugin extends Plugin {
     // 3. Create sample task files so the board isn't empty on first open
     const sampleTasks = [
       {
-        title: "Example task",
+        title: "Plan project",
         value: "To Do",
         order: 0,
+        tags: ["planning"],
       },
       {
-        title: "Getting started",
+        title: "Research and discovery",
+        value: "To Do",
+        order: 1,
+        tags: ["research"],
+      },
+      {
+        title: "Build first feature",
         value: "In Progress",
         order: 0,
+        tags: ["feature"],
+      },
+      {
+        title: "Fix onboarding bug",
+        value: "In Progress",
+        order: 1,
+        tags: ["bug"],
+      },
+      {
+        title: "Write documentation",
+        value: "Done",
+        order: 0,
+        tags: ["docs"],
       },
     ];
 
@@ -109,15 +129,22 @@ export default class BaseBoardPlugin extends Plugin {
       const safeName = sanitizeFilename(task.title);
       const taskPath = `${tasksFolder}/${safeName}.md`;
       if (!vault.getAbstractFileByPath(taskPath)) {
+        const tagsLine =
+          task.tags.length > 0
+            ? `tags:\n${task.tags.map((t) => `  - ${t}`).join("\n")}`
+            : "";
         const content = [
           "---",
           `${groupBy}: ${task.value}`,
           `kanban_order: ${task.order}`,
+          tagsLine,
           "---",
           "",
           `# ${task.title}`,
           "",
-        ].join("\n");
+        ]
+          .filter((line) => line !== "")
+          .join("\n");
         await vault.create(taskPath, content);
       }
     }

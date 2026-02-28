@@ -13,7 +13,7 @@ import type BaseBoardPlugin from "./main";
 import { DragDropManager } from "./drag-drop";
 import { ColumnManager } from "./column";
 import { CardManager } from "./card";
-import { Labels } from "./labels";
+import { Tags } from "./tags";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
@@ -46,7 +46,7 @@ export class KanbanView extends BasesView implements HoverParent {
   /** Debounce timer for render calls. */
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
   /** Label Manager for tags and filters */
-  public labels: Labels;
+  public tags: Tags;
 
   constructor(
     controller: QueryController,
@@ -58,7 +58,7 @@ export class KanbanView extends BasesView implements HoverParent {
     this.plugin = plugin;
     this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
 
-    this.labels = new Labels(this);
+    this.tags = new Tags(this);
     this.cardManager = new CardManager(this);
     this.columnManager = new ColumnManager(this);
 
@@ -310,7 +310,7 @@ export class KanbanView extends BasesView implements HoverParent {
       this.isFirstRender = false;
     }
 
-    this.labels.renderFilterBar(this.containerEl);
+    this.tags.renderFilterBar(this.containerEl);
 
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);

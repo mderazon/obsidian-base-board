@@ -111,13 +111,13 @@ export class CardManager {
     });
     const file = this.view.app.vault.getAbstractFileByPath(filePath);
     if (file instanceof TFile) {
-      const fileTags = this.view.labels.extractTagsFromFile(file);
+      const fileTags = this.view.tags.extractTagsFromFile(file);
       for (const tag of fileTags) {
         const tagEl = tagContainerEl.createSpan({
           cls: "base-board-card-tag",
           text: tag,
         });
-        const color = this.view.labels.getColorForTag(tag);
+        const color = this.view.tags.getColorForTag(tag);
         if (color) {
           tagEl.style.setProperty("--tag-color", color);
           if (relativeLuminance(color) === "dark") {
@@ -199,10 +199,10 @@ export class CardManager {
 
     menu.addItem((item) => {
       item
-        .setTitle("Edit labels")
+        .setTitle("Edit tags")
         .setIcon("lucide-tags")
         .onClick(() => {
-          this.view.labels.promptEditTags(file);
+          this.view.tags.promptEditTags(file);
         });
     });
 

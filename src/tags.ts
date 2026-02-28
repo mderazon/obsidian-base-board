@@ -4,7 +4,7 @@ import { App, Modal, TFile, setIcon, setTooltip, Setting } from "obsidian";
 import { InputModal } from "./modals";
 import { relativeLuminance } from "./color-utils";
 
-export class Labels {
+export class Tags {
   private view: KanbanView;
   public activeFilters: Set<string> = new Set();
 
@@ -78,7 +78,7 @@ export class Labels {
     const currentTags = this.extractTagsFromFile(file).join(", ");
     new InputModal(
       this.view.app,
-      "Edit labels",
+      "Edit tags",
       "Comma-separated tags...",
       (value: string) => {
         const newTags = value
@@ -213,7 +213,7 @@ export class ColorPickerModal extends Modal {
     const { contentEl } = this;
     contentEl.createEl("h3", { text: `Color for "${this.tag}"` });
 
-    new Setting(contentEl).setName("Label color").addColorPicker((color) => {
+    new Setting(contentEl).setName("Tag color").addColorPicker((color) => {
       color.setValue(this.currentColor);
       color.onChange((value) => {
         this.currentColor = value;

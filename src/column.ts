@@ -74,13 +74,13 @@ export class ColumnManager {
       return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
     });
 
-    const activeFilters = this.view.labels.activeFilters;
+    const activeFilters = this.view.tags.activeFilters;
     let visibleCards = sorted;
     if (activeFilters.size > 0) {
       visibleCards = sorted.filter((entry) => {
         const file = entry.file;
         if (!(file instanceof TFile)) return false;
-        const fileTags = this.view.labels.extractTagsFromFile(file);
+        const fileTags = this.view.tags.extractTagsFromFile(file);
         // Match ANY of the active tag filters
         return Array.from(activeFilters).some((filter) =>
           fileTags.includes(filter),

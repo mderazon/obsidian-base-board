@@ -1,6 +1,7 @@
 import {
   BasesEntry,
   BasesPropertyId,
+  DateValue,
   NullValue,
   setIcon,
   TFile,
@@ -111,33 +112,53 @@ export class CardManager {
     // ---- Property chips ----
     const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
     const groupByProp = this.view.getGroupByProperty();
-    const viewData = this.view as unknown as {
-      data?: { properties?: BasesPropertyId[] };
-      allProperties?: BasesPropertyId[];
-    };
-    const visibleProps: BasesPropertyId[] =
-      viewData.data?.properties ?? viewData.allProperties ?? [];
+    // Use the official API: getOrder() returns the user-configured visible
+    // properties in the order set via the Properties toolbar menu.
+    const visibleProps: BasesPropertyId[] = this.view.config.getOrder();
     let shown = 0;
     for (const propId of visibleProps) {
       if (shown >= 3) break;
-      // Skip file-level, formula, groupBy, and order properties
-      if (propId.startsWith("file.") || propId.startsWith("formula.")) continue;
+      // Skip formula properties (not user-readable as chips).
+      if (propId.startsWith("formula.")) continue;
+      // For file.* properties, only skip ones that are redundant (name/path
+      // variants already shown as the card title) or complex list types that
+      // don't render well as a short chip value.
+      if (propId.startsWith("file.")) {
+        const fileProp = propId.slice(5); // strip "file."
+        const FILE_PROPS_TO_SKIP = new Set([
+          "name",
+          "basename",
+          "fullname",
+          "ext",
+          "extension",
+          "path",
+          "links",
+          "backlinks",
+          "inlinks",
+          "outlinks",
+          "embeds",
+          "tags",
+        ]);
+        if (FILE_PROPS_TO_SKIP.has(fileProp)) continue;
+        // file.ctime, file.mtime, file.size, file.folder, etc. pass through.
+      }
       const propName = propId.startsWith("note.") ? propId.slice(5) : propId;
       if (groupByProp && propName === groupByProp) continue;
       if (propName === ORDER_PROPERTY) continue;
 
       const val = entry.getValue(propId);
       if (!val || val instanceof NullValue || !val.isTruthy()) continue;
-      const display = val.toString();
+      // Use relative time for dates (e.g. "3 days ago") — much more readable
+      // on a card chip than a raw ISO string or a full locale date.
+      const display =
+        val instanceof DateValue ? val.relative() : val.toString();
       if (!display) continue;
 
       const chip = propsEl.createEl("span", {
         cls: "base-board-card-chip",
       });
-      const viewConfig = this.view as unknown as {
-        config?: { getDisplayName: (id: string) => string };
-      };
-      const displayName = viewConfig.config?.getDisplayName(propId) ?? propName;
+      // getDisplayName respects user-configured renames from the Base config.
+      const displayName = this.view.config.getDisplayName(propId);
       chip.createEl("span", {
         text: displayName,
         cls: "base-board-chip-label",

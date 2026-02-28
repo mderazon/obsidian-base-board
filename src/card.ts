@@ -76,6 +76,20 @@ export class CardManager {
       void this.view.app.workspace.getLeaf("tab").openFile(file);
     });
 
+    // Hover → native Obsidian page-preview popover (same as hovering a [[wikilink]])
+    // Use mouseenter (not mouseover) — mouseover bubbles from every child element
+    // and would re-trigger the preview on each chip/tag/title crossing.
+    cardEl.addEventListener("mouseenter", (evt: MouseEvent) => {
+      if (!filePath) return;
+      this.view.app.workspace.trigger("hover-link", {
+        event: evt,
+        source: "base-board",
+        hoverParent: this.view,
+        targetEl: cardEl,
+        linktext: filePath,
+      });
+    });
+
     // Right-click → standard Obsidian file context menu
     cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();

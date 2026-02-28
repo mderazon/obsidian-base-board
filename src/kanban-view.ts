@@ -2,6 +2,8 @@ import {
   BasesView,
   BasesEntry,
   BasesEntryGroup,
+  HoverParent,
+  HoverPopover,
   QueryController,
   NullValue,
   setIcon,
@@ -22,8 +24,10 @@ import {
 //  Kanban View
 // ---------------------------------------------------------------------------
 
-export class KanbanView extends BasesView {
+export class KanbanView extends BasesView implements HoverParent {
   type = "kanban";
+  // Required by HoverParent — Obsidian manages the popover lifecycle.
+  hoverPopover: HoverPopover | null = null;
   scrollEl: HTMLElement;
   containerEl: HTMLElement;
   plugin: BaseBoardPlugin;

@@ -74,7 +74,21 @@ export class ColumnManager {
       return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
     });
 
-    sorted.forEach((entry) => {
+    const activeFilters = this.view.labels.activeFilters;
+    let visibleCards = sorted;
+    if (activeFilters.size > 0) {
+      visibleCards = sorted.filter((entry) => {
+        const file = entry.file;
+        if (!(file instanceof TFile)) return false;
+        const fileTags = this.view.labels.extractTagsFromFile(file);
+        // Match ANY of the active tag filters
+        return Array.from(activeFilters).some((filter) =>
+          fileTags.includes(filter),
+        );
+      });
+    }
+
+    visibleCards.forEach((entry) => {
       this.view.cardManager.renderCard(cardsEl, entry, columnName);
     });
 

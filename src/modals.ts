@@ -15,11 +15,15 @@ export class InputModal extends Modal {
     title: string,
     placeholder: string,
     onSubmit: (value: string) => void,
+    initialValue?: string,
   ) {
     super(app);
     this.title = title;
     this.placeholder = placeholder;
     this.onSubmit = onSubmit;
+    if (initialValue) {
+      this.value = initialValue;
+    }
   }
 
   onOpen(): void {
@@ -28,6 +32,9 @@ export class InputModal extends Modal {
 
     new Setting(contentEl).setName("Name").addText((text) => {
       text.setPlaceholder(this.placeholder);
+      if (this.value) {
+        text.setValue(this.value);
+      }
       text.onChange((v) => (this.value = v));
       // Focus and handle Enter key
       setTimeout(() => {

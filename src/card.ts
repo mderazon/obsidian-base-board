@@ -9,6 +9,7 @@ import {
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
+import { relativeLuminance } from "./color-utils";
 
 export class CardManager {
   private view: KanbanView;
@@ -73,6 +74,29 @@ export class CardManager {
       menu.showAtMouseEvent(e);
     });
 
+    const tagContainerEl = cardEl.createDiv({
+      cls: "base-board-tag-container",
+    });
+    const file = this.view.app.vault.getAbstractFileByPath(filePath);
+    if (file instanceof TFile) {
+      const fileTags = this.view.labels.extractTagsFromFile(file);
+      for (const tag of fileTags) {
+        const tagEl = tagContainerEl.createSpan({
+          cls: "base-board-card-tag",
+          text: tag,
+        });
+        const color = this.view.labels.getColorForTag(tag);
+        if (color) {
+          tagEl.style.setProperty("--tag-color", color);
+          if (relativeLuminance(color) === "dark") {
+            tagEl.addClass("base-board-card-tag-light");
+          } else {
+            tagEl.addClass("base-board-card-tag-dark");
+          }
+        }
+      }
+    }
+
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
     titleEl.createEl("span", { text: entry.file?.basename ?? "Untitled" });
 
@@ -135,6 +159,15 @@ export class CardManager {
     if (!file || !(file instanceof TFile)) return;
 
     const menu = new Menu();
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Edit labels")
+        .setIcon("lucide-tags")
+        .onClick(() => {
+          this.view.labels.promptEditTags(file);
+        });
+    });
 
     menu.addItem((item) => {
       item

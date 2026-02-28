@@ -7,7 +7,6 @@ import globals from "globals";
 
 export default defineConfig([
   ...tseslint.configs.recommendedTypeChecked,
-  // @ts-expect-error - The types for this plugin don't perfectly match the expected FlatConfig format yet
   ...(obsidianmd.configs?.recommendedWithLocalesEn || []),
   eslintPluginPrettierRecommended,
   {

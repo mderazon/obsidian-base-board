@@ -11,6 +11,7 @@ import type BaseBoardPlugin from "./main";
 import { DragDropManager } from "./drag-drop";
 import { ColumnManager } from "./column";
 import { CardManager } from "./card";
+import { Labels } from "./labels";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
@@ -40,6 +41,8 @@ export class KanbanView extends BasesView {
   private isFirstRender = true;
   /** Debounce timer for render calls. */
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Label Manager for tags and filters */
+  public labels: Labels;
 
   constructor(
     controller: QueryController,
@@ -51,6 +54,7 @@ export class KanbanView extends BasesView {
     this.plugin = plugin;
     this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
 
+    this.labels = new Labels(this);
     this.cardManager = new CardManager(this);
     this.columnManager = new ColumnManager(this);
 
@@ -302,6 +306,8 @@ export class KanbanView extends BasesView {
       this.isFirstRender = false;
     }
 
+    this.labels.renderFilterBar(this.containerEl);
+
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);
       this.columnManager.renderColumn(boardEl, columnName, group, idx);
@@ -312,7 +318,7 @@ export class KanbanView extends BasesView {
   }
 
   // ---------------------------------------------------------------------------
-  //  Column management helpers
+  //  Column & Filter management helpers
   // ---------------------------------------------------------------------------
 
   private handleColumnReorder(orderedNames: string[]): void {

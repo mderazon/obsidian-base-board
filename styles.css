@@ -464,3 +464,113 @@
 .base-board-add-card-input::placeholder {
   color: var(--text-faint);
 }
+
+/* ---- Filter Bar ---- */
+
+.base-board-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-filter-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+}
+
+.base-board-filter-pill {
+  position: relative;
+  font-size: var(--font-ui-smaller);
+  padding: 4px 10px;
+  border-radius: 12px;
+  background-color: var(--tag-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
+  border: 1px solid transparent;
+}
+
+/* Ensure color contrast if a user picks a deep color - standard hack is to just add a slight text shadow or use CSS relative colors but we keep it simple */
+.base-board-filter-pill {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.base-board-filter-pill:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+}
+
+.base-board-filter-pill.is-active {
+  box-shadow:
+    0 0 0 2px var(--background-secondary),
+    0 0 0 4px var(--interactive-accent);
+  font-weight: var(--font-bold);
+}
+
+.base-board-filter-clear {
+  margin-left: auto;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+}
+
+.base-board-filter-clear:hover {
+  color: var(--text-error);
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.base-board-card-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--tag-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.base-board-color-picker-close {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.base-board-filter-pill-light {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.base-board-filter-pill-dark {
+  color: #1c212b !important;
+  text-shadow: none;
+}
+
+.base-board-card-tag-light {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.base-board-card-tag-dark {
+  color: #1c212b !important;
+  text-shadow: none;
+}

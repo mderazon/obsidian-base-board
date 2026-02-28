@@ -1,7 +1,7 @@
 import { KanbanView } from "./kanban-view";
 import { CONFIG_KEY_TAG_COLORS } from "./constants";
 import { App, Modal, TFile, setIcon, setTooltip, Setting } from "obsidian";
-import { InputModal } from "./modals";
+import { TagEditModal } from "./tag-edit-modal";
 import { relativeLuminance } from "./color-utils";
 
 export class Tags {
@@ -75,31 +75,20 @@ export class Tags {
   }
 
   public promptEditTags(file: TFile): void {
-    const currentTags = this.extractTagsFromFile(file).join(", ");
-    new InputModal(
-      this.view.app,
-      "Edit tags",
-      "Comma-separated tags...",
-      (value: string) => {
-        const newTags = value
-          .split(",")
-          .map((t) => t.trim())
-          .filter((t) => t);
-
-        void this.view.app.fileManager.processFrontMatter(
-          file,
-          (fm: Record<string, unknown>) => {
-            if (newTags.length === 0) {
-              delete fm.tags;
-              delete fm.tag;
-            } else {
-              fm.tags = newTags;
-            }
-          },
-        );
-      },
-      currentTags,
-    ).open();
+    const currentTags = this.extractTagsFromFile(file);
+    new TagEditModal(this.view.app, currentTags, this, (newTags: string[]) => {
+      void this.view.app.fileManager.processFrontMatter(
+        file,
+        (fm: Record<string, unknown>) => {
+          if (newTags.length === 0) {
+            delete fm.tags;
+            delete fm.tag;
+          } else {
+            fm.tags = newTags;
+          }
+        },
+      );
+    }).open();
   }
 
   public renderFilterBar(container: HTMLElement): void {

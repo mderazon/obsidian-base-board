@@ -594,3 +594,122 @@
   color: #1c212b !important;
   text-shadow: none;
 }
+
+/* Card Detail Modal */
+.modal.base-board-card-modal {
+  width: 800px;
+  max-width: 95vw;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.base-board-card-modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.base-board-card-modal-actions button {
+  box-shadow: none;
+}
+
+.base-board-modal-separator {
+  margin: 16px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.base-board-card-modal-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.base-board-rogue-leaf-container {
+  flex: 1;
+  position: relative !important;
+  height: 100% !important;
+  width: 100%;
+}
+
+/* Tag Edit Modal */
+.base-board-tag-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  min-height: 40px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-form-field);
+  cursor: text;
+}
+
+.base-board-tag-input-container:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.base-board-tag-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-ui-smaller);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--tag-color, var(--background-modifier-hover));
+}
+
+.base-board-tag-chip-text {
+  font-weight: 500;
+}
+
+.base-board-tag-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-tag-chip-remove:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.base-board-tag-chip.base-board-tag-chip-light {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-tag-chip.base-board-tag-chip-light
+  .base-board-tag-chip-remove:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.base-board-tag-chip.base-board-tag-chip-dark {
+  color: #1c212b !important;
+  text-shadow: none;
+}
+
+.base-board-tag-input {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  min-width: 100px;
+  flex: 1 1 auto;
+  padding: 0 !important;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal) !important;
+}
+
+.base-board-modal-actions-right {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}

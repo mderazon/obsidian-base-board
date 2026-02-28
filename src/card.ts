@@ -11,6 +11,7 @@ import {
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
+import { CardDetailModal } from "./card-detail-modal";
 
 // File properties that are redundant (shown as the card title) or are
 // complex list types that don't render usefully as a short chip value.
@@ -62,10 +63,13 @@ export class CardManager {
       if (dragging) return;
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
-      const newTab = e.ctrlKey || e.metaKey;
-      void this.view.app.workspace
-        .getLeaf(newTab ? "tab" : false)
-        .openFile(file);
+
+      const newTabUrl = e.ctrlKey || e.metaKey;
+      if (newTabUrl) {
+        void this.view.app.workspace.getLeaf("tab").openFile(file);
+      } else {
+        new CardDetailModal(this.view.app, file, this.view).open();
+      }
     });
 
     // Middle-click → always open in new tab
@@ -211,7 +215,7 @@ export class CardManager {
         .setTitle("Open")
         .setIcon("lucide-file-text")
         .onClick(() => {
-          void this.view.app.workspace.getLeaf(false).openFile(file);
+          new CardDetailModal(this.view.app, file, this.view).open();
         });
     });
 

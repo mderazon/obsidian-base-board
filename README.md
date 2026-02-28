@@ -16,6 +16,7 @@ https://github.com/user-attachments/assets/9ae6e1b7-729f-4891-b853-d1f5d2ebe755
 - **Property-Based Columns**: Instantly generate columns from any frontmatter property.
 - **Intuitive Drag & Drop**: Move cards between columns to update their properties automatically, and reorder cards within a column.
 - **Inline Power**: Rename cards or column titles directly on the board.
+- **Native Editing Modal**: Open any card into a fully-functional Obsidian editor floating directly over your workspace.
 - **Rich Cards**: View key metadata fields as chips on each card for a quick overview.
 - **Tags**: Color-coded tag chips on cards with a clickable filter bar to narrow the board by tag.
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).

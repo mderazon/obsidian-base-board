@@ -17,7 +17,7 @@
     "Tasks::Task Board::status": {
       "columns": [
         "Backlog",
-        "Read to work",
+        "In progress",
         "Done"
       ]
     },

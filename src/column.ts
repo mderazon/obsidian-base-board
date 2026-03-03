@@ -186,12 +186,12 @@ export class ColumnManager {
     input.className = "base-board-column-title-input";
 
     // Hide count and + during editing so the input can use the full width
-    if (countEl) countEl.style.display = "none";
-    if (addCardBtn) addCardBtn.style.display = "none";
+    if (countEl) countEl.classList.add("base-board-hidden");
+    if (addCardBtn) addCardBtn.classList.add("base-board-hidden");
 
     const restoreChrome = () => {
-      if (countEl) countEl.style.display = "";
-      if (addCardBtn) addCardBtn.style.display = "";
+      if (countEl) countEl.classList.remove("base-board-hidden");
+      if (addCardBtn) addCardBtn.classList.remove("base-board-hidden");
     };
 
     // Replace the span with the input

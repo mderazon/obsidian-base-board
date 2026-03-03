@@ -1,0 +1,36 @@
+{
+  "name": "base-board-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Base Board — lets LLM agents read and manage your Obsidian kanban board",
+  "keywords": [
+    "obsidian",
+    "kanban",
+    "mcp",
+    "model-context-protocol",
+    "bases",
+    "ai-tools"
+  ],
+  "author": "Michael DeRazon",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/mcp/index.js",
+  "bin": {
+    "base-board-mcp": "./dist/mcp/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/mcp/index.js",
+    "test": "npm run build && node --test \"dist/tests/*.js\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "zod": "^4.3.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

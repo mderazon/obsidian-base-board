@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Lint (Plugin & MCP Server)
+        run: npm run lint
+
+      - name: Test MCP Server
+        run: npm test --workspace=mcp-server
+
       - name: Build plugin
         run: npm run build
 

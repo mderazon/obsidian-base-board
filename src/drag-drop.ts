@@ -13,6 +13,8 @@ export interface DragDropCallbacks {
   ) => Promise<void>;
   /** Column header was dragged to a new position. */
   onColumnReorder: (orderedColumnNames: string[]) => void;
+  /** Returns the set of currently selected card file paths. */
+  getSelectedCards: () => Set<string>;
 }
 
 export class DragDropManager {
@@ -26,6 +28,8 @@ export class DragDropManager {
   private cardDropped = false;
   /** Height of the dragged card, used to size the placeholder */
   private draggedCardHeight = 0;
+  /** Other selected card elements dimmed during multi-drag */
+  private multiDragEls: HTMLElement[] = [];
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -126,8 +130,13 @@ export class DragDropManager {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(CARD_MIME, cardEl.dataset.filePath ?? "");
 
-    // Create a tilted clone for the drag ghost
-    const PAD = 20; // extra space so rotation isn't clipped
+    const selectedCards = this.callbacks.getSelectedCards();
+    const filePath = cardEl.dataset.filePath ?? "";
+    const isMultiDrag = selectedCards.size > 1 && selectedCards.has(filePath);
+    const dragCount = isMultiDrag ? selectedCards.size : 1;
+
+    // Create the drag ghost
+    const PAD = 20;
     const ghostWrapper = document.createElement("div");
     ghostWrapper.style.cssText = `
       position: fixed;
@@ -137,31 +146,123 @@ export class DragDropManager {
       pointer-events: none;
       z-index: 9999;
     `;
-    const ghost = cardEl.cloneNode(true) as HTMLElement;
-    ghost.style.cssText = `
-      width: ${cardRect.width}px;
-      transform: rotate(3deg);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-      opacity: 0.85;
-      border-radius: var(--radius-s);
-    `;
-    ghostWrapper.appendChild(ghost);
+
+    if (isMultiDrag) {
+      // Stacked cards effect: offset shadow cards behind the main card
+      const stackContainer = document.createElement("div");
+      stackContainer.style.cssText = `
+        position: relative;
+        width: ${cardRect.width}px;
+      `;
+
+      // Read the computed background to use concrete values for the ghost
+      const compStyles = getComputedStyle(cardEl);
+      const cardBg = compStyles.backgroundColor || "#1e1e2e";
+      const borderColor = compStyles.borderColor || "#383850";
+      const accentColor =
+        getComputedStyle(document.body).getPropertyValue(
+          "--interactive-accent",
+        ) || "#7c3aed";
+
+      // Shadow layers (bottom-most first) — visible offset behind the main card
+      const layerCount = Math.min(dragCount - 1, 2);
+      for (let i = layerCount; i >= 1; i--) {
+        const layer = document.createElement("div");
+        layer.style.cssText = `
+          position: absolute;
+          top: ${i * 6}px;
+          left: ${i * 4}px;
+          width: 100%;
+          height: ${cardRect.height}px;
+          background: ${cardBg};
+          border: 1px solid ${borderColor};
+          border-radius: 6px;
+          opacity: ${0.6 - i * 0.15};
+          box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        `;
+        stackContainer.appendChild(layer);
+      }
+
+      // Top card (the actual dragged card clone)
+      const ghost = cardEl.cloneNode(true) as HTMLElement;
+      ghost.style.cssText = `
+        position: relative;
+        width: ${cardRect.width}px;
+        transform: rotate(2deg);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+        opacity: 0.95;
+        border-radius: 6px;
+        background: ${cardBg};
+        border: 1px solid ${borderColor};
+      `;
+      ghost.classList.remove("base-board-card--selected");
+      stackContainer.appendChild(ghost);
+
+      // Count badge
+      const badge = document.createElement("div");
+      badge.textContent = String(dragCount);
+      badge.style.cssText = `
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        min-width: 24px;
+        height: 24px;
+        line-height: 24px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+        background: ${accentColor};
+        border-radius: 12px;
+        padding: 0 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        z-index: 1;
+      `;
+      stackContainer.appendChild(badge);
+
+      ghostWrapper.appendChild(stackContainer);
+    } else {
+      // Single card: tilted clone
+      const ghost = cardEl.cloneNode(true) as HTMLElement;
+      ghost.style.cssText = `
+        width: ${cardRect.width}px;
+        transform: rotate(3deg);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        opacity: 0.85;
+        border-radius: var(--radius-s, 6px);
+      `;
+      ghostWrapper.appendChild(ghost);
+    }
+
     document.body.appendChild(ghostWrapper);
-    // Offset accounts for the padding so cursor stays at grab point
     e.dataTransfer.setDragImage(
       ghostWrapper,
       e.clientX - cardRect.left + PAD,
       e.clientY - cardRect.top + PAD,
     );
-    // Clean up the ghost after the browser has captured it
+
+    // Clean up the ghost after the browser captures it, and dim cards
     requestAnimationFrame(() => {
       ghostWrapper.remove();
-      // Collapse the card and insert placeholder in the same frame
+
+      // Collapse the dragged card and insert placeholder
       this.placeholderEl = document.createElement("div");
       this.placeholderEl.className = "base-board-card-placeholder";
       this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
       cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
       cardEl.addClass("base-board-card--dragging");
+
+      // Dim all other selected cards during multi-drag
+      if (isMultiDrag && this.boardEl) {
+        this.multiDragEls = Array.from(
+          this.boardEl.querySelectorAll<HTMLElement>(".base-board-card"),
+        ).filter(
+          (el) => el !== cardEl && selectedCards.has(el.dataset.filePath ?? ""),
+        );
+        for (const el of this.multiDragEls) {
+          el.addClass("base-board-card--drag-ghost");
+        }
+      }
     });
   }
 
@@ -285,6 +386,12 @@ export class DragDropManager {
   // ---------------------------------------------------------------------------
 
   private onDragEnd(): void {
+    // Restore multi-drag ghost cards
+    for (const el of this.multiDragEls) {
+      el.removeClass("base-board-card--drag-ghost");
+    }
+    this.multiDragEls = [];
+
     if (this.cardDropped) {
       // Successful card drop — don't restore the card or remove the placeholder.
       // The re-render will replace the entire DOM with the correct order.
@@ -316,10 +423,10 @@ export class DragDropManager {
       this.handleColumnDrop(e);
       this.onDragEnd();
     } else if (this.dragType === "card") {
-      this.cardDropped = true;
-      await this.handleCardDrop(e);
+      const success = await this.handleCardDrop(e);
+      this.cardDropped = success;
       // Don't call onDragEnd here — the browser fires dragend automatically,
-      // and our flag ensures we skip visual cleanup.
+      // and our flag ensures we skip visual cleanup on success.
     }
   }
 
@@ -351,15 +458,15 @@ export class DragDropManager {
     this.callbacks.onColumnReorder(orderedNames);
   }
 
-  private async handleCardDrop(e: DragEvent): Promise<void> {
+  private async handleCardDrop(e: DragEvent): Promise<boolean> {
     const filePath = e.dataTransfer?.getData(CARD_MIME);
-    if (!filePath) return;
+    if (!filePath) return false;
 
     const columnEl = (e.target as HTMLElement).closest(".base-board-column");
-    if (!(columnEl instanceof HTMLElement)) return;
+    if (!(columnEl instanceof HTMLElement)) return false;
 
     const targetColumnName = columnEl.dataset.columnName;
-    if (!targetColumnName) return;
+    if (!targetColumnName) return false;
 
     const cardsContainer = columnEl.querySelector(".base-board-cards");
 
@@ -385,6 +492,7 @@ export class DragDropManager {
     }
 
     await this.callbacks.onCardDrop(filePath, targetColumnName, orderedPaths);
+    return true;
   }
 
   // ---------------------------------------------------------------------------

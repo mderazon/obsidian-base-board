@@ -47,6 +47,8 @@ export class KanbanView extends BasesView implements HoverParent {
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
   /** Label Manager for tags and filters */
   public tags: Tags;
+  /** Currently selected card file paths (for batch operations) */
+  public selectedCards: Set<string> = new Set();
 
   constructor(
     controller: QueryController,
@@ -70,6 +72,7 @@ export class KanbanView extends BasesView implements HoverParent {
       ) => this.handleCardDrop(filePath, targetColumn, orderedPaths),
       onColumnReorder: (orderedNames: string[]) =>
         this.handleColumnReorder(orderedNames),
+      getSelectedCards: () => this.selectedCards,
     });
   }
 
@@ -275,6 +278,7 @@ export class KanbanView extends BasesView implements HoverParent {
   // ---------------------------------------------------------------------------
 
   public render(): void {
+    this.selectedCards.clear();
     this.containerEl.empty();
 
     // Use the official API: this.data is a BasesQueryResult
@@ -357,27 +361,54 @@ export class KanbanView extends BasesView implements HoverParent {
     const groupByProp = this.getGroupByProperty();
     if (!groupByProp) return;
 
+    // Snapshot the selection NOW, before any async work or re-render can clear it
+    const selectedSnapshot = new Set(this.selectedCards);
+    const isMultiDrag =
+      selectedSnapshot.size > 1 && selectedSnapshot.has(filePath);
+
+    // If the dragged card is part of a multi-selection, expand the drop to
+    // include all selected cards. The dragged card goes where it was dropped
+    // (already in orderedPaths); the rest of the selection is appended after.
+    const otherSelected = isMultiDrag
+      ? Array.from(selectedSnapshot).filter(
+          (p) => p !== filePath && !orderedPaths.includes(p),
+        )
+      : [];
+
+    // Insert co-selected cards right after the dragged card's position
+    const fullOrderedPaths = [...orderedPaths];
+    if (otherSelected.length > 0) {
+      const dropIdx = fullOrderedPaths.indexOf(filePath);
+      const insertAt = dropIdx !== -1 ? dropIdx + 1 : fullOrderedPaths.length;
+      fullOrderedPaths.splice(insertAt, 0, ...otherSelected);
+    }
+
     await this.applyBatchUpdate(async () => {
-      // 1. Move card to new column if needed
-      const draggedFile = this.app.vault.getAbstractFileByPath(filePath);
-      if (draggedFile && draggedFile instanceof TFile) {
-        const sourceColumn = this.getCardSourceColumn(filePath);
-        if (sourceColumn !== targetColumnName) {
-          await this.app.fileManager.processFrontMatter(
-            draggedFile,
-            (fm: Record<string, unknown>) => {
-              if (targetColumnName === NO_VALUE_COLUMN) {
-                delete fm[groupByProp];
-              } else {
-                fm[groupByProp] = targetColumnName;
-              }
-            },
-          );
-        }
-      }
+      // 1. Move all cards to the target column (dragged card + any co-selected)
+      const pathsToMove = isMultiDrag
+        ? [filePath, ...otherSelected]
+        : [filePath];
+
+      const movePromises = pathsToMove.map((fp) => {
+        const file = this.app.vault.getAbstractFileByPath(fp);
+        if (!file || !(file instanceof TFile)) return Promise.resolve();
+        const sourceColumn = this.getCardSourceColumn(fp);
+        if (sourceColumn === targetColumnName) return Promise.resolve();
+        return this.app.fileManager.processFrontMatter(
+          file,
+          (fm: Record<string, unknown>) => {
+            if (targetColumnName === NO_VALUE_COLUMN) {
+              delete fm[groupByProp];
+            } else {
+              fm[groupByProp] = targetColumnName;
+            }
+          },
+        );
+      });
+      await Promise.all(movePromises);
 
       // 2. Update kanban_order for all cards in the target column
-      const updatePromises = orderedPaths.map((cardPath, i) => {
+      const orderPromises = fullOrderedPaths.map((cardPath, i) => {
         const file = this.app.vault.getAbstractFileByPath(cardPath);
         if (!file || !(file instanceof TFile)) return Promise.resolve();
         return this.app.fileManager.processFrontMatter(
@@ -387,8 +418,12 @@ export class KanbanView extends BasesView implements HoverParent {
           },
         );
       });
-      await Promise.all(updatePromises);
+      await Promise.all(orderPromises);
     });
+
+    // Always ensure a re-render, even if Bases hasn't fired onDataUpdated yet.
+    // The scheduleRender is debounced, so if Bases fires later it just coalesces.
+    this.scheduleRender();
   }
 
   /** Debounced render — coalesces multiple calls into one. */

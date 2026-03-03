@@ -61,15 +61,26 @@ export class CardManager {
 
     cardEl.addEventListener("click", (e: MouseEvent) => {
       if (dragging) return;
+
+      const isMultiKey = e.ctrlKey || e.metaKey;
+      const isShift = e.shiftKey;
+
+      if (isMultiKey || isShift) {
+        e.preventDefault();
+        this.handleCardSelect(filePath, columnName, isShift);
+        return;
+      }
+
+      // If there are selected cards, clear them on a plain click instead of opening
+      if (this.view.selectedCards.size > 0) {
+        this.clearSelection();
+        return;
+      }
+
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
 
-      const newTabUrl = e.ctrlKey || e.metaKey;
-      if (newTabUrl) {
-        void this.view.app.workspace.getLeaf("tab").openFile(file);
-      } else {
-        new CardDetailModal(this.view.app, file, this.view).open();
-      }
+      new CardDetailModal(this.view.app, file, this.view).open();
     });
 
     // Middle-click → always open in new tab
@@ -78,6 +89,15 @@ export class CardManager {
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
       void this.view.app.workspace.getLeaf("tab").openFile(file);
+    });
+
+    // Keyboard: Escape clears multi-selection when a card is focused
+    cardEl.setAttribute("tabindex", "-1");
+    cardEl.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape" && this.view.selectedCards.size > 0) {
+        e.preventDefault();
+        this.clearSelection();
+      }
     });
 
     // Hover → native Obsidian page-preview popover (same as hovering a [[wikilink]])
@@ -94,11 +114,21 @@ export class CardManager {
       });
     });
 
-    // Right-click → standard Obsidian file context menu
+    // Right-click → batch move menu when cards are selected, otherwise standard file menu
     cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
+
+      // If this card is part of a multi-selection, show the batch move menu
+      if (
+        this.view.selectedCards.size > 1 &&
+        this.view.selectedCards.has(filePath)
+      ) {
+        this.showBatchMoveMenu(e);
+        return;
+      }
+
       const menu = new Menu();
       this.view.app.workspace.trigger(
         "file-menu",
@@ -306,10 +336,17 @@ export class CardManager {
     columnName: string,
     existingCount: number,
   ): void {
-    // Hide the button and show an input
+    // Find the cards list for this column.
+    // The trigger button may be in the header OR in the footer, so we walk
+    // up to the column element and then down into .base-board-cards.
+    const columnEl = btnEl.closest(".base-board-column");
+    const cardsEl =
+      (columnEl?.querySelector(".base-board-cards") as HTMLElement | null) ??
+      btnEl.parentElement!;
+
     btnEl.classList.add("base-board-hidden");
 
-    const inputWrapper = btnEl.parentElement!.createDiv({
+    const inputWrapper = cardsEl.createDiv({
       cls: "base-board-add-card-input-wrapper",
     });
     const input = inputWrapper.createEl("input", {
@@ -330,19 +367,15 @@ export class CardManager {
       }
     };
 
-    const cancel = () => {
-      committed = true;
-      inputWrapper.remove();
-      btnEl.classList.remove("base-board-hidden");
-    };
-
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         void commit();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        cancel();
+        committed = true;
+        inputWrapper.remove();
+        btnEl.classList.remove("base-board-hidden");
       }
     });
     input.addEventListener("blur", () => {
@@ -418,5 +451,134 @@ export class CardManager {
     }
 
     return "";
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Multi-select helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Toggle or range-select a card.
+   *
+   * - Cmd/Ctrl+click  → toggle this card in/out of the selection
+   * - Shift+click     → select a contiguous range from the last-selected card
+   *                     to this one (within the same column's DOM order)
+   */
+  public handleCardSelect(
+    filePath: string,
+    columnName: string,
+    isShift: boolean,
+  ): void {
+    const sel = this.view.selectedCards;
+
+    if (isShift && sel.size > 0) {
+      // Build DOM order for the column
+      const columnEl = this.view.containerEl.querySelector(
+        `[data-column-name="${CSS.escape(columnName)}"]`,
+      );
+      if (columnEl) {
+        const cardEls = Array.from(
+          columnEl.querySelectorAll<HTMLElement>(".base-board-card"),
+        );
+        const paths = cardEls.map((el) => el.dataset.filePath ?? "");
+        const clickedIdx = paths.indexOf(filePath);
+        // Find the last card in the current selection that exists in this column
+        const lastIdx = paths.reduceRight((found, p, i) => {
+          if (found !== -1) return found;
+          return sel.has(p) ? i : -1;
+        }, -1);
+        if (clickedIdx !== -1 && lastIdx !== -1) {
+          const [from, to] = [
+            Math.min(clickedIdx, lastIdx),
+            Math.max(clickedIdx, lastIdx),
+          ];
+          for (let i = from; i <= to; i++) {
+            if (paths[i]) sel.add(paths[i]);
+          }
+        } else {
+          sel.add(filePath); // fallback: just add
+        }
+      }
+    } else {
+      // Cmd/Ctrl+click: toggle
+      if (sel.has(filePath)) {
+        sel.delete(filePath);
+      } else {
+        sel.add(filePath);
+      }
+    }
+
+    // Sync visual state on all card elements
+    this.view.containerEl
+      .querySelectorAll<HTMLElement>(".base-board-card")
+      .forEach((el) => {
+        if (sel.has(el.dataset.filePath ?? "")) {
+          el.addClass("base-board-card--selected");
+        } else {
+          el.removeClass("base-board-card--selected");
+        }
+      });
+  }
+
+  public clearSelection(): void {
+    this.view.selectedCards.clear();
+    this.view.containerEl
+      .querySelectorAll<HTMLElement>(".base-board-card--selected")
+      .forEach((el) => el.removeClass("base-board-card--selected"));
+  }
+
+  /**
+   * Show a "Move to…" context menu for the current multi-selection.
+   * Uses the same `applyBatchUpdate` + `processFrontMatter` pattern as
+   * the single-card drag/drop to stay consistent.
+   */
+  public showBatchMoveMenu(e: MouseEvent): void {
+    const selectedPaths = Array.from(this.view.selectedCards);
+    const groupByProp = this.view.getGroupByProperty();
+    if (!groupByProp) return;
+
+    const columns = this.view.getColumns();
+    const menu = new Menu();
+
+    menu.addItem((item) => {
+      item.setTitle(`Move ${selectedPaths.length} cards to…`).setDisabled(true);
+    });
+    menu.addSeparator();
+
+    for (const col of columns) {
+      menu.addItem((item) => {
+        item.setTitle(col).onClick(() => {
+          void this.moveBatchToColumn(selectedPaths, col, groupByProp);
+        });
+      });
+    }
+
+    menu.showAtMouseEvent(e);
+  }
+
+  private async moveBatchToColumn(
+    filePaths: string[],
+    targetColumn: string,
+    groupByProp: string,
+  ): Promise<void> {
+    await this.view.applyBatchUpdate(async () => {
+      const updates = filePaths.map((fp, i) => {
+        const file = this.view.app.vault.getAbstractFileByPath(fp);
+        if (!file || !(file instanceof TFile)) return Promise.resolve();
+        return this.view.app.fileManager.processFrontMatter(
+          file,
+          (fm: Record<string, unknown>) => {
+            fm[groupByProp] = targetColumn;
+            // Preserve relative order by assigning sequential indices
+            fm[ORDER_PROPERTY] = i;
+          },
+        );
+      });
+      await Promise.all(updates);
+    });
+    this.clearSelection();
+    new Notice(
+      `Moved ${filePaths.length} card${filePaths.length > 1 ? "s" : ""} to "${targetColumn}"`,
+    );
   }
 }

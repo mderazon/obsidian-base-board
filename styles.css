@@ -7,6 +7,8 @@
 .base-board-container {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -14,10 +16,16 @@
   display: flex;
   gap: 12px;
   padding: 12px;
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
   align-items: flex-start;
+}
+
+/* Utility — used to hide the + button while inline card creation input is open */
+.base-board-hidden {
+  display: none !important;
 }
 
 /* ---- Placeholder (no groupBy set) ---- */
@@ -44,6 +52,7 @@
   max-height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background-color: var(--background-secondary);
   border-radius: var(--radius-m);
   border: 1px solid var(--background-modifier-border);
@@ -98,7 +107,7 @@
 .base-board-column-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--background-modifier-border);
   user-select: none;
@@ -126,7 +135,6 @@
 }
 
 .base-board-column-title {
-  flex: 1 1 auto;
   font-weight: var(--font-semibold);
   font-size: var(--font-ui-small);
   white-space: nowrap;
@@ -135,14 +143,10 @@
   cursor: default;
   border-radius: var(--radius-s);
   padding: 2px 4px;
-}
-
-.base-board-column-title:not(.base-board-no-value-title):hover {
-  background-color: var(--background-modifier-hover);
+  max-width: 160px;
 }
 
 .base-board-column-title-input {
-  flex: 1 1 auto;
   font-weight: var(--font-semibold);
   font-size: var(--font-ui-small);
   font-family: inherit;
@@ -152,6 +156,8 @@
   border-radius: var(--radius-s);
   padding: 2px 4px;
   outline: none;
+  /* Fill remaining space now that count + button are hidden */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -160,38 +166,42 @@
   font-style: italic;
 }
 
-.base-board-header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
 .base-board-column-count {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
-  background-color: var(--background-modifier-hover);
-  border-radius: var(--radius-s);
-  padding: 1px 7px;
+  flex-shrink: 0;
 }
 
-.base-board-column-delete {
-  cursor: pointer;
-  color: var(--text-faint);
+/* Pushes the + button to the far right */
+.base-board-header-spacer {
+  flex: 1 1 auto;
+}
+
+/* ---- Column header add-card button — always visible ---- */
+
+.base-board-column-add-card {
   display: flex;
   align-items: center;
-  opacity: 0;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
   transition:
-    opacity 0.15s ease,
+    background-color 0.15s ease,
     color 0.15s ease;
 }
 
-.base-board-column-header:hover .base-board-column-delete {
-  opacity: 1;
+.base-board-column-add-card svg {
+  width: 14px;
+  height: 14px;
 }
 
-.base-board-column-delete:hover {
-  color: var(--text-error);
+.base-board-column-add-card:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--interactive-accent);
 }
 
 /* ---- Cards container (scrollable) ---- */
@@ -285,6 +295,29 @@
 
 .base-board-card--dragging {
   display: none;
+}
+
+/* Multi-select highlight */
+.base-board-card--selected {
+  border-color: var(--interactive-accent);
+  box-shadow:
+    0 0 0 2px var(--interactive-accent),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 6%,
+    var(--background-primary)
+  );
+}
+
+/* Other selected cards dimmed during a multi-drag */
+.base-board-card--drag-ghost {
+  opacity: 0.35;
+  transform: scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 /* ---- Card title ---- */

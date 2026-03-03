@@ -1,4 +1,11 @@
-import { BasesEntry, BasesEntryGroup, setIcon, TFile, Notice } from "obsidian";
+import {
+  BasesEntry,
+  BasesEntryGroup,
+  setIcon,
+  TFile,
+  Notice,
+  Menu,
+} from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { InputModal } from "./modals";
 import { NO_VALUE_COLUMN } from "./constants";
@@ -19,6 +26,26 @@ export class ColumnManager {
     const isNoValue = columnName === NO_VALUE_COLUMN;
     const entries = group ? group.entries : [];
 
+    // Sort entries up-front so the header add-card button can reference sorted.length
+    const sorted = [...entries].sort((a: BasesEntry, b: BasesEntry) => {
+      const pathA = a.file?.path ?? "";
+      const pathB = b.file?.path ?? "";
+      return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
+    });
+
+    const activeFilters = this.view.tags.activeFilters;
+    const visibleCards =
+      activeFilters.size > 0
+        ? sorted.filter((entry) => {
+            const file = entry.file;
+            if (!(file instanceof TFile)) return false;
+            const fileTags = this.view.tags.extractTagsFromFile(file);
+            return Array.from(activeFilters).some((filter) =>
+              fileTags.includes(filter),
+            );
+          })
+        : sorted;
+
     const columnEl = boardEl.createDiv({ cls: "base-board-column" });
     columnEl.dataset.columnName = columnName;
     columnEl.dataset.columnIndex = String(columnIndex);
@@ -32,84 +59,87 @@ export class ColumnManager {
     });
     setIcon(dragHandle, "grip-vertical");
 
+    // Title + inline count badge
     const titleEl = headerEl.createEl("span", {
       text: columnName,
       cls: "base-board-column-title",
     });
     if (isNoValue) {
       titleEl.addClass("base-board-no-value-title");
-    } else {
-      // Double-click to rename
-      titleEl.addEventListener("dblclick", () => {
-        this.startColumnRename(titleEl, columnName, entries);
-      });
     }
 
-    const headerRight = headerEl.createDiv({
-      cls: "base-board-header-right",
-    });
-
-    headerRight.createEl("span", {
+    // Count badge sits right after the title, inline
+    const countEl = headerEl.createEl("span", {
       text: String(entries.length),
       cls: "base-board-column-count",
     });
 
-    if (entries.length === 0 && !isNoValue) {
-      const deleteBtn = headerRight.createDiv({
-        cls: "base-board-column-delete",
+    // Spacer pushes the + button to the far right
+    headerEl.createDiv({ cls: "base-board-header-spacer" });
+
+    // ---- Add card button — always visible ----
+    let addCardHeaderBtn: HTMLElement | null = null;
+    if (!isNoValue) {
+      addCardHeaderBtn = headerEl.createDiv({
+        cls: "base-board-column-add-card",
       });
-      setIcon(deleteBtn, "x");
-      deleteBtn.addEventListener("click", () => {
-        this.handleDeleteColumn(columnName);
+      setIcon(addCardHeaderBtn, "plus");
+      addCardHeaderBtn.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        this.view.cardManager.startInlineCardCreation(
+          addCardHeaderBtn!,
+          columnName,
+          sorted.length,
+        );
+      });
+    }
+
+    // ---- Right-click context menu on header ----
+    if (!isNoValue) {
+      headerEl.addEventListener("contextmenu", (e: MouseEvent) => {
+        e.preventDefault();
+        const menu = new Menu();
+
+        menu.addItem((item) => {
+          item
+            .setTitle("Rename column")
+            .setIcon("lucide-pencil")
+            .onClick(() => {
+              this.startColumnRename(
+                titleEl,
+                columnName,
+                entries,
+                countEl,
+                addCardHeaderBtn,
+              );
+            });
+        });
+
+        menu.addSeparator();
+        menu.addItem((item) => {
+          item
+            .setTitle(
+              entries.length > 0
+                ? `Delete column (${entries.length} card${entries.length > 1 ? "s" : ""} will remain)`
+                : "Delete column",
+            )
+            .setIcon("lucide-trash-2")
+            .setWarning(true)
+            .onClick(() => {
+              this.handleDeleteColumn(columnName);
+            });
+        });
+
+        menu.showAtMouseEvent(e);
       });
     }
 
     // ---- Cards container ----
     const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
 
-    // Sort entries by kanban_order (read from metadataCache for reliability)
-    const sorted = [...entries].sort((a: BasesEntry, b: BasesEntry) => {
-      const pathA = a.file?.path ?? "";
-      const pathB = b.file?.path ?? "";
-      return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
-    });
-
-    const activeFilters = this.view.tags.activeFilters;
-    let visibleCards = sorted;
-    if (activeFilters.size > 0) {
-      visibleCards = sorted.filter((entry) => {
-        const file = entry.file;
-        if (!(file instanceof TFile)) return false;
-        const fileTags = this.view.tags.extractTagsFromFile(file);
-        // Match ANY of the active tag filters
-        return Array.from(activeFilters).some((filter) =>
-          fileTags.includes(filter),
-        );
-      });
-    }
-
     visibleCards.forEach((entry) => {
       this.view.cardManager.renderCard(cardsEl, entry, columnName);
     });
-
-    // ---- Add card button ----
-    if (!isNoValue) {
-      const addCardBtn = columnEl.createDiv({
-        cls: "base-board-add-card-btn",
-      });
-      setIcon(
-        addCardBtn.createSpan({ cls: "base-board-add-card-icon" }),
-        "plus",
-      );
-      addCardBtn.createSpan({ text: "Add card" });
-      addCardBtn.addEventListener("click", () => {
-        this.view.cardManager.startInlineCardCreation(
-          addCardBtn,
-          columnName,
-          sorted.length,
-        );
-      });
-    }
   }
 
   public renderAddColumnButton(boardEl: HTMLElement): void {
@@ -147,11 +177,22 @@ export class ColumnManager {
     titleEl: HTMLElement,
     oldName: string,
     entries: BasesEntry[],
+    countEl?: HTMLElement | null,
+    addCardBtn?: HTMLElement | null,
   ): void {
     const input = document.createElement("input");
     input.type = "text";
     input.value = oldName;
     input.className = "base-board-column-title-input";
+
+    // Hide count and + during editing so the input can use the full width
+    if (countEl) countEl.style.display = "none";
+    if (addCardBtn) addCardBtn.style.display = "none";
+
+    const restoreChrome = () => {
+      if (countEl) countEl.style.display = "";
+      if (addCardBtn) addCardBtn.style.display = "";
+    };
 
     // Replace the span with the input
     titleEl.replaceWith(input);
@@ -163,6 +204,7 @@ export class ColumnManager {
       if (committed) return;
       committed = true;
       const newName = input.value.trim();
+      restoreChrome();
       if (newName && newName !== oldName) {
         void this.handleRenameColumn(oldName, newName, entries);
       } else {
@@ -178,6 +220,7 @@ export class ColumnManager {
       } else if (e.key === "Escape") {
         e.preventDefault();
         committed = true;
+        restoreChrome();
         this.view.render();
       }
     });

@@ -1,5 +1,5 @@
 {
-  "name": "@mderazon/bb",
+  "name": "base-board-cli",
   "version": "0.1.0-beta",
   "description": "CLI for Base Board — manage your Obsidian kanban board from the terminal",
   "keywords": [
@@ -16,7 +16,8 @@
     "bb": "./dist/cli/src/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",

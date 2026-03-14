@@ -1,5 +1,6 @@
+/* eslint-disable import/no-nodejs-modules */
 /**
- * Tests for core/obsidian.ts — parseQueryResult
+ * Tests for obsidian.ts — parseQueryResult
  *
  * This is the most fragile part of the codebase: it parses whatever JSON
  * the Obsidian CLI returns into our Board type. Tests here act as a contract
@@ -11,14 +12,8 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseQueryResult } from "../core/obsidian.js";
+import { parseQueryResult } from "../obsidian.js";
 
-// ---------------------------------------------------------------------------
-// Fixtures — representative samples of what base:query format=json might return
-// (Update these once the real CLI schema is confirmed)
-// ---------------------------------------------------------------------------
-
-/** Minimal row shape: path + file name + status (confirmed CLI v1.12.4 schema) */
 const MINIMAL_ROWS = [
   {
     path: "Tasks/Fix login bug.md",
@@ -33,11 +28,11 @@ const MINIMAL_ROWS = [
   },
 ];
 
-/** Rows with richer properties */
 const RICH_ROWS = [
   {
     path: "Tasks/Fix login bug.md",
     "file name": "Fix login bug",
+    id: "amber-wolf-42",
     status: "Backlog",
     priority: "high",
     tags: ["bug", "backend"],
@@ -52,12 +47,7 @@ const RICH_ROWS = [
   },
 ];
 
-/** Edge case: only system fields present (no custom properties at all) */
 const SYSTEM_FIELDS_ONLY = [{ path: "Tasks/Task A.md", "file name": "Task A" }];
-
-// ---------------------------------------------------------------------------
-// Error cases
-// ---------------------------------------------------------------------------
 
 describe("parseQueryResult — error handling", () => {
   it("throws if input is not an array", () => {
@@ -74,10 +64,6 @@ describe("parseQueryResult — error handling", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Board metadata
-// ---------------------------------------------------------------------------
-
 describe("parseQueryResult — board metadata", () => {
   it("sets the board name from the parameter", () => {
     const board = parseQueryResult(MINIMAL_ROWS, "My Board");
@@ -90,15 +76,11 @@ describe("parseQueryResult — board metadata", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Card grouping
-// ---------------------------------------------------------------------------
-
 describe("parseQueryResult — card grouping", () => {
   it("groups cards by their status value", () => {
     const board = parseQueryResult(MINIMAL_ROWS, "Board");
-    assert.ok("Backlog" in board.columns, "should have Backlog column");
-    assert.ok("In Progress" in board.columns, "should have In Progress column");
+    assert.ok("Backlog" in board.columns);
+    assert.ok("In Progress" in board.columns);
     assert.equal(board.columns["Backlog"].length, 2);
     assert.equal(board.columns["In Progress"].length, 1);
   });
@@ -110,15 +92,32 @@ describe("parseQueryResult — card grouping", () => {
     assert.ok(titles.includes("Add search"));
   });
 
+  it("stores the vault-relative path on each card", () => {
+    const board = parseQueryResult(MINIMAL_ROWS, "Board");
+    const card = board.columns["Backlog"][0];
+    assert.ok(card.path.endsWith(".md"), "path should include .md extension");
+  });
+
+  it("reads id from frontmatter when present", () => {
+    const board = parseQueryResult(RICH_ROWS, "Board");
+    const card = board.columns["Backlog"][0];
+    assert.equal(card.id, "amber-wolf-42");
+  });
+
+  it("sets id to undefined when not present in frontmatter", () => {
+    const board = parseQueryResult(MINIMAL_ROWS, "Board");
+    const card = board.columns["Backlog"][0];
+    assert.equal(card.id, undefined);
+  });
+
   it("falls back to path stem when 'file name' is absent", () => {
     const rows = [{ path: "Tasks/Fallback card.md", status: "Backlog" }];
     const board = parseQueryResult(rows, "Board");
     assert.equal(board.columns["Backlog"][0].title, "Fallback card");
   });
 
-  it("does not use system fields (path, file name) as groupBy candidate", () => {
+  it("does not use system fields as groupBy candidate", () => {
     const board = parseQueryResult(SYSTEM_FIELDS_ONLY, "Board");
-    // groupBy should not be "path" or "file name"
     assert.notEqual(board.groupBy, "path");
     assert.notEqual(board.groupBy, "file name");
   });
@@ -136,9 +135,5 @@ describe("parseQueryResult — card grouping", () => {
     assert.equal(card.properties["priority"], "high");
     assert.deepEqual(card.properties["tags"], ["bug", "backend"]);
     assert.equal(card.properties["due"], "2026-03-15");
-  });
-
-  it("does not throw when only system fields are present (no custom props)", () => {
-    assert.doesNotThrow(() => parseQueryResult(SYSTEM_FIELDS_ONLY, "Board"));
   });
 });

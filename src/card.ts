@@ -13,6 +13,21 @@ import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
 
+const SUFFIX_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+function generateCardId(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  const suffix = Array.from(
+    { length: 4 },
+    () => SUFFIX_CHARS[Math.floor(Math.random() * SUFFIX_CHARS.length)],
+  ).join("");
+  return `${slug}-${suffix}`;
+}
+
 // File properties that are redundant (shown as the card title) or are
 // complex list types that don't render usefully as a short chip value.
 const FILE_PROPS_TO_SKIP = new Set([
@@ -405,10 +420,12 @@ export class CardManager {
       counter++;
     }
 
+    const id = generateCardId(title);
     const frontmatter = [
       "---",
       `${groupByProp}: ${columnName}`,
       `${ORDER_PROPERTY}: ${orderIndex}`,
+      `id: ${id}`,
       "---",
       "",
       `# ${title}`,

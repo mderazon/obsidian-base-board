@@ -8,9 +8,13 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { firstPendingCard, getBoard, getCard } from "../core/obsidian.js";
-import { formatBoard } from "../core/format.js";
-import type { BoardConfig } from "../core/types.js";
+import {
+  firstPendingCard,
+  getBoard,
+  getCard,
+} from "../../core/src/obsidian.js";
+import { formatBoard } from "../../core/src/format.js";
+import type { BoardConfig } from "../../core/src/types.js";
 
 function getConfig(): BoardConfig {
   return {
@@ -20,14 +24,6 @@ function getConfig(): BoardConfig {
 }
 
 export function registerPrompts(server: McpServer): void {
-  // -------------------------------------------------------------------------
-  // work-on-task
-  // Assembles everything the agent needs to start working on a task:
-  //   - Board overview (so the agent knows context)
-  //   - Full card content (frontmatter + body)
-  //   - Instruction to move the card when done
-  // One prompt call = one agent ready to work.
-  // -------------------------------------------------------------------------
   server.registerPrompt(
     "work-on-task",
     {
@@ -44,7 +40,7 @@ export function registerPrompts(server: McpServer): void {
           .string()
           .optional()
           .describe(
-            "Task title to work on. Defaults to the first card in the first non-Done column.",
+            "Card id to work on (e.g. amber-wolf-42). Defaults to the first card in the first non-Done column.",
           ),
       },
     },
@@ -57,23 +53,28 @@ export function registerPrompts(server: McpServer): void {
       const boardData = await getBoard(config);
       const boardOverview = formatBoard(boardData);
 
-      // Resolve which card to work on
-      const cardTitle = task ?? firstPendingCard(boardData)?.title;
-      if (!cardTitle) {
+      const allCards = Object.values(boardData.columns).flat();
+      const card = task
+        ? allCards.find((c) => c.id === task)
+        : firstPendingCard(boardData);
+
+      if (!card) {
         return {
           messages: [
             {
               role: "user",
               content: {
                 type: "text",
-                text: "No pending tasks found on the board. All done!",
+                text: task
+                  ? `Card "${task}" not found. Run bb assign-ids if cards are missing ids.`
+                  : "No pending tasks found on the board. All done!",
               },
             },
           ],
         };
       }
 
-      const cardContent = await getCard(config, cardTitle);
+      const cardContent = await getCard(config, card.path);
 
       const prompt = [
         `You are working on a task from the "${boardData.name}" kanban board.`,
@@ -81,13 +82,13 @@ export function registerPrompts(server: McpServer): void {
         `## Board Overview`,
         boardOverview,
         ``,
-        `## Task to implement: ${cardTitle}`,
+        `## Task to implement: ${card.title} [${card.id ?? "no-id"}]`,
         ``,
         cardContent,
         ``,
         `---`,
-        `When you have finished implementing the task, call the \`board_move_card\` tool`,
-        `to move "${cardTitle}" to "Done".`,
+        `When you have finished implementing the task, call \`board_move_card\``,
+        `to move card "${card.id ?? card.title}" to "Done".`,
       ].join("\n");
 
       return {

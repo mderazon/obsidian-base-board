@@ -16,8 +16,9 @@ export default defineConfig([
   // ---------------------------------------------------------------------------
   // Shared: TypeScript type-checked rules + Prettier — all TS source files
   // projectService auto-discovers the correct tsconfig.json per file:
-  //   src/            → tsconfig.json (root)
-  //   mcp-server/src/ → mcp-server/tsconfig.json
+  //   src/                  → tsconfig.json (root)
+  //   packages/*/src/       → packages/*/tsconfig.json
+  //   packages/core/src/    → packages/core/tsconfig.json
   // ---------------------------------------------------------------------------
   ...tseslint.configs.recommendedTypeChecked,
   // Obsidian plugin linting — checks Obsidian API patterns.
@@ -25,7 +26,7 @@ export default defineConfig([
   ...(obsidianmd.configs?.recommendedWithLocalesEn || []),
   eslintPluginPrettierRecommended,
   {
-    files: ["src/**/*.ts", "mcp-server/src/**/*.ts"],
+    files: ["src/**/*.ts", "packages/*/src/**/*.ts"],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -43,24 +44,19 @@ export default defineConfig([
   },
 
   // ---------------------------------------------------------------------------
-  // MCP server — Node.js package, not Obsidian plugin
+  // packages/cli, packages/mcp, packages/core — Node.js packages, not Obsidian plugin
   // ---------------------------------------------------------------------------
   {
-    // The MCP server is pure Node.js — importing built-in modules is correct.
-    // The `import/no-nodejs-modules` rule is from eslint-plugin-obsidianmd
-    // which targets Obsidian plugin code (browser/Electron context).
-    files: ["mcp-server/src/**/*.ts"],
+    // packages/* are pure Node.js — importing built-in modules is correct and
+    // expected. The obsidianmd rules target plugin code only.
+    files: ["packages/*/src/**/*.ts"],
     rules: {
-      "import/no-nodejs-modules": "off",
-      // Rule targets Obsidian plugin code using Vault#configDir;
-      // the MCP server handles XDG/snap paths for the CLI subprocess.
       "obsidianmd/hardcoded-config-path": "off",
     },
   },
   {
     // node:test's describe() and it() return Promises managed by the test runner.
-    // Awaiting them is not idiomatic and causes issues; suppress the warning.
-    files: ["mcp-server/src/tests/**/*.ts"],
+    files: ["packages/*/src/tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-floating-promises": "off",
     },

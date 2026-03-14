@@ -4,14 +4,15 @@
   "description": "Kanban board view for Bases with drag and drop",
   "main": "main.js",
   "workspaces": [
-    "mcp-server"
+    "packages/cli",
+    "packages/mcp"
   ],
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
-    "lint": "tsc -noEmit -skipLibCheck && eslint \"src/**/*.ts\" \"mcp-server/src/**/*.ts\"",
-    "format": "prettier --write \"src/**/*.ts\" \"mcp-server/src/**/*.ts\""
+    "lint": "tsc -noEmit -skipLibCheck && eslint \"src/**/*.ts\" \"packages/*/src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"packages/*/src/**/*.ts\""
   },
   "keywords": [
     "obsidian",

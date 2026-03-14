@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable import/no-nodejs-modules */
 /**
  * base-board-mcp — MCP server entry point.
  *
@@ -34,8 +35,6 @@ async function checkCli(): Promise<void> {
   const execAsync = promisify(exec);
 
   try {
-    // We pass --no-sandbox for the same reason we do in obsidian.ts:
-    // to bypass the AppArmor crash on Linux when spawned as a subprocess.
     await execAsync("obsidian --no-sandbox version");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -60,8 +59,7 @@ async function checkCli(): Promise<void> {
       console.error(
         "Error: Obsidian CLI crashed (sandbox restriction).\n" +
           "  This is a known issue on Linux (Ubuntu 23.10+ with AppArmor).\n" +
-          "  The Obsidian CLI cannot be spawned as a subprocess in this environment.\n" +
-          "  See: https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md",
+          "  The Obsidian CLI cannot be spawned as a subprocess in this environment.",
       );
     } else {
       console.error(`Error: Obsidian CLI check failed: ${msg}`);
@@ -75,7 +73,6 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  // Log to stderr only — stdout is reserved for MCP JSON-RPC messages.
   console.error("base-board-mcp running");
 }
 

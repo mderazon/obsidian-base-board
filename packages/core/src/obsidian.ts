@@ -1,3 +1,4 @@
+/* eslint-disable import/no-nodejs-modules */
 /**
  * Thin wrapper over the Obsidian CLI (`obsidian` v1.12+).
  *
@@ -10,7 +11,7 @@
  */
 
 import { exec } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import type {
   Board,
@@ -38,10 +39,8 @@ const execAsync = promisify(exec);
 
 /** Resolve XDG_CONFIG_HOME for the obsidian CLI subprocess. */
 function resolveXdgConfigHome(): string | undefined {
-  // Explicit override takes priority
   if (process.env["BB_XDG_CONFIG_HOME"])
     return process.env["BB_XDG_CONFIG_HOME"];
-  // Auto-detect snap install
   const snapPath = `${process.env["HOME"]}/snap/obsidian/current/.config`;
   if (existsSync(`${snapPath}/obsidian/obsidian.json`)) return snapPath;
   return undefined;
@@ -50,20 +49,58 @@ function resolveXdgConfigHome(): string | undefined {
 const XDG_CONFIG_HOME = resolveXdgConfigHome();
 
 // ---------------------------------------------------------------------------
+// Vault path resolution — needed to read frontmatter directly from files
+// (base:query only returns the groupBy property, not arbitrary frontmatter)
+// ---------------------------------------------------------------------------
+
+interface ObsidianConfig {
+  vaults?: Record<string, { path: string }>;
+}
+
+function getVaultPaths(): string[] {
+  const xdgConfig = XDG_CONFIG_HOME ?? `${process.env["HOME"] ?? ""}/.config`;
+  const obsidianJson = `${xdgConfig}/obsidian/obsidian.json`;
+  try {
+    const data = JSON.parse(
+      readFileSync(obsidianJson, "utf8"),
+    ) as ObsidianConfig;
+    return Object.values(data.vaults ?? {}).map((v) => v.path);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Resolve the filesystem root of the vault that contains a given file path.
+ * `cardPath` is vault-relative (e.g. "Tasks/Foo.md").
+ */
+function resolveVaultRoot(cardPath: string): string | undefined {
+  for (const vaultPath of getVaultPaths()) {
+    if (existsSync(`${vaultPath}/${cardPath}`)) return vaultPath;
+  }
+  return undefined;
+}
+
+/** Extract a single frontmatter property value from raw markdown content. */
+function readFrontmatterProp(
+  markdown: string,
+  key: string,
+): string | undefined {
+  const fmMatch = /^---\r?\n([\s\S]*?)\r?\n---/.exec(markdown);
+  if (!fmMatch) return undefined;
+  const line = new RegExp(`^${key}:\\s*(.+)$`, "m").exec(fmMatch[1]);
+  return line ? line[1].trim() : undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Build the optional vault prefix for all obsidian CLI commands. */
 function vaultPrefix(config: BoardConfig): string {
   return config.vault ? `vault="${config.vault}" ` : "";
 }
 
-/**
- * Run an obsidian CLI command and return stdout.
- * Throws a descriptive error if the CLI is not found or Obsidian isn't running.
- */
 async function run(command: string): Promise<string> {
-  // --no-sandbox: required on Linux with AppArmor userns restrictions
   const fullCmd = `obsidian --no-sandbox ${command}`;
   const env = XDG_CONFIG_HOME
     ? { ...process.env, XDG_CONFIG_HOME }
@@ -95,30 +132,19 @@ async function run(command: string): Promise<string> {
 //     { "path": "Tasks/Foo.md", "file name": "Foo", "status": "Backlog", ...custom props },
 //     ...
 //   ]
-//
-// Key field names:
-//   "file name"  — the note title (file name without .md extension)
-//   "path"       — vault-relative path to the note
-//   "status"     — the groupBy property (or whatever the board groups by)
 // ---------------------------------------------------------------------------
 
-/** Safely convert an unknown value to string, avoiding [object Object] output. */
 function toStr(val: unknown): string {
   if (typeof val === "string") return val;
   if (typeof val === "number" || typeof val === "boolean") return String(val);
   return "";
 }
 
-/**
- * Parse the JSON returned by `obsidian base:query path=<board> format=json` into a Board.
- */
 export function parseQueryResult(raw: unknown, boardName: string): Board {
   if (!Array.isArray(raw)) {
     throw new Error(`Unexpected base:query output format. Got: ${typeof raw}`);
   }
 
-  // Detect groupBy column: prefer "status", fall back to first non-system string property.
-  // System fields from the CLI are: "path", "file name".
   const systemFields = new Set(["path", "file name"]);
   const sample = raw[0] as Record<string, unknown> | undefined;
   const groupBy =
@@ -132,74 +158,78 @@ export function parseQueryResult(raw: unknown, boardName: string): Board {
 
   const columns: Record<string, Card[]> = {};
   for (const row of raw as Record<string, unknown>[]) {
-    // Use the confirmed "file name" field; fall back to "path" stem for safety.
     const rawTitle = row["file name"] ?? row["path"];
     const title = toStr(rawTitle).replace(/\.md$/, "").split("/").pop() ?? "";
     const column = toStr(row[groupBy]);
+    const path = toStr(row["path"]);
+    const id = typeof row["id"] === "string" ? row["id"] : undefined;
+
     if (!columns[column]) columns[column] = [];
-    columns[column].push({ title, column, properties: row });
+    columns[column].push({ id, title, path, column, properties: row });
   }
 
   return { name: boardName, groupBy, columns };
 }
 
 // ---------------------------------------------------------------------------
-// Public API — pure functions, no side effects beyond CLI calls.
-// These are imported directly by the MCP tools and (in future) by the CLI.
+// Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Return the full board state (all cards grouped by column).
- * Uses `base:query format=json` for authoritative Obsidian data.
- */
 export async function getBoard(config: BoardConfig): Promise<Board> {
   const pfx = vaultPrefix(config);
   const name = config.board ?? "";
-  // CLI requires path= (not file=) to target a .base file by path.
-  // Without it, the CLI defaults to the active file which may not be a base.
   const pathArg = name ? `path="${name}" ` : "";
   const raw = await run(`${pfx}base:query ${pathArg}format=json`);
   const parsed = JSON.parse(raw) as unknown;
-  return parseQueryResult(parsed, name.replace(/\.base$/, "") || "Board");
+  const board = parseQueryResult(
+    parsed,
+    name.replace(/\.base$/, "") || "Board",
+  );
+
+  // base:query only returns the groupBy property — read id from files directly
+  const cards = allCards(board);
+  const vaultRoot =
+    cards.length > 0 ? resolveVaultRoot(cards[0].path) : undefined;
+  if (vaultRoot) {
+    for (const card of cards) {
+      try {
+        const content = readFileSync(`${vaultRoot}/${card.path}`, "utf8");
+        card.id = readFrontmatterProp(content, "id");
+      } catch {
+        // file unreadable — leave id as undefined
+      }
+    }
+  }
+
+  return board;
 }
 
-/**
- * Return the full markdown content of a single card (frontmatter + body).
- * Uses `obsidian read file=<name>`.
- */
 export async function getCard(
   config: BoardConfig,
-  title: string,
+  path: string,
 ): Promise<string> {
   const pfx = vaultPrefix(config);
-  return run(`${pfx}read file="${title}"`);
+  return run(`${pfx}read file="${path}"`);
 }
 
-/**
- * Move a card to a different column by updating its groupBy property.
- * Returns a MoveResult with the from/to column names.
- */
 export async function moveCard(
   config: BoardConfig,
-  title: string,
+  path: string,
   toColumn: string,
 ): Promise<MoveResult> {
-  // Determine the current column so we can report it in the result.
   const board = await getBoard(config);
-  const fromColumn = findCardColumn(board, title) ?? "unknown";
+  const card = findCardByPath(board, path);
+  const fromColumn = card?.column ?? "unknown";
+  const title = card?.title ?? path;
 
   const pfx = vaultPrefix(config);
   await run(
-    `${pfx}property:set name="${board.groupBy}" value="${toColumn}" file="${title}"`,
+    `${pfx}property:set name="${board.groupBy}" value="${toColumn}" file="${path}"`,
   );
 
   return { title, fromColumn, toColumn };
 }
 
-/**
- * Create a new card in the given column.
- * Creates the note via `base:create`, then sets additional properties.
- */
 export async function createCard(
   config: BoardConfig,
   title: string,
@@ -208,30 +238,23 @@ export async function createCard(
   const pfx = vaultPrefix(config);
   const boardArg = config.board ? `file="${config.board}" ` : "";
 
-  // Create the note via base:create (sets the status/column via the base's groupBy property)
   await run(`${pfx}base:create ${boardArg}name="${title}"`);
 
-  // Set the target column (status / groupBy property)
   const board = await getBoard(config);
   await run(
     `${pfx}property:set name="${board.groupBy}" value="${options.column}" file="${title}"`,
   );
-
-  // Optional additional properties
-  if (options.priority) {
+  if (options.id) {
     await run(
-      `${pfx}property:set name="priority" value="${options.priority}" file="${title}"`,
-    );
-  }
-  if (options.tags?.length) {
-    // Tags is a list property — join as comma-separated for the CLI.
-    // The CLI's property:set should handle list types.
-    await run(
-      `${pfx}property:set name="tags" value="${options.tags.join(",")}" type=list file="${title}"`,
+      `${pfx}property:set name="id" value="${options.id}" file="${title}"`,
     );
   }
 
-  // Append body content if provided
+  for (const [key, value] of Object.entries(options.properties ?? {})) {
+    await run(
+      `${pfx}property:set name="${key}" value="${value}" file="${title}"`,
+    );
+  }
   if (options.body) {
     await run(
       `${pfx}append file="${title}" content="${options.body.replace(/"/g, '\\"')}"`,
@@ -239,9 +262,16 @@ export async function createCard(
   }
 }
 
-/**
- * Get a list of all .base files (boards) in the vault.
- */
+export async function setProperty(
+  config: BoardConfig,
+  path: string,
+  key: string,
+  value: string,
+): Promise<void> {
+  const pfx = vaultPrefix(config);
+  await run(`${pfx}property:set name="${key}" value="${value}" file="${path}"`);
+}
+
 export async function listBoards(config: BoardConfig): Promise<string[]> {
   const pfx = vaultPrefix(config);
   const out = await run(`${pfx}bases`);
@@ -255,14 +285,18 @@ export async function listBoards(config: BoardConfig): Promise<string[]> {
 // Internal utilities
 // ---------------------------------------------------------------------------
 
-function findCardColumn(board: Board, title: string): string | undefined {
-  for (const [col, cards] of Object.entries(board.columns)) {
-    if (cards.some((c) => c.title === title)) return col;
+function findCardByPath(board: Board, path: string): Card | undefined {
+  for (const cards of Object.values(board.columns)) {
+    const found = cards.find((c) => c.path === path);
+    if (found) return found;
   }
   return undefined;
 }
 
-/** Return the first card in the first non-empty column that is not "Done". */
+export function allCards(board: Board): Card[] {
+  return Object.values(board.columns).flat();
+}
+
 export function firstPendingCard(board: Board): Card | undefined {
   const doneVariants = new Set(["done", "completed", "closed"]);
   for (const [col, cards] of Object.entries(board.columns)) {

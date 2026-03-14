@@ -1,0 +1,30 @@
+{
+  "name": "@mderazon/bb",
+  "version": "0.1.0-beta",
+  "description": "CLI for Base Board — manage your Obsidian kanban board from the terminal",
+  "keywords": [
+    "obsidian",
+    "kanban",
+    "cli",
+    "bases",
+    "ai-tools"
+  ],
+  "author": "Michael DeRazon",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "bb": "./dist/cli/src/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

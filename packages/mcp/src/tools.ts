@@ -4,9 +4,8 @@
  * Each tool is a thin adapter: validate input with Zod, call the core library,
  * format the result for token-lean output, and return it.
  *
- * Core operations live in ../core/obsidian.ts — this file contains no
- * business logic. A future CLI adapter in ../cli/ will import the same
- * core functions directly.
+ * Core operations live in ../../core/src/obsidian.ts — this file contains no
+ * business logic.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -17,16 +16,15 @@ import {
   getCard,
   listBoards,
   moveCard,
-} from "../core/obsidian.js";
+} from "../../core/src/obsidian.js";
 import {
   formatBoard,
   formatBoardList,
   formatCreateResult,
   formatMoveResult,
-} from "../core/format.js";
-import type { BoardConfig } from "../core/types.js";
+} from "../../core/src/format.js";
+import type { BoardConfig } from "../../core/src/types.js";
 
-/** Read base config from environment variables. */
 function getConfig(): BoardConfig {
   return {
     vault: process.env["BB_VAULT"],
@@ -34,7 +32,6 @@ function getConfig(): BoardConfig {
   };
 }
 
-/** Wrap a tool handler to catch errors and return a friendly message. */
 async function safe(
   fn: () => Promise<string>,
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
@@ -48,11 +45,6 @@ async function safe(
 }
 
 export function registerTools(server: McpServer): void {
-  // -------------------------------------------------------------------------
-  // board_get
-  // Returns the board overview: card titles + key properties grouped by column.
-  // Does NOT return card bodies — keeps the response token-lean.
-  // -------------------------------------------------------------------------
   server.registerTool(
     "board_get",
     {
@@ -75,42 +67,44 @@ export function registerTools(server: McpServer): void {
       }),
   );
 
-  // -------------------------------------------------------------------------
-  // board_get_card
-  // Fetches the full content of a single card (frontmatter + body).
-  // Call this after board_get to drill into a specific task.
-  // -------------------------------------------------------------------------
   server.registerTool(
     "board_get_card",
     {
       description:
-        "Get the full markdown content (frontmatter + body) of a specific card by title.",
+        "Get the full markdown content (frontmatter + body) of a specific card by its id.",
       inputSchema: {
-        title: z
+        id: z
           .string()
-          .describe("Exact card title (note file name without .md extension)."),
+          .describe(
+            "Card id (e.g. amber-wolf-42). Shown in brackets in board_get output.",
+          ),
       },
     },
-    async ({ title }) =>
+    async ({ id }) =>
       safe(async () => {
         const config = getConfig();
-        return getCard(config, title);
+        const board = await getBoard(config);
+        const cards = Object.values(board.columns).flat();
+        const card = cards.find((c) => c.id === id);
+        if (!card)
+          throw new Error(
+            `Card not found: "${id}". Run bb assign-ids if cards are missing ids.`,
+          );
+        return getCard(config, card.path);
       }),
   );
 
-  // -------------------------------------------------------------------------
-  // board_move_card
-  // Moves a card to a different column by updating its groupBy property.
-  // -------------------------------------------------------------------------
   server.registerTool(
     "board_move_card",
     {
       description:
         "Move a card to a different column. Updates the card's status property in its frontmatter.",
       inputSchema: {
-        title: z
+        id: z
           .string()
-          .describe("Exact card title (note file name without .md extension)."),
+          .describe(
+            "Card id (e.g. amber-wolf-42). Shown in brackets in board_get output.",
+          ),
         column: z
           .string()
           .describe(
@@ -118,18 +112,18 @@ export function registerTools(server: McpServer): void {
           ),
       },
     },
-    async ({ title, column }) =>
+    async ({ id, column }) =>
       safe(async () => {
         const config = getConfig();
-        const result = await moveCard(config, title, column);
+        const board = await getBoard(config);
+        const cards = Object.values(board.columns).flat();
+        const card = cards.find((c) => c.id === id);
+        if (!card) throw new Error(`Card not found: "${id}".`);
+        const result = await moveCard(config, card.path, column);
         return formatMoveResult(result);
       }),
   );
 
-  // -------------------------------------------------------------------------
-  // board_create_card
-  // Creates a new card in a given column.
-  // -------------------------------------------------------------------------
   server.registerTool(
     "board_create_card",
     {
@@ -141,11 +135,12 @@ export function registerTools(server: McpServer): void {
           .describe(
             "Column (status value) to place the card in, e.g. 'Backlog'.",
           ),
-        priority: z
-          .string()
+        properties: z
+          .record(z.string(), z.string())
           .optional()
-          .describe("Priority value, e.g. 'high', 'medium', 'low'."),
-        tags: z.array(z.string()).optional().describe("List of tags."),
+          .describe(
+            'Arbitrary frontmatter properties to set, e.g. {"priority": "high", "due": "2026-03-20"}.',
+          ),
         body: z
           .string()
           .optional()
@@ -158,17 +153,16 @@ export function registerTools(server: McpServer): void {
           ),
       },
     },
-    async ({ title, column, priority, tags, body, board }) =>
+    async ({ title, column, properties, body, board }) =>
       safe(async () => {
+        const { generateId } = await import("../../core/src/id.js");
+        const id = generateId(title);
         const config = { ...getConfig(), ...(board ? { board } : {}) };
-        await createCard(config, title, { column, priority, tags, body });
-        return formatCreateResult(title, column);
+        await createCard(config, title, { column, id, properties, body });
+        return formatCreateResult(title, id, column);
       }),
   );
 
-  // -------------------------------------------------------------------------
-  // board_list  (Tier 2 — included now since it's trivial)
-  // -------------------------------------------------------------------------
   server.registerTool(
     "board_list",
     {

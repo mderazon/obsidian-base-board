@@ -10,6 +10,9 @@ export const CONFIG_KEY_COLUMNS = "boardColumns";
 /** Key used by BasesViewConfig.set/get to persist custom tag colors in the .base file. */
 export const CONFIG_KEY_TAG_COLORS = "tagColors";
 
+/** Key used by BasesViewConfig.set/get to persist whether card thumbnails are shown. */
+export const CONFIG_KEY_SHOW_THUMBNAILS = "showCardThumbnails";
+
 /**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.

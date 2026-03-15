@@ -9,6 +9,11 @@
     "bases",
     "ai-tools"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mderazon/obsidian-base-board",
+    "directory": "packages/cli"
+  },
   "author": "Michael DeRazon",
   "license": "MIT",
   "type": "module",

@@ -2,6 +2,7 @@ import {
   BasesView,
   BasesEntry,
   BasesEntryGroup,
+  BasesAllOptions,
   HoverParent,
   HoverPopover,
   QueryController,
@@ -18,6 +19,7 @@ import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
+  CONFIG_KEY_SHOW_THUMBNAILS,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -118,8 +120,21 @@ export class KanbanView extends BasesView implements HoverParent {
     }
   }
 
-  static getViewOptions(): never[] {
-    return [];
+  static getViewOptions(): BasesAllOptions[] {
+    return [
+      {
+        type: "group" as const,
+        displayName: "Display",
+        items: [
+          {
+            key: CONFIG_KEY_SHOW_THUMBNAILS,
+            type: "toggle" as const,
+            displayName: "Show card thumbnails",
+            default: false,
+          },
+        ],
+      },
+    ];
   }
 
   // ---------------------------------------------------------------------------
@@ -262,6 +277,10 @@ export class KanbanView extends BasesView implements HoverParent {
     }
 
     return dataColumns;
+  }
+
+  public shouldShowCardThumbnails(): boolean {
+    return this.config?.get(CONFIG_KEY_SHOW_THUMBNAILS) === true;
   }
 
   private getGroupForColumn(columnName: string): BasesEntryGroup | null {

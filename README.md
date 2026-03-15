@@ -18,6 +18,7 @@ https://github.com/user-attachments/assets/9ae6e1b7-729f-4891-b853-d1f5d2ebe755
 - **Inline Power**: Rename cards or column titles directly on the board.
 - **Native Editing Modal**: Open any card into a fully-functional Obsidian editor floating directly over your workspace.
 - **Rich Cards**: View key metadata fields as chips on each card for a quick overview.
+- **Optional Card Thumbnails**: Show the first image found in a note directly on the card when enabled per view.
 - **Tags**: Color-coded tag chips on cards with a clickable filter bar to narrow the board by tag.
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).
 - **One-Click Creation**: Add new notes directly to a specific column without leaving the board view.
@@ -42,6 +43,10 @@ Because Base Board relies purely on standard markdown frontmatter instead of pro
 ## Usage
 
 Open the **Command palette** (`Ctrl/Cmd + P`) and run **"Base Board: Create new board"**. Enter a name, choose a folder, and the plugin will scaffold everything for you — a `.base` file, a tasks folder, and sample task notes. The board opens automatically.
+
+To show note thumbnails on cards, open **Configure view** for a Kanban view and enable **Display → Show card thumbnails**. Base Board will use the first image found in the note body.
+
+See [docs/card-thumbnails.md](docs/card-thumbnails.md) for a quick example.
 
 ## Installation
 

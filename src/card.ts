@@ -12,6 +12,7 @@ import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
+import { CardThumbnailResolver } from "./card-thumbnail";
 
 const SUFFIX_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -47,9 +48,11 @@ const FILE_PROPS_TO_SKIP = new Set([
 
 export class CardManager {
   private view: KanbanView;
+  private thumbnails: CardThumbnailResolver;
 
   constructor(view: KanbanView) {
     this.view = view;
+    this.thumbnails = new CardThumbnailResolver(view.app);
   }
 
   public renderCard(
@@ -62,6 +65,12 @@ export class CardManager {
     cardEl.setAttr("draggable", "true");
     cardEl.dataset.filePath = filePath;
     cardEl.dataset.columnName = columnName;
+
+    const file = this.view.app.vault.getAbstractFileByPath(filePath);
+    const noteFile = file instanceof TFile ? file : null;
+    if (noteFile && this.view.shouldShowCardThumbnails()) {
+      this.thumbnails.attach(cardEl, noteFile);
+    }
 
     // Open the note on click; guard against accidental clicks after a drag
     let dragging = false;
@@ -158,9 +167,8 @@ export class CardManager {
     const tagContainerEl = cardEl.createDiv({
       cls: "base-board-tag-container",
     });
-    const file = this.view.app.vault.getAbstractFileByPath(filePath);
-    if (file instanceof TFile) {
-      const fileTags = this.view.tags.extractTagsFromFile(file);
+    if (noteFile) {
+      const fileTags = this.view.tags.extractTagsFromFile(noteFile);
       for (const tag of fileTags) {
         const tagEl = tagContainerEl.createSpan({
           cls: "base-board-card-tag",

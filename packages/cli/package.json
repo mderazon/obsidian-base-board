@@ -13,7 +13,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "bb": "./dist/index.js"
+    "bb": "dist/index.js"
   },
   "files": [
     "dist",

@@ -14,12 +14,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.14.0"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
@@ -32,4 +32,4 @@ jobs:
         run: npm run build --workspace=packages/cli
 
       - name: Publish to npm
-        run: npm publish --workspace=packages/cli --access public
+        run: npm publish --workspace=packages/cli --access public --tag beta

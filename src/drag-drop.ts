@@ -30,6 +30,11 @@ export class DragDropManager {
   private draggedCardHeight = 0;
   /** Other selected card elements dimmed during multi-drag */
   private multiDragEls: HTMLElement[] = [];
+  /** Auto-scroll state */
+  private autoScrollRAF: number | null = null;
+  private autoScrollSpeed = 0; // horizontal (boardEl)
+  private autoScrollVerticalSpeed = 0; // vertical (active cards container)
+  private autoScrollVerticalEl: HTMLElement | null = null;
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -275,6 +280,8 @@ export class DragDropManager {
     if (!e.dataTransfer) return;
     e.dataTransfer.dropEffect = "move";
 
+    this.updateAutoScroll(e.clientX, e.clientY, e.target as HTMLElement);
+
     if (this.dragType === "column") {
       this.handleColumnDragOver(e);
     } else if (this.dragType === "card") {
@@ -385,7 +392,82 @@ export class DragDropManager {
   //  Drag End
   // ---------------------------------------------------------------------------
 
+  private updateAutoScroll(
+    clientX: number,
+    clientY: number,
+    target: HTMLElement,
+  ): void {
+    const H_ZONE = 80;
+    const V_ZONE = 60;
+    const MAX_SPEED = 12;
+
+    // Horizontal: scroll the board left/right
+    if (this.boardEl) {
+      const rect = this.boardEl.getBoundingClientRect();
+      const relX = clientX - rect.left;
+      if (relX < H_ZONE) {
+        this.autoScrollSpeed = -MAX_SPEED * (1 - relX / H_ZONE);
+      } else if (relX > rect.width - H_ZONE) {
+        this.autoScrollSpeed = MAX_SPEED * (1 - (rect.width - relX) / H_ZONE);
+      } else {
+        this.autoScrollSpeed = 0;
+      }
+    }
+
+    // Vertical: scroll the hovered column's cards container up/down
+    const cardsEl = target.closest<HTMLElement>(".base-board-cards");
+    if (cardsEl) {
+      const rect = cardsEl.getBoundingClientRect();
+      const relY = clientY - rect.top;
+      if (relY < V_ZONE) {
+        this.autoScrollVerticalSpeed = -MAX_SPEED * (1 - relY / V_ZONE);
+        this.autoScrollVerticalEl = cardsEl;
+      } else if (relY > rect.height - V_ZONE) {
+        this.autoScrollVerticalSpeed =
+          MAX_SPEED * (1 - (rect.height - relY) / V_ZONE);
+        this.autoScrollVerticalEl = cardsEl;
+      } else {
+        this.autoScrollVerticalSpeed = 0;
+        this.autoScrollVerticalEl = null;
+      }
+    } else {
+      this.autoScrollVerticalSpeed = 0;
+      this.autoScrollVerticalEl = null;
+    }
+
+    const needsScroll =
+      this.autoScrollSpeed !== 0 || this.autoScrollVerticalSpeed !== 0;
+    if (needsScroll && this.autoScrollRAF === null) {
+      const tick = () => {
+        if (this.autoScrollSpeed === 0 && this.autoScrollVerticalSpeed === 0) {
+          this.autoScrollRAF = null;
+          return;
+        }
+        if (this.boardEl && this.autoScrollSpeed !== 0) {
+          this.boardEl.scrollLeft += this.autoScrollSpeed;
+        }
+        if (this.autoScrollVerticalEl && this.autoScrollVerticalSpeed !== 0) {
+          this.autoScrollVerticalEl.scrollTop += this.autoScrollVerticalSpeed;
+        }
+        this.autoScrollRAF = requestAnimationFrame(tick);
+      };
+      this.autoScrollRAF = requestAnimationFrame(tick);
+    } else if (!needsScroll && this.autoScrollRAF !== null) {
+      cancelAnimationFrame(this.autoScrollRAF);
+      this.autoScrollRAF = null;
+    }
+  }
+
   private onDragEnd(): void {
+    // Stop any in-progress auto-scroll
+    if (this.autoScrollRAF !== null) {
+      cancelAnimationFrame(this.autoScrollRAF);
+      this.autoScrollRAF = null;
+    }
+    this.autoScrollSpeed = 0;
+    this.autoScrollVerticalSpeed = 0;
+    this.autoScrollVerticalEl = null;
+
     // Restore multi-drag ghost cards
     for (const el of this.multiDragEls) {
       el.removeClass("base-board-card--drag-ghost");

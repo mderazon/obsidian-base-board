@@ -12,6 +12,12 @@
   overflow: hidden;
 }
 
+/* Inline embed: .bases-embed wraps the view with no defined height,
+   collapsing height:100% children. Give it enough room to show columns. */
+.bases-embed .base-board-container {
+  min-height: 400px;
+}
+
 .base-board-board {
   display: flex;
   gap: 12px;

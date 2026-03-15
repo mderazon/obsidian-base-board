@@ -6,7 +6,7 @@ Command-line interface for [Base Board](https://github.com/mderazon/obsidian-bas
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22+
 - Obsidian running with CLI enabled (Settings > General > Advanced > Command line interface)
 
 ## Usage

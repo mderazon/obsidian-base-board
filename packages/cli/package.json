@@ -1,6 +1,6 @@
 {
   "name": "base-board-cli",
-  "version": "0.1.0-beta",
+  "version": "0.1.1-beta",
   "description": "CLI for Base Board — manage your Obsidian kanban board from the terminal",
   "keywords": [
     "obsidian",

@@ -11,6 +11,26 @@ export const CONFIG_KEY_COLUMNS = "boardColumns";
 export const CONFIG_KEY_TAG_COLORS = "tagColors";
 
 /**
+ * Key used by BasesViewConfig.set/get to specify which frontmatter property
+ * to display as the card title instead of the filename.
+ *
+ * When set, the card title shows the value of this property (e.g. "raw_title")
+ * with a fallback to the file basename if the property is empty or missing.
+ *
+ * Accepts either a bare property name ("raw_title") or a Bases property ID
+ * ("note.raw_title").
+ */
+export const CONFIG_KEY_TITLE_PROPERTY = "cardTitleProperty";
+
+/**
+ * Key used by BasesViewConfig.set/get to control the maximum number of
+ * property chips displayed on each card.
+ *
+ * Defaults to 3 when not set.
+ */
+export const CONFIG_KEY_MAX_PROPERTIES = "maxCardProperties";
+
+/**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.
  */

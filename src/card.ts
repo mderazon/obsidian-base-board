@@ -9,7 +9,12 @@ import {
   Menu,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
-import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
+import {
+  ORDER_PROPERTY,
+  CONFIG_KEY_TITLE_PROPERTY,
+  CONFIG_KEY_MAX_PROPERTIES,
+  sanitizeFilename,
+} from "./constants";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
 
@@ -179,7 +184,20 @@ export class CardManager {
     }
 
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
-    titleEl.createEl("span", { text: entry.file?.basename ?? "Untitled" });
+    const titleProp = this.view.config?.get(CONFIG_KEY_TITLE_PROPERTY) as
+      | string
+      | undefined;
+    let displayTitle = entry.file?.basename ?? "Untitled";
+    if (titleProp) {
+      const propId: BasesPropertyId = (
+        titleProp.startsWith("note.") ? titleProp : `note.${titleProp}`
+      ) as BasesPropertyId;
+      const val = entry.getValue(propId);
+      if (val && !(val instanceof NullValue) && val.isTruthy()) {
+        displayTitle = val.toString();
+      }
+    }
+    titleEl.createEl("span", { text: displayTitle });
 
     // ---- Edit button (visible on hover) ----
     const editBtn = cardEl.createDiv({ cls: "base-board-card-edit-btn" });
@@ -195,9 +213,13 @@ export class CardManager {
     // Use the official API: getOrder() returns the user-configured visible
     // properties in the order set via the Properties toolbar menu.
     const visibleProps: BasesPropertyId[] = this.view.config.getOrder();
+    const maxProps =
+      (this.view.config?.get(CONFIG_KEY_MAX_PROPERTIES) as
+        | number
+        | undefined) ?? 3;
     let shown = 0;
     for (const propId of visibleProps) {
-      if (shown >= 3) break;
+      if (shown >= maxProps) break;
       // Skip formula properties (not user-readable as chips).
       if (propId.startsWith("formula.")) continue;
       // For file.* properties, only skip ones that are redundant (name/path

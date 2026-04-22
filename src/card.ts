@@ -2,11 +2,14 @@ import {
   BasesEntry,
   BasesPropertyId,
   DateValue,
+  LinkValue,
+  ListValue,
   NullValue,
   setIcon,
   TFile,
   Notice,
   Menu,
+  Value,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
@@ -26,6 +29,41 @@ function generateCardId(title: string): string {
     () => SUFFIX_CHARS[Math.floor(Math.random() * SUFFIX_CHARS.length)],
   ).join("");
   return `${slug}-${suffix}`;
+}
+
+// Format a Value for chip display:
+//   - DateValue    → relative ("3 days ago")
+//   - LinkValue    → alias if set, otherwise basename without .md extension
+//                    (e.g. [[folder/Mario]] → "Mario", [[Welcome|Alias]] → "Alias")
+//   - ListValue    → comma-separated list of the above, applied recursively
+//   - everything else → toString() (existing behaviour)
+function formatValueForChip(val: Value): string {
+  if (val instanceof DateValue) {
+    return val.relative();
+  }
+  if (val instanceof LinkValue) {
+    const raw = val.toString();
+    const match = raw.match(/^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/);
+    if (match) {
+      const target = match[1];
+      const alias = match[2];
+      if (alias) return alias;
+      const basename = target.split("/").pop() ?? target;
+      return basename.replace(/\.md$/, "");
+    }
+    return raw;
+  }
+  if (val instanceof ListValue) {
+    const parts: string[] = [];
+    const len = val.length();
+    for (let i = 0; i < len; i++) {
+      const item = val.get(i);
+      if (!item || item instanceof NullValue || !item.isTruthy()) continue;
+      parts.push(formatValueForChip(item));
+    }
+    return parts.join(", ");
+  }
+  return val.toString();
 }
 
 // File properties that are redundant (shown as the card title) or are
@@ -215,8 +253,7 @@ export class CardManager {
       if (!val || val instanceof NullValue || !val.isTruthy()) continue;
       // Use relative time for dates (e.g. "3 days ago") — much more readable
       // on a card chip than a raw ISO string or a full locale date.
-      const display =
-        val instanceof DateValue ? val.relative() : val.toString();
+      const display = formatValueForChip(val);
       if (!display) continue;
 
       const chip = propsEl.createEl("span", {

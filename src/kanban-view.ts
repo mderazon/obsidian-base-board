@@ -299,7 +299,17 @@ export class KanbanView extends BasesView implements HoverParent {
         groupedData[0].key !== undefined &&
         !(groupedData[0].key instanceof NullValue));
 
-    if (!hasGroupBy && groupedData.length <= 1) {
+    // If the board has configured columns (from .base or data.json) but
+    // no cards exist yet, render the empty columns so users can see and
+    // add cards instead of showing an opaque placeholder.
+    const stored =
+      (this.config?.get(CONFIG_KEY_COLUMNS) as string[] | undefined) ??
+      this.plugin.getColumnConfig(this.getBaseId())?.columns;
+    const hasStoredColumns = stored && stored.length > 0;
+    const shouldShowPlaceholder =
+      !hasGroupBy && groupedData.length <= 1 && !hasStoredColumns;
+
+    if (shouldShowPlaceholder) {
       const msgEl = this.containerEl.createDiv({
         cls: "base-board-placeholder",
       });

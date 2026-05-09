@@ -9,6 +9,11 @@ export default defineConfig([
   {
     ignores: ["**/dist/**", "main.js"],
   },
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+    },
+  },
 
   ...tseslint.configs.recommendedTypeChecked,
   ...(obsidianmd.configs?.recommendedWithLocalesEn || []),

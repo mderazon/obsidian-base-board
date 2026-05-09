@@ -201,8 +201,9 @@ export class KanbanView extends BasesView implements HoverParent {
       const val = (key as Record<string, unknown>).value;
       return String(val);
     }
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    return String(key as { toString(): string });
+    if (typeof key === "string") return key;
+    if (typeof key === "number" || typeof key === "boolean") return String(key);
+    return "";
   }
 
   /**

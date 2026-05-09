@@ -285,6 +285,22 @@
   user-select: none;
 }
 
+.base-board-card-thumbnail {
+  margin: -10px -12px 8px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-card-thumbnail-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Only animate cards on initial board mount */
 .base-board-board--animate .base-board-card {
   animation: base-board-card-enter 0.25s ease both;

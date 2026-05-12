@@ -18,6 +18,7 @@
 - **Inline Power**: Rename cards or column titles directly on the board.
 - **Native Editing Modal**: Open any card into a fully-functional Obsidian editor floating directly over your workspace.
 - **Rich Cards**: View key metadata fields as chips on each card for a quick overview.
+- **Configurable Card Title**: Set `cardTitleProperty: note.title` in your `.base` file to use a frontmatter property (e.g. `title`) as the card heading instead of the filename.
 - **Tags**: Color-coded tag chips on cards with a clickable filter bar to narrow the board by tag.
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).
 - **One-Click Creation**: Add new notes directly to a specific column without leaving the board view.

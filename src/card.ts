@@ -217,7 +217,23 @@ export class CardManager {
     }
 
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
-    titleEl.createSpan({ text: entry.file?.basename ?? "Untitled" });
+
+    // Respect cardTitleProperty if configured — use a frontmatter property
+    // (e.g. "title") as the card heading instead of the filename.
+    let cardTitle = entry.file?.basename ?? "Untitled";
+    const titleProp = this.view.config.get("cardTitleProperty") as
+      | string
+      | undefined;
+    if (titleProp) {
+      const propId = titleProp.startsWith("note.")
+        ? titleProp
+        : `note.${titleProp}`;
+      const tv = entry.getValue(propId as BasesPropertyId);
+      if (tv && !(tv instanceof NullValue) && tv.isTruthy()) {
+        cardTitle = formatValueForChip(tv);
+      }
+    }
+    titleEl.createSpan({ text: cardTitle });
 
     // ---- Edit button (visible on hover) ----
     const editBtn = cardEl.createDiv({ cls: "base-board-card-edit-btn" });

@@ -259,7 +259,6 @@ export class CardManager {
     const chips: ChipDescriptor[] = [];
     for (const propId of visibleProps) {
       if (chips.length >= 6) break;
-      if (propId.startsWith("formula.")) continue;
       if (propId.startsWith("file.")) {
         if (FILE_PROPS_TO_SKIP.has(propId.slice(5))) continue;
       }

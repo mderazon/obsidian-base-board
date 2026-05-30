@@ -248,11 +248,15 @@ export class KanbanView extends BasesView implements HoverParent {
     // 2. Fallback: legacy plugin data.json
     const fromPlugin = this.plugin.getColumnConfig(this.getBaseId());
 
-    const stored = fromConfig?.length
+    const rawStored = fromConfig?.length
       ? fromConfig
       : fromPlugin?.columns?.length
         ? fromPlugin.columns
         : null;
+
+    const stored = rawStored
+      ? rawStored.map((col) => (col === "" ? NO_VALUE_COLUMN : col))
+      : null;
 
     const dataColumns = this.currentGroups.map((g) =>
       this.getColumnName(g.key),
@@ -399,7 +403,8 @@ export class KanbanView extends BasesView implements HoverParent {
    */
   public saveColumns(columns: string[]): void {
     // Primary: persist in .base file via the official config API
-    this.config?.set(CONFIG_KEY_COLUMNS, columns);
+    const toSave = columns.map((col) => (col === NO_VALUE_COLUMN ? "" : col));
+    this.config?.set(CONFIG_KEY_COLUMNS, toSave);
 
     // Legacy fallback: also write to plugin data.json
     void this.plugin.saveColumnConfig(this.getBaseId(), { columns });

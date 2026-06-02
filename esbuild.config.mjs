@@ -10,6 +10,10 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = process.argv[2] === "production";
 
+// Where `npm run dev` writes the bundle. Set this to your vault's plugin
+// folder (e.g. "/path/to/Vault/.obsidian/plugins/base-board") to auto-deploy
+const PLUGIN_DEV_DIR = ".";
+
 const context = await esbuild.context({
   banner: {
     js: banner,
@@ -37,7 +41,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  outfile: "main.js",
+  outfile: prod ? "main.js" : `${PLUGIN_DEV_DIR}/main.js`,
 });
 
 if (prod) {

@@ -430,7 +430,7 @@ export class CardManager {
     const titleSpan = titleEl.querySelector("span");
     if (!titleSpan) return;
 
-    const input = activeDocument.createEl("input");
+    const input = activeDocument.createElement("input");
     input.type = "text";
     input.value = file.basename;
     input.className = "base-board-card-rename-input";

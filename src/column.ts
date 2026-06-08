@@ -206,7 +206,7 @@ export class ColumnManager {
     countEl?: HTMLElement | null,
     addCardBtn?: HTMLElement | null,
   ): void {
-    const input = activeDocument.createEl("input");
+    const input = activeDocument.createElement("input");
     input.type = "text";
     input.value = oldName;
     input.className = "base-board-column-title-input";

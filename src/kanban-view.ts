@@ -22,6 +22,7 @@ import {
   CONFIG_KEY_COLUMNS,
   CONFIG_KEY_OPEN_BEHAVIOR,
   CONFIG_KEY_COLUMN_COLORS,
+  CONFIG_KEY_WIP_LIMITS,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -251,6 +252,34 @@ export class KanbanView extends BasesView implements HoverParent {
       delete colors[columnName];
     }
     this.config?.set(CONFIG_KEY_COLUMN_COLORS, colors);
+    this.scheduleRender();
+  }
+
+  // ---------------------------------------------------------------------------
+  //  WIP Limits
+  // ---------------------------------------------------------------------------
+
+  public getWipLimits(): Record<string, number> {
+    const raw = this.config?.get(CONFIG_KEY_WIP_LIMITS);
+    return raw && typeof raw === "object"
+      ? (raw as Record<string, number>)
+      : {};
+  }
+
+  public getWipLimit(columnName: string): number | null {
+    const limits = this.getWipLimits();
+    const val = limits[columnName];
+    return typeof val === "number" && val > 0 ? val : null;
+  }
+
+  public setWipLimit(columnName: string, limit: number | null): void {
+    const limits = this.getWipLimits();
+    if (limit !== null && limit > 0) {
+      limits[columnName] = limit;
+    } else {
+      delete limits[columnName];
+    }
+    this.config?.set(CONFIG_KEY_WIP_LIMITS, limits);
     this.scheduleRender();
   }
 

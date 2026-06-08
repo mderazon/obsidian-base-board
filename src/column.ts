@@ -10,6 +10,7 @@ import { KanbanView } from "./kanban-view";
 import { InputModal } from "./modals";
 import { NO_VALUE_COLUMN } from "./constants";
 import { ColorPickerModal } from "./tags";
+import { WipLimitModal } from "./modals";
 
 export class ColumnManager {
   private view: KanbanView;
@@ -51,6 +52,12 @@ export class ColumnManager {
     columnEl.dataset.columnName = columnName;
     columnEl.dataset.columnIndex = String(columnIndex);
 
+    // ---- WIP limit check ----
+    const wipLimit = this.view.getWipLimit(columnName);
+    if (wipLimit !== null && entries.length > wipLimit) {
+      columnEl.addClass("base-board-column--wip-overflow");
+    }
+
     const columnColor = this.view.getColumnColor(columnName);
     if (columnColor) {
       columnEl.style.setProperty("--column-color", columnColor);
@@ -77,8 +84,13 @@ export class ColumnManager {
     }
 
     // Count badge sits right after the title, inline
+    // Show "count / limit" when a WIP limit is set
+    const countText =
+      wipLimit !== null
+        ? `${entries.length} / ${wipLimit}`
+        : String(entries.length);
     const countEl = headerEl.createSpan({
-      text: String(entries.length),
+      text: countText,
       cls: "base-board-column-count",
     });
 
@@ -137,6 +149,27 @@ export class ColumnManager {
               currentColor,
               (color) => {
                 this.view.setColumnColor(columnName, color);
+              },
+            ).open();
+          });
+      });
+
+      const currentWipLimit = this.view.getWipLimit(columnName);
+      menu.addItem((item) => {
+        item
+          .setTitle(
+            currentWipLimit !== null
+              ? `WIP limit: ${currentWipLimit}`
+              : "Set WIP limit",
+          )
+          .setIcon("lucide-gauge")
+          .onClick(() => {
+            new WipLimitModal(
+              this.view.app,
+              columnName,
+              currentWipLimit,
+              (limit) => {
+                this.view.setWipLimit(columnName, limit);
               },
             ).open();
           });

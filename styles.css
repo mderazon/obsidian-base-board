@@ -67,6 +67,29 @@
     transform 0.15s ease;
 }
 
+/* WIP overflow — red highlight */
+.base-board-column--wip-overflow {
+  border-color: var(--text-error, #e74c3c);
+  background-color: color-mix(
+    in srgb,
+    var(--text-error, #e74c3c) 6%,
+    var(--background-secondary)
+  );
+}
+
+.base-board-column--wip-overflow .base-board-column-count {
+  background-color: color-mix(
+    in srgb,
+    var(--text-error, #e74c3c) 18%,
+    var(--background-secondary)
+  );
+  color: var(--text-error, #e74c3c);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: var(--font-semibold);
+  margin-left: 4px;
+}
+
 .base-board-column[style*="--column-color"] {
   background-color: color-mix(
     in srgb,

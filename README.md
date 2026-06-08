@@ -22,6 +22,7 @@
 - **Tags**: Color-coded tag chips on cards with a clickable filter bar to narrow the board by tag.
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).
 - **One-Click Creation**: Add new notes directly to a specific column without leaving the board view.
+- **WIP Limits**: Set per-column work-in-progress limits via the column header context menu. Columns that exceed their limit are highlighted in red.
 - **Data First**: All changes are written directly to your Markdown files.
 
 ## Usage

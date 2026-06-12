@@ -114,7 +114,6 @@ export default class BaseBoardPlugin extends Plugin {
       .getFiles()
       .filter((f) => f.extension === "base");
 
-    let updatedCount = 0;
     for (const baseFile of baseFiles) {
       try {
         let content = await this.app.vault.read(baseFile);
@@ -128,7 +127,6 @@ export default class BaseBoardPlugin extends Plugin {
         }
         if (changed) {
           await this.app.vault.modify(baseFile, content);
-          updatedCount++;
         }
       } catch (err) {
         console.error(

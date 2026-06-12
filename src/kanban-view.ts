@@ -147,6 +147,7 @@ export class KanbanView extends BasesView implements HoverParent {
             key: CONFIG_KEY_COVER_PROPERTY,
             type: "text" as const,
             displayName: "Cover property",
+            default: "cover",
             placeholder: "E.g. cover",
           },
         ],
@@ -233,6 +234,9 @@ export class KanbanView extends BasesView implements HoverParent {
 
   public getCardCoverProperty(): string | null {
     const val = this.config?.get(CONFIG_KEY_COVER_PROPERTY);
+    if (val === undefined || val === null) {
+      return "cover";
+    }
     return typeof val === "string" && val.trim() !== "" ? val.trim() : null;
   }
 

@@ -23,6 +23,7 @@ import {
   CONFIG_KEY_OPEN_BEHAVIOR,
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
+  CONFIG_KEY_COVER_PROPERTY,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,12 @@ export class KanbanView extends BasesView implements HoverParent {
               tab: "New tab",
             },
           },
+          {
+            key: CONFIG_KEY_COVER_PROPERTY,
+            type: "text" as const,
+            displayName: "Cover property",
+            placeholder: "E.g. cover",
+          },
         ],
       },
     ];
@@ -222,6 +229,11 @@ export class KanbanView extends BasesView implements HoverParent {
     const val = this.config?.get(CONFIG_KEY_OPEN_BEHAVIOR);
     if (val === "modal" || val === "split" || val === "tab") return val;
     return "active";
+  }
+
+  public getCardCoverProperty(): string | null {
+    const val = this.config?.get(CONFIG_KEY_COVER_PROPERTY);
+    return typeof val === "string" && val.trim() !== "" ? val.trim() : null;
   }
 
   public isLeafAttached(leaf: WorkspaceLeaf): boolean {

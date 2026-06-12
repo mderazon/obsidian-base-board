@@ -17,6 +17,21 @@ import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
 
+const IMAGE_EXTENSIONS = new Set([
+  "apng",
+  "avif",
+  "bmp",
+  "gif",
+  "heic",
+  "heif",
+  "ico",
+  "jpeg",
+  "jpg",
+  "png",
+  "svg",
+  "webp",
+]);
+
 // Format a Value for chip display:
 //   - DateValue    → relative ("3 days ago")
 //   - LinkValue    → alias if set, otherwise basename without .md extension
@@ -86,6 +101,15 @@ export class CardManager {
     cardEl.setAttr("draggable", "true");
     cardEl.dataset.filePath = filePath;
     cardEl.dataset.columnName = columnName;
+
+    const file = this.view.app.vault.getAbstractFileByPath(filePath);
+    const coverProp = this.view.getCardCoverProperty();
+    if (file instanceof TFile && coverProp) {
+      const src = this.getCardCoverSrc(file, coverProp);
+      if (src) {
+        this.renderCardThumbnail(cardEl, src);
+      }
+    }
 
     // Open the note on click; guard against accidental clicks after a drag
     let dragging = false;
@@ -211,7 +235,6 @@ export class CardManager {
     const tagContainerEl = cardEl.createDiv({
       cls: "base-board-tag-container",
     });
-    const file = this.view.app.vault.getAbstractFileByPath(filePath);
     if (file instanceof TFile) {
       const fileTags = this.view.tags.extractTagsFromFile(file);
       for (const tag of fileTags) {
@@ -676,5 +699,55 @@ export class CardManager {
     new Notice(
       `Moved ${filePaths.length} card${filePaths.length > 1 ? "s" : ""} to "${targetColumn}"`,
     );
+  }
+
+  private getCardCoverSrc(file: TFile, coverPropName: string): string | null {
+    const cache = this.view.app.metadataCache.getFileCache(file);
+    const rawValue: unknown = cache?.frontmatter?.[coverPropName];
+    if (!rawValue) return null;
+    if (typeof rawValue !== "string" && typeof rawValue !== "number")
+      return null;
+
+    if (typeof rawValue === "string" && /^https?:\/\//i.test(rawValue)) {
+      return rawValue;
+    }
+
+    const cleanPath = String(rawValue)
+      .replace(/^!?\[\[(.*?)\]\]$/, "$1")
+      .split("|")[0]
+      .split("#")[0]
+      .trim();
+
+    if (!cleanPath) return null;
+
+    const resolved = this.view.app.metadataCache.getFirstLinkpathDest(
+      cleanPath,
+      file.path,
+    );
+
+    if (
+      resolved instanceof TFile &&
+      IMAGE_EXTENSIONS.has(resolved.extension.toLowerCase())
+    ) {
+      return this.view.app.vault.getResourcePath(resolved);
+    }
+
+    return null;
+  }
+
+  private renderCardThumbnail(cardEl: HTMLElement, src: string): void {
+    const thumbEl = activeDocument.createElement("div");
+    thumbEl.className = "base-board-card-thumbnail";
+    thumbEl
+      .createEl("img", {
+        cls: "base-board-card-thumbnail-img",
+        attr: { src, loading: "lazy" },
+      })
+      .addEventListener("error", () => {
+        thumbEl.remove();
+        cardEl.removeClass("base-board-card--has-thumbnail");
+      });
+    cardEl.prepend(thumbEl);
+    cardEl.addClass("base-board-card--has-thumbnail");
   }
 }

@@ -216,6 +216,7 @@ export class ColorPickerModal extends Modal {
       .addButton((btn) => {
         btn
           .setButtonText("Reset to default")
+          // eslint-disable-next-line @typescript-eslint/no-deprecated
           .setWarning()
           .onClick(() => {
             this.onChange("");

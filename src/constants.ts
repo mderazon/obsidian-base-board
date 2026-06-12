@@ -16,6 +16,9 @@ export const CONFIG_KEY_OPEN_BEHAVIOR = "cardOpenBehavior";
 /** Key used by BasesViewConfig.set/get to persist column colors in the .base file. */
 export const CONFIG_KEY_COLUMN_COLORS = "columnColors";
 
+/** Key used by BasesViewConfig.set/get to persist per-column WIP limits. */
+export const CONFIG_KEY_WIP_LIMITS = "wipLimits";
+
 /**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.

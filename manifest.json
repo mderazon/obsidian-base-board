@@ -1,7 +1,7 @@
 {
 	"id": "base-board",
 	"name": "Base Board",
-	"version": "2.3.0",
+	"version": "2.3.1",
 	"minAppVersion": "1.10.2",
 	"description": "Organize notes into Kanban boards using frontmatter properties. Drag and drop cards between columns powered by Bases.",
 	"author": "Michael DeRazon",

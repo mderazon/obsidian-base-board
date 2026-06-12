@@ -702,6 +702,9 @@ export class CardManager {
   }
 
   private getCardCoverSrc(file: TFile, coverPropName: string): string | null {
+    if (coverPropName === "__proto__" || coverPropName === "constructor") {
+      return null;
+    }
     const cache = this.view.app.metadataCache.getFileCache(file);
     const rawValue: unknown = cache?.frontmatter?.[coverPropName];
     if (!rawValue) return null;

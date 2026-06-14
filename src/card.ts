@@ -105,7 +105,7 @@ export class CardManager {
     const file = this.view.app.vault.getAbstractFileByPath(filePath);
     const coverProp = this.view.getCardCoverProperty();
     if (file instanceof TFile && coverProp) {
-      const src = this.getCardCoverSrc(file, coverProp);
+      const src = this.getCardCoverSrc(file, entry, coverProp);
       if (src) {
         this.renderCardThumbnail(cardEl, src);
       }
@@ -701,21 +701,33 @@ export class CardManager {
     );
   }
 
-  private getCardCoverSrc(file: TFile, coverPropName: string): string | null {
-    if (coverPropName === "__proto__" || coverPropName === "constructor") {
-      return null;
-    }
+  private getCardCoverSrc(file: TFile, entry: BasesEntry, coverPropName: string): string | null {
+    if (coverPropName === "__proto__" || coverPropName === "constructor") return null;
+
+    // 1. Try frontmatter first (plain property like "cover")
     const cache = this.view.app.metadataCache.getFileCache(file);
     const rawValue: unknown = cache?.frontmatter?.[coverPropName];
-    if (!rawValue) return null;
-    if (typeof rawValue !== "string" && typeof rawValue !== "number")
-      return null;
-
-    if (typeof rawValue === "string" && /^https?:\/\//i.test(rawValue)) {
-      return rawValue;
+    if (rawValue && (typeof rawValue === "string" || typeof rawValue === "number")) {
+      const src = this.resolveCoverString(String(rawValue), file);
+      if (src) return src;
     }
 
-    const cleanPath = String(rawValue)
+    // 2. Try entry.getValue() for Bases property IDs like "formula.cover"
+    const propId = coverPropName.includes(".")
+      ? coverPropName
+      : `note.${coverPropName}`;
+    const val = entry.getValue(propId as BasesPropertyId);
+    if (!val || val instanceof NullValue || !val.isTruthy()) return null;
+
+    return this.resolveCoverString(val.toString().trim(), file);
+  }
+
+  private resolveCoverString(rawValue: string, file: TFile): string | null {
+    if (!rawValue) return null;
+
+    if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+    const cleanPath = rawValue
       .replace(/^!?\[\[(.*?)\]\]$/, "$1")
       .split("|")[0]
       .split("#")[0]

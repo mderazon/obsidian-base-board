@@ -5,11 +5,28 @@
 /* ---- Container / Board ---- */
 
 .base-board-container {
-  width: 100%;
-  height: 100%;
+  /* Anchor to the nearest positioned ancestor instead of relying on
+     height:100% propagation. In some Obsidian Bases contexts the
+     scrollEl's own height resolves to "auto" once content grows,
+     which makes height:100% here collapse to fit content instead of
+     filling the real available space — leaving a gap at the bottom
+     and a vertical scrollbar that stops short of the window edge.
+     position:absolute + inset:0 sidesteps that entirely. */
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* If the view's immediate wrapper is statically positioned, add this
+   helper class to make it a positioning context for absolutely-
+   positioned children like `.base-board-container`. Adding a class
+   avoids inline style mutations and keeps theming consistent. */
+.base-board-positioned-root {
+  position: relative;
 }
 
 /* Chip Config Modal header */

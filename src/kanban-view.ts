@@ -72,6 +72,17 @@ export class KanbanView extends BasesView implements HoverParent {
     super(controller);
     this.scrollEl = scrollEl;
     this.plugin = plugin;
+
+    // .base-board-container is anchored with position:absolute + inset:0
+    // (see styles.css) so it reliably fills the available space even if
+    // scrollEl's own height resolves to "auto". That requires scrollEl to
+    // be a positioning context — set it defensively rather than relying on
+    // Obsidian's default wrapper styling, which can vary by context
+    // (full view vs. inline embed) and silently break the anchor.
+    if (getComputedStyle(scrollEl).position === "static") {
+      scrollEl.classList.add("base-board-positioned-root");
+    }
+
     this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
 
     this.tags = new Tags(this);

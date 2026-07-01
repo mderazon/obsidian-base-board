@@ -625,6 +625,37 @@
 
 /* ---- Filter Bar ---- */
 
+.base-board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 0.35em 0.9em;
+  background-color: var(--background-modifier-surface);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.base-board-toolbar-button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-toolbar-button-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+}
+
 .base-board-filter-bar {
   display: flex;
   align-items: center;
@@ -841,4 +872,186 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* ---- Chip Properties (custom frontmatter value chips) ---- */
+
+.base-board-chip-property-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.base-board-chip-property {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--chip-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  cursor: default;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.base-board-chip-property:hover {
+  opacity: 0.85;
+}
+
+.base-board-chip-property-light {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-chip-property-dark {
+  color: #1c212b;
+  text-shadow: none;
+}
+
+/* ---- Card border via CSS variable ---- */
+
+.base-board-card {
+  border-left: 3px solid var(--card-border-color, transparent);
+}
+
+/* ---- Chip Config Modal ---- */
+
+.base-board-chip-config-desc {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: 16px;
+}
+
+.base-board-chip-config-section {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.base-board-chip-config-section:last-of-type {
+  border-bottom: none;
+}
+
+.base-board-chip-refresh-btn {
+  margin-bottom: 12px;
+}
+
+.base-board-chip-properties-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+}
+
+.base-board-chip-property-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  transition: background-color 0.15s ease;
+}
+
+.base-board-chip-property-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-chip-property-row input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+.base-board-chip-property-label {
+  font-weight: var(--font-medium);
+  font-size: var(--font-ui-small);
+  flex: 1;
+}
+
+.base-board-chip-property-samples {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.base-board-chip-properties-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 16px;
+}
+
+/* Border property selector */
+.base-board-chip-border-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-form-field);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+/* Color mapping editor */
+.base-board-chip-mapping-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.base-board-chip-mapping-section {
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+}
+
+.base-board-chip-mapping-section h4 {
+  margin: 0 0 8px 0;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+}
+
+.base-board-chip-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.base-board-chip-mapping-value {
+  font-weight: var(--font-medium);
+  font-size: var(--font-ui-small);
+  min-width: 60px;
+}
+
+.base-board-chip-color-swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.base-board-chip-mapping-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.base-board-chip-mapping-delete:hover {
+  color: var(--text-error);
+}
+
+.base-board-chip-add-mapping-btn {
+  margin-top: 8px;
+  font-size: var(--font-ui-small);
 }

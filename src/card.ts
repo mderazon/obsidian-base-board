@@ -13,6 +13,7 @@ import {
   Keymap,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
+import { InputModal } from "./modals";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
@@ -254,6 +255,34 @@ export class CardManager {
       }
     }
 
+    // ---- Chip properties (custom frontmatter value chips) ----
+    this.renderChipProperties(cardEl, entry);
+
+    // ---- Card border color from configured border property ----
+    const borderProp = this.view.chipProperties.getBorderProperty();
+    if (borderProp) {
+      const borderPropId = borderProp.startsWith("note.")
+        ? borderProp
+        : `note.${borderProp}`;
+      const borderVal = entry.getValue(borderPropId as BasesPropertyId);
+      if (
+        borderVal &&
+        !(borderVal instanceof NullValue) &&
+        borderVal.isTruthy()
+      ) {
+        const display = formatValueForChip(borderVal);
+        if (display) {
+          const borderColor = this.view.chipProperties.getColorForValue(
+            borderProp,
+            display,
+          );
+          if (borderColor) {
+            cardEl.style.setProperty("--card-border-color", borderColor);
+          }
+        }
+      }
+    }
+
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
 
     // Respect cardTitleProperty if configured — use a frontmatter property
@@ -297,6 +326,7 @@ export class CardManager {
     const chips: ChipDescriptor[] = [];
     for (const propId of visibleProps) {
       if (chips.length >= 6) break;
+      if (chips.length >= 10) break;
       if (propId.startsWith("file.")) {
         if (FILE_PROPS_TO_SKIP.has(propId.slice(5))) continue;
       }
@@ -365,6 +395,85 @@ export class CardManager {
     chip.createSpan({ text: label, cls: "base-board-chip-label" });
     chip.createSpan({ text: value, cls: "base-board-chip-value" });
     return chip;
+  }
+
+  /** Render custom frontmatter fields as colored value-only chips. */
+  private renderChipProperties(parent: HTMLElement, entry: BasesEntry): void {
+    const chipProps = this.view.chipProperties.getChipProperties();
+    if (chipProps.length === 0) return;
+
+    const container = parent.createDiv({
+      cls: "base-board-chip-property-container",
+    });
+
+    for (const propName of chipProps) {
+      const propId = propName.startsWith("note.")
+        ? propName
+        : `note.${propName}`;
+      const val = entry.getValue(propId as BasesPropertyId);
+      if (!val || val instanceof NullValue || !val.isTruthy()) continue;
+
+      const display = formatValueForChip(val);
+      if (!display) continue;
+
+      this.renderChipProperty(container, propName, display);
+    }
+  }
+
+  /** Render a single chip property pill. */
+  private renderChipProperty(
+    parent: HTMLElement,
+    propName: string,
+    value: string,
+  ): void {
+    const chip = parent.createSpan({ cls: "base-board-chip-property" });
+    chip.setAttr("data-property-name", propName);
+
+    // Resolve color from manager (mapped or deterministic fallback)
+    const color = this.view.chipProperties.getColorForValue(propName, value);
+    if (color) {
+      chip.style.setProperty("--chip-color", color);
+      if (relativeLuminance(color) === "dark") {
+        chip.addClass("base-board-chip-property-light");
+      } else {
+        chip.addClass("base-board-chip-property-dark");
+      }
+    }
+
+    chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+
+    // Right-click → context menu for color editing
+    chip.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+      this.showChipContextMenu(e, propName, value);
+    });
+  }
+
+  /** Show context menu on a chip property (right-click). */
+  private showChipContextMenu(
+    e: MouseEvent,
+    propName: string,
+    value: string,
+  ): void {
+    const currentColor = this.view.chipProperties.getColorForValue(
+      propName,
+      value,
+    );
+    new InputModal(
+      this.view.app,
+      `Color for "${value}"`,
+      "Enter hex color (e.g. #ff0000)",
+      (newColor) => {
+        if (newColor && newColor.trim()) {
+          this.view.chipProperties.setCustomColor(
+            propName,
+            value,
+            newColor.trim(),
+          );
+        }
+      },
+      currentColor || "",
+    ).open();
   }
 
   private showCardActionMenu(
@@ -701,13 +810,21 @@ export class CardManager {
     );
   }
 
-  private getCardCoverSrc(file: TFile, entry: BasesEntry, coverPropName: string): string | null {
-    if (coverPropName === "__proto__" || coverPropName === "constructor") return null;
+  private getCardCoverSrc(
+    file: TFile,
+    entry: BasesEntry,
+    coverPropName: string,
+  ): string | null {
+    if (coverPropName === "__proto__" || coverPropName === "constructor")
+      return null;
 
     // 1. Try frontmatter first (plain property like "cover")
     const cache = this.view.app.metadataCache.getFileCache(file);
     const rawValue: unknown = cache?.frontmatter?.[coverPropName];
-    if (rawValue && (typeof rawValue === "string" || typeof rawValue === "number")) {
+    if (
+      rawValue &&
+      (typeof rawValue === "string" || typeof rawValue === "number")
+    ) {
       const src = this.resolveCoverString(String(rawValue), file);
       if (src) return src;
     }

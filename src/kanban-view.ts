@@ -16,6 +16,8 @@ import { DragDropManager } from "./drag-drop";
 import { ColumnManager } from "./column";
 import { CardManager } from "./card";
 import { Tags } from "./tags";
+import { ChipPropertiesManager } from "./chip-properties";
+import { ChipConfigModal, ChipConfigSnapshot } from "./chip-config-modal";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
@@ -24,6 +26,9 @@ import {
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
+  CONFIG_KEY_BORDER_PROPERTY,
+  CONFIG_KEY_CHIP_PROPERTIES,
+  CONFIG_KEY_CHIP_COLORS,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -42,6 +47,7 @@ export class KanbanView extends BasesView implements HoverParent {
   private columnManager: ColumnManager;
   public currentGroups: BasesEntryGroup[] = [];
   public cardManager: CardManager;
+  public chipProperties: ChipPropertiesManager;
 
   /** Prevent re-renders while we batch-update frontmatter. */
   private isUpdating = false;
@@ -70,6 +76,7 @@ export class KanbanView extends BasesView implements HoverParent {
     this.tags = new Tags(this);
     this.cardManager = new CardManager(this);
     this.columnManager = new ColumnManager(this);
+    this.chipProperties = new ChipPropertiesManager(this);
 
     this.dragDropManager = new DragDropManager(this.app, {
       onCardDrop: (
@@ -417,6 +424,7 @@ export class KanbanView extends BasesView implements HoverParent {
     }
 
     this.containerEl.empty();
+    this.renderToolbar(this.containerEl);
 
     // Use the official API: this.data is a BasesQueryResult
     const groupedData: BasesEntryGroup[] = this.data?.groupedData ?? [];
@@ -494,6 +502,31 @@ export class KanbanView extends BasesView implements HoverParent {
   // ---------------------------------------------------------------------------
   //  Column & Filter management helpers
   // ---------------------------------------------------------------------------
+
+  private renderToolbar(container: HTMLElement): void {
+    const toolbarEl = container.createDiv({ cls: "base-board-toolbar" });
+    const buttonEl = toolbarEl.createEl("button", {
+      cls: "base-board-toolbar-button mod-cta",
+      text: "Configure chip properties",
+    });
+    buttonEl.type = "button";
+    setIcon(
+      buttonEl.createSpan({ cls: "base-board-toolbar-button-icon" }),
+      "lucide-settings",
+    );
+    buttonEl.addEventListener("click", () => {
+      new ChipConfigModal(
+        this.app,
+        this.chipProperties,
+        (config: ChipConfigSnapshot) => {
+          this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, config.properties);
+          this.config?.set(CONFIG_KEY_BORDER_PROPERTY, config.borderProperty);
+          this.config?.set(CONFIG_KEY_CHIP_COLORS, config.colors);
+          this.scheduleRender();
+        },
+      ).open();
+    });
+  }
 
   private handleColumnReorder(orderedNames: string[]): void {
     this.saveColumns(orderedNames);

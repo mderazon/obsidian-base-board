@@ -723,6 +723,25 @@
   font-weight: var(--font-bold);
 }
 
+.base-board-chip-config-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 0.35em;
+  background-color: var(--background-modifier-surface);
+  color: var(--text-normal);
+  cursor: pointer;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+}
+
+.base-board-chip-config-btn:hover {
+  background-color: var(--background-modifier-hover);
+}
+
 .base-board-filter-clear {
   margin-left: auto;
   font-size: var(--font-ui-smaller);

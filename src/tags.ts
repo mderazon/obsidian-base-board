@@ -7,9 +7,14 @@ import { relativeLuminance } from "./color-utils";
 export class Tags {
   private view: KanbanView;
   public activeFilters: Set<string> = new Set();
+  private chipConfigCallback?: () => void;
 
   constructor(view: KanbanView) {
     this.view = view;
+  }
+
+  public setChipConfigCallback(callback: () => void): void {
+    this.chipConfigCallback = callback;
   }
 
   public getColors(): Record<string, string> {
@@ -163,6 +168,16 @@ export class Tags {
           this.activeFilters.add(tag);
         }
         this.view.scheduleRender();
+      });
+    }
+
+    if (this.chipConfigCallback) {
+      const configBtn = barEl.createEl("button", {
+        cls: "base-board-chip-config-btn mod-cta",
+      });
+      setIcon(configBtn, "lucide-settings");
+      configBtn.addEventListener("click", () => {
+        this.chipConfigCallback!();
       });
     }
 

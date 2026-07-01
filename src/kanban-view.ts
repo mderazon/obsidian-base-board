@@ -75,6 +75,19 @@ export class KanbanView extends BasesView implements HoverParent {
     this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
 
     this.tags = new Tags(this);
+    this.tags.setChipConfigCallback(() => {
+      new ChipConfigModal(
+        this.app,
+        this.chipProperties,
+        (config: ChipConfigSnapshot) => {
+          this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, config.properties);
+          this.config?.set(CONFIG_KEY_BORDER_PROPERTY, config.borderProperty);
+          this.config?.set(CONFIG_KEY_CHIP_COLORS, config.colors);
+          this.config?.set(CONFIG_KEY_CHIP_FIXED_COLORS, config.fixedColors);
+          this.scheduleRender();
+        },
+      ).open();
+    });
     this.cardManager = new CardManager(this);
     this.columnManager = new ColumnManager(this);
     this.chipProperties = new ChipPropertiesManager(this);
@@ -425,7 +438,6 @@ export class KanbanView extends BasesView implements HoverParent {
     }
 
     this.containerEl.empty();
-    this.renderToolbar(this.containerEl);
 
     // Use the official API: this.data is a BasesQueryResult
     const groupedData: BasesEntryGroup[] = this.data?.groupedData ?? [];
@@ -503,32 +515,6 @@ export class KanbanView extends BasesView implements HoverParent {
   // ---------------------------------------------------------------------------
   //  Column & Filter management helpers
   // ---------------------------------------------------------------------------
-
-  private renderToolbar(container: HTMLElement): void {
-    const toolbarEl = container.createDiv({ cls: "base-board-toolbar" });
-    const buttonEl = toolbarEl.createEl("button", {
-      cls: "base-board-toolbar-button mod-cta",
-      text: "Configure chip properties",
-    });
-    buttonEl.type = "button";
-    setIcon(
-      buttonEl.createSpan({ cls: "base-board-toolbar-button-icon" }),
-      "lucide-settings",
-    );
-    buttonEl.addEventListener("click", () => {
-      new ChipConfigModal(
-        this.app,
-        this.chipProperties,
-        (config: ChipConfigSnapshot) => {
-          this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, config.properties);
-          this.config?.set(CONFIG_KEY_BORDER_PROPERTY, config.borderProperty);
-          this.config?.set(CONFIG_KEY_CHIP_COLORS, config.colors);
-          this.config?.set(CONFIG_KEY_CHIP_FIXED_COLORS, config.fixedColors);
-          this.scheduleRender();
-        },
-      ).open();
-    });
-  }
 
   private handleColumnReorder(orderedNames: string[]): void {
     this.saveColumns(orderedNames);

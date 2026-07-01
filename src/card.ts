@@ -325,6 +325,7 @@ export class CardManager {
 
     const chips: ChipDescriptor[] = [];
     const chipPropNames = new Set(this.view.chipProperties.getChipProperties());
+    const borderPropName = this.view.chipProperties.getBorderProperty();
     for (const propId of visibleProps) {
       if (chips.length >= 6) break;
       if (chips.length >= 10) break;
@@ -335,6 +336,7 @@ export class CardManager {
       if (groupByProp && propName === groupByProp) continue;
       if (propName === ORDER_PROPERTY) continue;
       if (chipPropNames.has(propName)) continue;
+      if (borderPropName && propName === borderPropName) continue;
 
       const val = entry.getValue(propId);
       if (!val || val instanceof NullValue || !val.isTruthy()) continue;

@@ -36,6 +36,14 @@ There are no tests. The `lint` script is the closest thing to a quality gate —
 | `DragDropManager` | `src/drag-drop.ts` | HTML5 native drag-and-drop, auto-scroll, placeholder, multi-drag |
 | `Tags` | `src/tags.ts` | Tag extraction from frontmatter, filter bar, color-coded tag pills |
 
+### Modals
+
+- **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid over every icon Obsidian knows about. Each tile rendered with `setIcon()` for pixel-accurate previews. Used when configuring chip icon overrides.
+
+### Layout
+
+The main board container (`base-board-container`) is positioned to fill available space in the Obsidian workspace. This ensures the Kanban board properly occupies the view area regardless of sidebar state or other UI elements.
+
 ### Data Flow
 
 1. **Bases engine** queries data based on the `.base` file's filters and groups entries by the configured `groupBy` property.
@@ -66,6 +74,9 @@ When a folder is moved/renamed, `handleFolderRename()` debounces (250ms burst wi
 - `ORDER_PROPERTY = "kanban_order"` — frontmatter key for card ordering
 - Config keys are all defined in `src/constants.ts` (`CONFIG_KEY_*`)
   - `CONFIG_KEY_CHIP_FIXED_COLORS = "chipFixedColors"` — persisted fixed color per chip property (one color applied to all values)
+  - `CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels"` — per-property label toggle
+  - `CONFIG_KEY_CHIP_ICONS = "chipIcons"` — per-property value→icon mappings
+  - `CONFIG_KEY_BORDER_PROPERTY = "borderProperty"` — which field controls card border color
 
 ### Chip Properties Feature
 
@@ -73,10 +84,11 @@ Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 
 - **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, icon overrides, and property discovery
 - **`ChipConfigModal`** (`src/chip-config-modal.ts`) — UI for configuring which properties become chips and their color mappings. Uses a two-column grid layout with header at top, radio toggle between "One color for all values" (fixed) and "Separate color per value" modes, and a Save button in the footer.
+- **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid of all Obsidian icons. Used when configuring icon overrides for chip properties. Each tile uses `setIcon()` for pixel-accurate previews.
 - **Toolbar Button**: Boards render a persistent `Configure chip properties` button in the board toolbar to open the modal directly from the board UI
 - **Command**: `Configure chip properties` remains available as a fallback from the command palette
 - **Storage**: `chipProperties` (array of property names), `chipColors` (object of property→value→color mappings), `chipFixedColors` (object of property→single-color mappings), `chipShowLabels` (per-property label toggle), `chipIcons` (per-property icon override), `borderProperty` (which field controls card border color)
-- **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color. If an icon override is configured, the chip renders the icon instead of the text value using the chip color.
+- **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color. The border property is excluded from chip rendering logic to prevent it from appearing as a visible chip. If an icon override is configured, the chip renders the icon instead of the text value using the chip color.
 - **Color resolution**: Checks fixed colors first (one color for all values of a property), then per-value mappings, then falls back to deterministic hash (same as tags).
 - **Discovery behavior**: Property discovery now includes booleans like `false`, keeps configured properties visible even when they are not currently selected, and preserves color-map edits for unsaved properties until Save is pressed.
 

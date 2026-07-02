@@ -7,11 +7,24 @@ import {
   ChipFixedColorMap,
 } from "./chip-properties";
 
+const CHIP_ICON_OPTIONS = [
+  { value: "", label: "No icon" },
+  { value: "lucide-circle", label: "Circle" },
+  { value: "lucide-check", label: "Check" },
+  { value: "lucide-alert-circle", label: "Alert" },
+  { value: "lucide-flag", label: "Flag" },
+  { value: "lucide-star", label: "Star" },
+  { value: "lucide-clock", label: "Clock" },
+  { value: "lucide-bell", label: "Bell" },
+  { value: "lucide-zap", label: "Zap" },
+];
+
 export interface ChipConfigSnapshot {
   properties: string[];
   borderProperty: string;
   colors: Record<string, Record<string, string>>;
   fixedColors: ChipFixedColorMap;
+  icons: Record<string, Record<string, string>>;
 }
 
 export class ChipConfigModal extends Modal {
@@ -28,6 +41,7 @@ export class ChipConfigModal extends Modal {
   // not currently checked in the list.
   private colorState: ChipColorMap = {};
   private fixedColors: ChipFixedColorMap = {};
+  private chipIcons: Record<string, Record<string, string>> = {};
   private useFixedColor: boolean = false;
 
   // layout refs
@@ -51,15 +65,21 @@ export class ChipConfigModal extends Modal {
     this.borderProperty = chipManager.getBorderProperty();
     this.colorState = { ...chipManager.getChipColors() };
     this.fixedColors = { ...chipManager.getFixedColors() };
+    this.chipIcons = { ...chipManager.getChipIcons() };
   }
 
   onOpen(): void {
-    const { contentEl, containerEl } = this;
+    const { contentEl } = this;
 
     contentEl.empty();
 
-    // Add class to allow taller modal
-    containerEl.addClass("base-board-chip-config-modal");
+    // Add class to allow a wider/taller modal. This must go on `modalEl`
+    // (the actual .modal box) rather than `containerEl` (the outer
+    // .modal-container overlay) — the CSS rule below is scoped to
+    // `.modal.base-board-chip-config-modal`, and adding the class to the
+    // wrong element silently falls back to Obsidian's default modal width,
+    // squeezing the two-column layout and forcing the right pane to scroll.
+    this.modalEl.addClass("base-board-chip-config-modal");
 
     // root layout (header + two-column grid)
     const root = contentEl.createDiv({ cls: "chip-config-layout" });
@@ -407,6 +427,7 @@ export class ChipConfigModal extends Modal {
         prop.name,
         value,
         currentColors[value] || "",
+        this.chipIcons[prop.name]?.[value] || "",
       );
     }
 
@@ -419,7 +440,14 @@ export class ChipConfigModal extends Modal {
       new InputModal(this.app, "New value", "Enter value", (v) => {
         if (!v?.trim()) return;
 
-        this.createMappingRowBefore(container, addBtn, prop.name, v.trim(), "");
+        this.createMappingRowBefore(
+          container,
+          addBtn,
+          prop.name,
+          v.trim(),
+          "",
+          "",
+        );
       }).open();
     };
   }
@@ -432,38 +460,16 @@ export class ChipConfigModal extends Modal {
     propName: string,
     value: string,
     currentColor: string,
+    currentIcon: string,
   ): HTMLDivElement {
-    const row = container.createDiv({
-      cls: "base-board-chip-mapping-row",
-    });
-
-    row.createEl("span", {
-      text: value,
-      cls: "base-board-chip-mapping-value",
-    });
-
-    const color = row.createEl("input", {
-      type: "color",
-      cls: "base-board-chip-color-swatch",
-    });
-
-    color.value = currentColor || "#808080";
-
-    color.oninput = () => {
-      this.updateMapping(propName, value, color.value);
-    };
-
-    const del = row.createEl("button", {
-      text: "×",
-      cls: "chip-delete",
-    });
-
-    del.onclick = () => {
-      this.updateMapping(propName, value, "");
-      row.remove();
-    };
-
-    return row;
+    return this.createMappingRowInternal(
+      container,
+      propName,
+      value,
+      currentColor,
+      currentIcon,
+      null,
+    );
   }
 
   private createMappingRowBefore(
@@ -472,15 +478,70 @@ export class ChipConfigModal extends Modal {
     propName: string,
     value: string,
     currentColor: string,
+    currentIcon: string,
+  ): HTMLDivElement {
+    return this.createMappingRowInternal(
+      container,
+      propName,
+      value,
+      currentColor,
+      currentIcon,
+      anchor,
+    );
+  }
+
+  private createMappingRowInternal(
+    container: HTMLElement,
+    propName: string,
+    value: string,
+    currentColor: string,
+    currentIcon: string,
+    anchor: HTMLElement | null,
   ): HTMLDivElement {
     const row = container.createDiv({
       cls: "base-board-chip-mapping-row",
     });
 
-    row.createEl("span", {
-      text: value,
+    let currentValue = value;
+
+    const valueEl = row.createEl("span", {
+      text: currentValue,
       cls: "base-board-chip-mapping-value",
     });
+    valueEl.title = currentValue;
+
+    const editBtn = row.createEl("button", {
+      text: "Edit",
+      cls: "base-board-chip-mapping-edit",
+    });
+
+    editBtn.onclick = () => {
+      new InputModal(
+        this.app,
+        "Edit value",
+        "Enter value",
+        (nextValue) => {
+          const trimmed = nextValue?.trim();
+          if (!trimmed || trimmed === currentValue) return;
+
+          const colors = this.colorState[propName] || {};
+          const currentColorForValue = colors[currentValue] || "";
+          const currentIconForValue =
+            this.chipIcons[propName]?.[currentValue] || "";
+
+          this.updateMapping(propName, currentValue, "");
+          this.updateMapping(propName, trimmed, currentColorForValue);
+
+          this.updateIconMapping(propName, currentValue, "");
+          this.updateIconMapping(propName, trimmed, currentIconForValue);
+
+          currentValue = trimmed;
+          valueEl.textContent = currentValue;
+          valueEl.title = currentValue;
+        },
+        currentValue,
+      ).open();
+    };
 
     const color = row.createEl("input", {
       type: "color",
@@ -490,20 +551,40 @@ export class ChipConfigModal extends Modal {
     color.value = currentColor || "#808080";
 
     color.oninput = () => {
-      this.updateMapping(propName, value, color.value);
+      this.updateMapping(propName, currentValue, color.value);
+    };
+
+    const iconSelect = row.createEl("select", {
+      cls: "chip-icon-select",
+    });
+    for (const option of CHIP_ICON_OPTIONS) {
+      const opt = iconSelect.createEl("option", {
+        value: option.value,
+        text: option.label,
+      });
+      if (option.value === currentIcon) {
+        opt.selected = true;
+      }
+    }
+    iconSelect.onchange = () => {
+      this.updateIconMapping(propName, currentValue, iconSelect.value);
     };
 
     const del = row.createEl("button", {
       text: "×",
-      cls: "chip-delete",
+      cls: "base-board-chip-mapping-delete",
     });
 
     del.onclick = () => {
-      this.updateMapping(propName, value, "");
+      this.updateMapping(propName, currentValue, "");
+      this.updateIconMapping(propName, currentValue, "");
       row.remove();
     };
 
-    anchor.before(row);
+    if (anchor) {
+      anchor.before(row);
+    }
+
     return row;
   }
 
@@ -526,6 +607,24 @@ export class ChipConfigModal extends Modal {
     }
   }
 
+  private updateIconMapping(
+    propName: string,
+    value: string,
+    icon: string,
+  ): void {
+    if (!this.chipIcons[propName]) this.chipIcons[propName] = {};
+
+    if (icon) {
+      this.chipIcons[propName][value] = icon;
+    } else {
+      delete this.chipIcons[propName][value];
+
+      if (Object.keys(this.chipIcons[propName]).length === 0) {
+        delete this.chipIcons[propName];
+      }
+    }
+  }
+
   // ----------------------------
   // SAVE
   // ----------------------------
@@ -535,6 +634,7 @@ export class ChipConfigModal extends Modal {
       borderProperty: this.borderProperty,
       colors: this.colorState,
       fixedColors: { ...this.fixedColors },
+      icons: { ...this.chipIcons },
     };
 
     this.close();

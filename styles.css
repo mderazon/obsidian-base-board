@@ -971,6 +971,30 @@
   font-weight: var(--font-normal);
 }
 
+.base-board-chip-property-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--chip-color, var(--interactive-accent));
+  line-height: 1;
+}
+
+.base-board-chip-property-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  line-height: 1;
+}
+
+.base-board-chip-property-icon svg {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
 /* Chip config modal — show label toggle */
 .chip-show-label-wrapper {
   display: flex;
@@ -992,6 +1016,20 @@
 .chip-show-label-checkbox {
   margin: 0;
   cursor: pointer;
+}
+
+.chip-icon-select {
+  min-width: 112px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.chip-icon-help {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
 }
 
 .chip-show-label-text {
@@ -1018,14 +1056,16 @@
    ============================================================ */
 
 .modal.base-board-chip-config-modal {
-  width: min(940px, calc(100vw - 32px));
-  max-height: min(85vh, 900px);
+  width: min(1200px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: min(92vh, 1100px);
 }
 
 .chip-config-layout {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1.6fr);
+  min-width: 0;
   min-height: min(70vh, 720px);
   max-height: 100%;
   margin-bottom: 8px;
@@ -1068,9 +1108,10 @@
 
 /* RIGHT: editor panel */
 .chip-config-right {
-  padding: 16px;
+  padding: 20px 24px;
   overflow-y: auto;
   background-color: var(--background-primary);
+  min-width: 0;
 }
 
 /* Section blocks (shared) */
@@ -1131,7 +1172,8 @@
    ============================================================ */
 
 .chip-property-editor {
-  max-width: 720px;
+  max-width: none;
+  width: 100%;
 }
 
 /* Title feels like a section header, not a modal header */
@@ -1173,17 +1215,38 @@
 /* Each row becomes a mini "property editor row" */
 .base-board-chip-mapping-row {
   display: grid;
-  grid-template-columns: 1fr 32px 24px;
+  grid-template-columns: minmax(0, 1.4fr) auto auto minmax(120px, 220px) auto;
   align-items: center;
   gap: 10px;
-  padding: 6px 0;
+  padding: 8px 0;
 }
 
 /* Value label */
 .base-board-chip-mapping-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
   font-size: var(--font-ui-small);
   font-weight: var(--font-medium);
   color: var(--text-normal);
+}
+
+.base-board-chip-mapping-edit {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+}
+
+.base-board-chip-mapping-edit:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
 }
 
 /* Color picker becomes cleaner */
@@ -1195,10 +1258,14 @@
   cursor: pointer;
   padding: 0;
   background: transparent;
+  flex: 0 0 auto;
 }
 
 /* Delete button becomes subtle until hover */
 .base-board-chip-mapping-delete {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
   opacity: 0.4;
   transition: opacity 0.15s ease, color 0.15s ease;
 }

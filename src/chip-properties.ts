@@ -5,6 +5,7 @@ import {
   CONFIG_KEY_CHIP_COLORS,
   CONFIG_KEY_CHIP_FIXED_COLORS,
   CONFIG_KEY_CHIP_SHOW_LABELS,
+  CONFIG_KEY_CHIP_ICONS,
   CONFIG_KEY_BORDER_PROPERTY,
   ORDER_PROPERTY,
 } from "./constants";
@@ -114,6 +115,38 @@ export class ChipPropertiesManager {
 
   public setShowLabels(labels: Record<string, boolean>): void {
     this.view.config?.set(CONFIG_KEY_CHIP_SHOW_LABELS, labels);
+    this.view.scheduleRender();
+  }
+
+  public getChipIcons(): Record<string, Record<string, string>> {
+    const raw = this.view.config?.get(CONFIG_KEY_CHIP_ICONS);
+    return raw && typeof raw === "object"
+      ? (raw as Record<string, Record<string, string>>)
+      : {};
+  }
+
+  public setChipIcons(icons: Record<string, Record<string, string>>): void {
+    this.view.config?.set(CONFIG_KEY_CHIP_ICONS, icons);
+    this.view.scheduleRender();
+  }
+
+  public getChipIcon(propName: string, value: string): string | null {
+    const icon = this.getChipIcons()[propName]?.[value];
+    return typeof icon === "string" && icon.trim() !== "" ? icon.trim() : null;
+  }
+
+  public setChipIcon(propName: string, value: string, icon: string): void {
+    const icons = this.getChipIcons();
+    if (!icons[propName]) icons[propName] = {};
+    if (icon) {
+      icons[propName][value] = icon;
+    } else {
+      delete icons[propName][value];
+      if (Object.keys(icons[propName]).length === 0) {
+        delete icons[propName];
+      }
+    }
+    this.view.config?.set(CONFIG_KEY_CHIP_ICONS, icons);
     this.view.scheduleRender();
   }
 

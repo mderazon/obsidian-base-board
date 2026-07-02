@@ -450,8 +450,9 @@ export class CardManager {
       }
     }
 
+    const chipIconName = this.view.chipProperties.getChipIcon(propName, value);
     const showLabels = this.view.chipProperties.getShowLabels();
-    if (showLabels[propName]) {
+    if (showLabels[propName] && !chipIconName) {
       const propId = propName.startsWith("note.")
         ? (propName as BasesPropertyId)
         : (`note.${propName}` as BasesPropertyId);
@@ -462,7 +463,18 @@ export class CardManager {
       });
     }
 
-    chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+    if (chipIconName) {
+      chip.removeClass("base-board-chip-property");
+      chip.addClass("base-board-chip-property-icon-only");
+      const iconEl = chip.createSpan({
+        cls: "base-board-chip-property-icon",
+      });
+      setIcon(iconEl, chipIconName);
+    } else if (!showLabels[propName]) {
+      chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+    } else {
+      chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+    }
 
     // Right-click → context menu for color editing
     chip.addEventListener("contextmenu", (e: MouseEvent) => {

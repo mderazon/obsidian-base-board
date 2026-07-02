@@ -71,13 +71,14 @@ When a folder is moved/renamed, `handleFolderRename()` debounces (250ms burst wi
 
 Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 
-- **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, and property discovery
+- **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, icon overrides, and property discovery
 - **`ChipConfigModal`** (`src/chip-config-modal.ts`) — UI for configuring which properties become chips and their color mappings. Uses a two-column grid layout with header at top, radio toggle between "One color for all values" (fixed) and "Separate color per value" modes, and a Save button in the footer.
-- **Toolbar Button**: Boards now render a persistent `Configure chip properties` button in the board toolbar to open the modal directly from the board UI
+- **Toolbar Button**: Boards render a persistent `Configure chip properties` button in the board toolbar to open the modal directly from the board UI
 - **Command**: `Configure chip properties` remains available as a fallback from the command palette
-- **Storage**: `chipProperties` (array of property names), `chipColors` (object of property→value→color mappings), `chipFixedColors` (object of property→single-color mappings), `borderProperty` (which field controls card border color)
-- **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color.
+- **Storage**: `chipProperties` (array of property names), `chipColors` (object of property→value→color mappings), `chipFixedColors` (object of property→single-color mappings), `chipShowLabels` (per-property label toggle), `chipIcons` (per-property icon override), `borderProperty` (which field controls card border color)
+- **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color. If an icon override is configured, the chip renders the icon instead of the text value using the chip color.
 - **Color resolution**: Checks fixed colors first (one color for all values of a property), then per-value mappings, then falls back to deterministic hash (same as tags).
+- **Discovery behavior**: Property discovery now includes booleans like `false`, keeps configured properties visible even when they are not currently selected, and preserves color-map edits for unsaved properties until Save is pressed.
 
 ### Chip Config Modal Layout
 

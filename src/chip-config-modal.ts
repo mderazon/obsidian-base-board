@@ -1,23 +1,12 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, setIcon } from "obsidian";
 import { InputModal } from "./modals";
+import { IconPickerModal } from "./icon-picker-modal";
 import {
   ChipPropertiesManager,
   AvailableProperty,
   ChipColorMap,
   ChipFixedColorMap,
 } from "./chip-properties";
-
-const CHIP_ICON_OPTIONS = [
-  { value: "", label: "No icon" },
-  { value: "lucide-circle", label: "Circle" },
-  { value: "lucide-check", label: "Check" },
-  { value: "lucide-alert-circle", label: "Alert" },
-  { value: "lucide-flag", label: "Flag" },
-  { value: "lucide-star", label: "Star" },
-  { value: "lucide-clock", label: "Clock" },
-  { value: "lucide-bell", label: "Bell" },
-  { value: "lucide-zap", label: "Zap" },
-];
 
 export interface ChipConfigSnapshot {
   properties: string[];
@@ -417,7 +406,7 @@ export class ChipConfigModal extends Modal {
     const currentColors = this.colorState[prop.name] || {};
 
     const values = new Set<string>([
-      ...prop.sampleValues,
+      ...prop.sampleValues.map((v) => String(v)),
       ...Object.keys(currentColors),
     ]);
 
@@ -502,7 +491,7 @@ export class ChipConfigModal extends Modal {
       cls: "base-board-chip-mapping-row",
     });
 
-    let currentValue = value;
+    let currentValue = String(value);
 
     const valueEl = row.createEl("span", {
       text: currentValue,
@@ -554,20 +543,42 @@ export class ChipConfigModal extends Modal {
       this.updateMapping(propName, currentValue, color.value);
     };
 
-    const iconSelect = row.createEl("select", {
-      cls: "chip-icon-select",
+    let currentIconValue = currentIcon;
+
+    const iconPickerBtn = row.createEl("button", {
+      cls: "chip-icon-picker-btn",
+      attr: { type: "button" },
     });
-    for (const option of CHIP_ICON_OPTIONS) {
-      const opt = iconSelect.createEl("option", {
-        value: option.value,
-        text: option.label,
-      });
-      if (option.value === currentIcon) {
-        opt.selected = true;
+    const iconPreviewEl = iconPickerBtn.createDiv({
+      cls: "chip-icon-picker-preview",
+    });
+    const iconLabelEl = iconPickerBtn.createEl("span", {
+      cls: "chip-icon-picker-label",
+    });
+
+    const refreshIconPreview = () => {
+      iconPreviewEl.empty();
+      if (currentIconValue) {
+        setIcon(iconPreviewEl, currentIconValue);
+        iconPreviewEl.classList.remove("is-empty");
+      } else {
+        iconPreviewEl.classList.add("is-empty");
       }
-    }
-    iconSelect.onchange = () => {
-      this.updateIconMapping(propName, currentValue, iconSelect.value);
+      iconLabelEl.textContent = currentIconValue
+        ? currentIconValue
+            .replace(/^lucide-/, "")
+            .split("-")
+            .join(" ")
+        : "No icon";
+    };
+    refreshIconPreview();
+
+    iconPickerBtn.onclick = () => {
+      new IconPickerModal(this.app, currentIconValue, (iconId) => {
+        currentIconValue = iconId;
+        this.updateIconMapping(propName, currentValue, currentIconValue);
+        refreshIconPreview();
+      }).open();
     };
 
     const del = row.createEl("button", {
@@ -593,13 +604,14 @@ export class ChipConfigModal extends Modal {
   // ----------------------------
   private updateMapping(propName: string, value: string, color: string): void {
     const colors = this.colorState;
+    const key = String(value);
 
     if (!colors[propName]) colors[propName] = {};
 
     if (color) {
-      colors[propName][value] = color;
+      colors[propName][key] = color;
     } else {
-      delete colors[propName][value];
+      delete colors[propName][key];
 
       if (Object.keys(colors[propName]).length === 0) {
         delete colors[propName];
@@ -612,12 +624,13 @@ export class ChipConfigModal extends Modal {
     value: string,
     icon: string,
   ): void {
+    const key = String(value);
     if (!this.chipIcons[propName]) this.chipIcons[propName] = {};
 
     if (icon) {
-      this.chipIcons[propName][value] = icon;
+      this.chipIcons[propName][key] = icon;
     } else {
-      delete this.chipIcons[propName][value];
+      delete this.chipIcons[propName][key];
 
       if (Object.keys(this.chipIcons[propName]).length === 0) {
         delete this.chipIcons[propName];

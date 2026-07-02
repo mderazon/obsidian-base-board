@@ -1018,13 +1018,56 @@
   cursor: pointer;
 }
 
-.chip-icon-select {
+.chip-icon-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 112px;
-  padding: 4px 6px;
+  max-width: 220px;
+  padding: 4px 10px 4px 6px;
   border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
   background-color: var(--background-primary);
   color: var(--text-normal);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chip-icon-picker-btn:hover {
+  border-color: var(--background-modifier-border-hover);
+  background-color: var(--background-modifier-hover);
+}
+
+.chip-icon-picker-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-normal);
+}
+
+.chip-icon-picker-preview.is-empty {
+  width: 14px;
+  height: 14px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+  margin: 3px;
+}
+
+.chip-icon-picker-preview svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chip-icon-picker-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
 }
 
 .chip-icon-help {
@@ -1374,4 +1417,97 @@
   border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
   background-color: var(--background-primary);
+}
+
+/* ============================================================
+   Icon Picker Modal — searchable grid of all Obsidian icons
+   ============================================================ */
+
+.modal.base-board-icon-picker-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+}
+
+.icon-picker-search {
+  width: 100%;
+  padding: 6px 10px;
+  margin: 4px 0 12px 0;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.icon-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: center;
+}
+
+.icon-picker-tile:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.icon-picker-tile.is-selected {
+  background-color: var(--background-modifier-active-hover);
+  border-color: var(--interactive-accent);
+}
+
+.icon-picker-tile-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-normal);
+}
+
+.icon-picker-tile-glyph svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-picker-tile-glyph.icon-picker-none {
+  width: 16px;
+  height: 16px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+}
+
+.icon-picker-tile-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-transform: capitalize;
+}
+
+.icon-picker-empty {
+  grid-column: 1 / -1;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
 }

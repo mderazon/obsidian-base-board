@@ -1,6 +1,7 @@
 import {
   BasesEntry,
   BasesPropertyId,
+  BooleanValue,
   DateValue,
   LinkValue,
   ListValue,
@@ -33,6 +34,15 @@ const IMAGE_EXTENSIONS = new Set([
   "webp",
 ]);
 
+/** Check if a value is present and should be displayed. */
+function isValuePresent(val: Value | null | undefined): val is Value {
+  if (!val) return false;
+  if (val instanceof NullValue) return false;
+  // BooleanValue(false) is an explicit false, not "no value"
+  if (val instanceof BooleanValue) return true;
+  return val.isTruthy();
+}
+
 // Format a Value for chip display:
 //   - DateValue    → relative ("3 days ago")
 //   - LinkValue    → alias if set, otherwise basename without .md extension
@@ -60,7 +70,7 @@ function formatValueForChip(val: Value): string {
     const len = val.length();
     for (let i = 0; i < len; i++) {
       const item = val.get(i);
-      if (!item || item instanceof NullValue || !item.isTruthy()) continue;
+      if (!isValuePresent(item)) continue;
       parts.push(formatValueForChip(item));
     }
     return parts.join(", ");
@@ -265,11 +275,7 @@ export class CardManager {
         ? borderProp
         : `note.${borderProp}`;
       const borderVal = entry.getValue(borderPropId as BasesPropertyId);
-      if (
-        borderVal &&
-        !(borderVal instanceof NullValue) &&
-        borderVal.isTruthy()
-      ) {
+      if (isValuePresent(borderVal)) {
         const display = formatValueForChip(borderVal);
         if (display) {
           const borderColor = this.view.chipProperties.getColorForValue(
@@ -296,7 +302,7 @@ export class CardManager {
         ? titleProp
         : `note.${titleProp}`;
       const tv = entry.getValue(propId as BasesPropertyId);
-      if (tv && !(tv instanceof NullValue) && tv.isTruthy()) {
+      if (isValuePresent(tv)) {
         cardTitle = formatValueForChip(tv);
       }
     }
@@ -339,7 +345,7 @@ export class CardManager {
       if (borderPropName && propName === borderPropName) continue;
 
       const val = entry.getValue(propId);
-      if (!val || val instanceof NullValue || !val.isTruthy()) continue;
+      if (!isValuePresent(val)) continue;
       const display = formatValueForChip(val);
       if (!display) continue;
 
@@ -415,7 +421,7 @@ export class CardManager {
         ? propName
         : `note.${propName}`;
       const val = entry.getValue(propId as BasesPropertyId);
-      if (!val || val instanceof NullValue || !val.isTruthy()) continue;
+      if (!isValuePresent(val)) continue;
 
       const display = formatValueForChip(val);
       if (!display) continue;
@@ -886,15 +892,14 @@ export class CardManager {
   private renderCardThumbnail(cardEl: HTMLElement, src: string): void {
     const thumbEl = activeDocument.createElement("div");
     thumbEl.className = "base-board-card-thumbnail";
-    thumbEl
-      .createEl("img", {
-        cls: "base-board-card-thumbnail-img",
-        attr: { src, loading: "lazy" },
-      })
-      .addEventListener("error", () => {
-        thumbEl.remove();
-        cardEl.removeClass("base-board-card--has-thumbnail");
-      });
+    const thumbImg = thumbEl.createEl("img", {
+      cls: "base-board-card-thumbnail-img",
+      attr: { src, loading: "lazy", draggable: "false" },
+    });
+    thumbImg.addEventListener("error", () => {
+      thumbEl.remove();
+      cardEl.removeClass("base-board-card--has-thumbnail");
+    });
     cardEl.prepend(thumbEl);
     cardEl.addClass("base-board-card--has-thumbnail");
   }

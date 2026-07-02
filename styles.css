@@ -1007,16 +1007,35 @@
   border-left: 3px solid var(--card-border-color, transparent);
 }
 
+.base-board-card-thumbnail-img,
+.base-board-card img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* ============================================================
    Chip Config Modal — Two Column Layout (NEW)
    ============================================================ */
 
+.modal.base-board-chip-config-modal {
+  width: min(940px, calc(100vw - 32px));
+  max-height: min(85vh, 900px);
+}
+
 .chip-config-layout {
   display: grid;
-  grid-template-rows: auto 1fr;
-  grid-template-columns: 260px 1fr;
-  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  min-height: min(70vh, 720px);
+  max-height: 100%;
   margin-bottom: 8px;
+}
+
+/* Ensure left panel fills available space */
+.chip-config-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Header spans both columns */
@@ -1069,7 +1088,7 @@
   flex-direction: column;
   gap: 4px;
   margin-top: 8px;
-  max-height: 260px;
+  max-height: min(420px, calc(70vh - 220px));
   overflow-y: auto;
   padding-right: 4px;
 }

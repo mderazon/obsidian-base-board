@@ -3,6 +3,7 @@ import { InputModal } from "./modals";
 import {
   ChipPropertiesManager,
   AvailableProperty,
+  ChipColorMap,
   ChipFixedColorMap,
 } from "./chip-properties";
 
@@ -23,7 +24,9 @@ export class ChipConfigModal extends Modal {
   private activeProperty: string | null = null;
   private borderProperty: string = "";
 
-  // fixed-color state
+  // local edit state so color mappings persist even for properties that are
+  // not currently checked in the list.
+  private colorState: ChipColorMap = {};
   private fixedColors: ChipFixedColorMap = {};
   private useFixedColor: boolean = false;
 
@@ -46,13 +49,17 @@ export class ChipConfigModal extends Modal {
 
     this.selectedProperties = new Set(chipManager.getChipProperties());
     this.borderProperty = chipManager.getBorderProperty();
-    this.fixedColors = chipManager.getFixedColors();
+    this.colorState = { ...chipManager.getChipColors() };
+    this.fixedColors = { ...chipManager.getFixedColors() };
   }
 
   onOpen(): void {
-    const { contentEl } = this;
+    const { contentEl, containerEl } = this;
 
     contentEl.empty();
+
+    // Add class to allow taller modal
+    containerEl.addClass("base-board-chip-config-modal");
 
     // root layout (header + two-column grid)
     const root = contentEl.createDiv({ cls: "chip-config-layout" });
@@ -344,8 +351,8 @@ export class ChipConfigModal extends Modal {
     // Set initial visibility
     const hasFixed = !!this.fixedColors[prop.name];
     const hasPerValue =
-      Object.keys(this.chipManager.getChipColors()[prop.name] || {}).length >
-        0 || prop.sampleValues.length > 0;
+      Object.keys(this.colorState[prop.name] || {}).length > 0 ||
+      prop.sampleValues.length > 0;
 
     if (hasFixed) {
       fixedRadio.checked = true;
@@ -387,7 +394,7 @@ export class ChipConfigModal extends Modal {
     container: HTMLElement,
     prop: AvailableProperty,
   ): void {
-    const currentColors = this.chipManager.getChipColors()[prop.name] || {};
+    const currentColors = this.colorState[prop.name] || {};
 
     const values = new Set<string>([
       ...prop.sampleValues,
@@ -504,7 +511,7 @@ export class ChipConfigModal extends Modal {
   // STATE UPDATE
   // ----------------------------
   private updateMapping(propName: string, value: string, color: string): void {
-    const colors = this.chipManager.getChipColors();
+    const colors = this.colorState;
 
     if (!colors[propName]) colors[propName] = {};
 
@@ -526,7 +533,7 @@ export class ChipConfigModal extends Modal {
     const config: ChipConfigSnapshot = {
       properties: Array.from(this.selectedProperties),
       borderProperty: this.borderProperty,
-      colors: this.chipManager.getChipColors(),
+      colors: this.colorState,
       fixedColors: { ...this.fixedColors },
     };
 

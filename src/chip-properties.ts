@@ -182,53 +182,80 @@ export class ChipPropertiesManager {
     const configured = new Set(this.getChipProperties());
     const seen = new Map<string, Set<string>>(); // propName -> Set<values>
 
+    const entries: Array<
+      (typeof this.view.currentGroups)[number]["entries"][number]
+    > = [];
     for (const group of this.view.currentGroups) {
-      for (const entry of group.entries) {
-        if (!(entry.file instanceof TFile)) continue;
-        const cache = this.view.app.metadataCache.getFileCache(entry.file);
-        const fm = cache?.frontmatter;
-        if (!fm) continue;
+      entries.push(...group.entries);
+    }
 
-        for (const key of Object.keys(fm)) {
-          const val = (fm as Record<string, unknown>)[key];
-          // Skip known file properties and special keys
-          if (FILE_PROPS_TO_SKIP.has(key)) continue;
-          if (key === ORDER_PROPERTY) continue;
-          if (groupByProp && key === groupByProp) continue;
-          if (!val || (typeof val === "string" && val.trim() === "")) continue;
+    const fallbackEntries = this.view.data?.data ?? [];
+    const entriesToInspect = entries.length > 0 ? entries : fallbackEntries;
 
-          // Normalize value to string
-          let display: string;
-          if (typeof val === "number" || typeof val === "boolean") {
-            display = String(val);
-          } else if (Array.isArray(val)) {
-            // For array values, use the first non-empty element as sample
-            const first = val.find(
-              (v): v is string => typeof v === "string" && v.trim() !== "",
-            );
-            display = first ? first : "";
-          } else if (typeof val === "object") {
-            // Skip objects (would stringify to [object Object])
-            continue;
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string -- val is guaranteed to be a primitive string after type checks
-            display = String(val);
-          }
+    for (const entry of entriesToInspect) {
+      if (!(entry.file instanceof TFile)) continue;
+      const cache = this.view.app.metadataCache.getFileCache(entry.file);
+      const fm = cache?.frontmatter;
+      if (!fm) continue;
 
-          if (!display) continue;
-
-          if (!seen.has(key)) seen.set(key, new Set());
-          seen.get(key)!.add(display);
+      for (const key of Object.keys(fm)) {
+        const val = (fm as Record<string, unknown>)[key];
+        // Skip known file properties and special keys
+        if (FILE_PROPS_TO_SKIP.has(key)) continue;
+        if (key === ORDER_PROPERTY) continue;
+        if (groupByProp && key === groupByProp) continue;
+        if (
+          val === null ||
+          val === undefined ||
+          (typeof val === "string" && val.trim() === "")
+        ) {
+          continue;
         }
+
+        // Normalize value to string
+        let display: string;
+        if (typeof val === "number" || typeof val === "boolean") {
+          display = String(val);
+        } else if (Array.isArray(val)) {
+          // For array values, use the first non-empty element as sample
+          const first = val.find(
+            (v): v is string => typeof v === "string" && v.trim() !== "",
+          );
+          display = first ? first : "";
+        } else if (typeof val === "object") {
+          // Skip objects (would stringify to [object Object])
+          continue;
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string -- val is guaranteed to be a primitive string after type checks
+          display = String(val);
+        }
+
+        if (!display) continue;
+
+        if (!seen.has(key)) seen.set(key, new Set());
+        seen.get(key)!.add(display);
       }
     }
 
-    return Array.from(seen.entries()).map(([name, values]) => ({
+    const discovered = Array.from(seen.entries()).map(([name, values]) => ({
       name,
       displayName: formatPropertyName(name),
       isConfigured: configured.has(name),
-      sampleValues: Array.from(values).slice(0, 5),
+      sampleValues: Array.from(values).slice(0, 10),
     }));
+
+    const configuredOnly = Array.from(configured)
+      .filter((name) => !seen.has(name))
+      .map((name) => ({
+        name,
+        displayName: formatPropertyName(name),
+        isConfigured: true,
+        sampleValues: [] as string[],
+      }));
+
+    return [...discovered, ...configuredOnly].sort((a, b) =>
+      a.displayName.localeCompare(b.displayName),
+    );
   }
 }
 

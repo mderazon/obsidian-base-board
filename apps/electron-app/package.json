@@ -1,0 +1,19 @@
+{
+  "name": "@base-board/electron-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone Electron app for the Kanban board.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build": "tsc -noEmit && node esbuild.config.mjs production",
+    "typecheck": "tsc -noEmit"
+  },
+  "dependencies": {
+    "electron": "^33.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "typescript": "6.0.3"
+  }
+}

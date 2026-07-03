@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Base Board</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div class="eb-app-header">
+        <h1>Base Board</h1>
+        <p class="eb-subtitle">Standalone Kanban board — data adapter coming soon</p>
+      </div>
+      <div id="board-container" class="eb-board-container">
+        <div class="eb-placeholder">
+          <p>Data adapter not yet implemented.</p>
+          <p class="eb-muted">
+            The board-core package is ready. Connect a data source
+            (local markdown files, JSON, etc.) to render columns and cards.
+          </p>
+        </div>
+      </div>
+    </div>
+    <script src="./main.js"></script>
+  </body>
+</html>

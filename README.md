@@ -59,9 +59,39 @@ Search for **Base Board** in the Obsidian Community Plugins browser and click **
 
 ## Development
 
+This is a monorepo with three packages:
+
+```
+packages/board-core/     — Pure Kanban types & utilities (zero Obsidian deps)
+plugins/obsidian-plugin/ — Obsidian Community Plugin
+apps/electron-app/       — Standalone Electron app (work in progress)
+```
+
+### Quick Start
+
 1. Clone this repo.
-2. Run `npm install`.
-3. Run `npm run dev` to start the build process in watch mode.
+2. Run `npm install` at the root.
+3. Run `npm run dev:plugin` to start watch-mode build for the Obsidian plugin.
+
+### Available Scripts
+
+```bash
+npm run build            # Build core → plugin (full chain)
+npm run build:core       # Build board-core only
+npm run build:plugin     # Build obsidian plugin only
+npm run build:electron   # Build electron app
+npm run dev:plugin       # Watch-mode build for Obsidian dev vault
+npm run dev:electron     # Launch Electron app
+npm run lint             # Type-check core + lint plugin
+npm run format           # Prettier across all packages
+npm run clean            # Remove all build outputs
+```
+
+### Architecture
+
+- **`packages/board-core`** defines the domain types (`CardData`, `Column`, `BoardConfig`) and pure utilities. Both the Obsidian plugin and Electron app consume this package.
+- **`plugins/obsidian-plugin`** extends `BasesView` from the Obsidian Bases API. The `KanbanView` class acts as an adapter, mapping Obsidian's `BasesEntry`/`BasesEntryGroup` types to board-core's `CardData`/`Column`.
+- **`apps/electron-app`** is a standalone Electron app with a data adapter layer that reads markdown files directly (no Obsidian API required). Currently a skeleton ready for implementation.
 
 ## License
 

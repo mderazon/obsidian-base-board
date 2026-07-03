@@ -1,11 +1,5 @@
-import {
-  BasesEntry,
-  BasesEntryGroup,
-  setIcon,
-  TFile,
-  Notice,
-  Menu,
-} from "obsidian";
+import { setIcon, TFile, Notice, Menu } from "obsidian";
+import type { CardData, Column } from "@base-board/board-core/types";
 import { KanbanView } from "./kanban-view";
 import { InputModal } from "./modals";
 import { NO_VALUE_COLUMN } from "./constants";
@@ -22,24 +16,27 @@ export class ColumnManager {
   public renderColumn(
     boardEl: HTMLElement,
     columnName: string,
-    group: BasesEntryGroup | null,
+    column: Column | null,
     columnIndex: number,
   ): void {
     const isNoValue = columnName === NO_VALUE_COLUMN;
-    const entries = group ? group.entries : [];
+    const cards = column ? column.cards : [];
 
-    // Sort entries up-front so the header add-card button can reference sorted.length
-    const sorted = [...entries].sort((a: BasesEntry, b: BasesEntry) => {
-      const pathA = a.file?.path ?? "";
-      const pathB = b.file?.path ?? "";
-      return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
+    // Sort cards up-front so the header add-card button can reference sorted.length
+    const sorted = [...cards].sort((a: CardData, b: CardData) => {
+      return (
+        this.view.getFileOrder(a.filePath) - this.view.getFileOrder(b.filePath)
+      );
     });
 
     const activeFilters = this.view.tags.activeFilters;
     const visibleCards =
       activeFilters.size > 0
-        ? sorted.filter((entry) => {
-            const file = entry.file;
+        ? sorted.filter((card) => {
+            // Tags are extracted from the actual vault file, not the card data
+            const file = this.view.app.vault.getAbstractFileByPath(
+              card.filePath,
+            );
             if (!(file instanceof TFile)) return false;
             const fileTags = this.view.tags.extractTagsFromFile(file);
             return Array.from(activeFilters).some((filter) =>
@@ -53,8 +50,8 @@ export class ColumnManager {
     columnEl.dataset.columnIndex = String(columnIndex);
 
     // ---- WIP limit check ----
-    const wipLimit = this.view.getWipLimit(columnName);
-    if (wipLimit !== null && entries.length > wipLimit) {
+    const wipLimit = column?.wipLimit ?? this.view.getWipLimit(columnName);
+    if (wipLimit !== null && cards.length > wipLimit) {
       columnEl.addClass("base-board-column--wip-overflow");
     }
 
@@ -87,8 +84,8 @@ export class ColumnManager {
     // Show "count / limit" when a WIP limit is set
     const countText =
       wipLimit !== null
-        ? `${entries.length} / ${wipLimit}`
-        : String(entries.length);
+        ? `${cards.length} / ${wipLimit}`
+        : String(cards.length);
     const countEl = headerEl.createSpan({
       text: countText,
       cls: "base-board-column-count",
@@ -109,7 +106,7 @@ export class ColumnManager {
         this.view.cardManager.startInlineCardCreation(
           addCardHeaderBtn!,
           columnName,
-          sorted.length,
+          cards.length,
         );
       });
     }
@@ -128,7 +125,7 @@ export class ColumnManager {
               this.startColumnRename(
                 titleEl,
                 columnName,
-                entries,
+                cards,
                 countEl,
                 addCardHeaderBtn,
               );
@@ -179,8 +176,8 @@ export class ColumnManager {
       menu.addItem((item) => {
         item
           .setTitle(
-            entries.length > 0
-              ? `Delete column (${entries.length} card${entries.length > 1 ? "s" : ""} will remain)`
+            cards.length > 0
+              ? `Delete column (${cards.length} card${cards.length > 1 ? "s" : ""} will remain)`
               : "Delete column",
           )
           .setIcon("lucide-trash-2")
@@ -196,8 +193,8 @@ export class ColumnManager {
     // ---- Cards container ----
     const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
 
-    visibleCards.forEach((entry) => {
-      this.view.cardManager.renderCard(cardsEl, entry, columnName);
+    visibleCards.forEach((card) => {
+      this.view.cardManager.renderCard(cardsEl, card, columnName);
     });
   }
 
@@ -235,7 +232,7 @@ export class ColumnManager {
   public startColumnRename(
     titleEl: HTMLElement,
     oldName: string,
-    entries: BasesEntry[],
+    cards: CardData[],
     countEl?: HTMLElement | null,
     addCardBtn?: HTMLElement | null,
   ): void {
@@ -265,7 +262,7 @@ export class ColumnManager {
       const newName = input.value.trim();
       restoreChrome();
       if (newName && newName !== oldName) {
-        void this.handleRenameColumn(oldName, newName, entries);
+        void this.handleRenameColumn(oldName, newName, cards);
       } else {
         // Revert — just re-render to restore the span
         this.view.render();
@@ -289,7 +286,7 @@ export class ColumnManager {
   private async handleRenameColumn(
     oldName: string,
     newName: string,
-    entries: BasesEntry[],
+    cards: CardData[],
   ): Promise<void> {
     const columns = this.view.getColumns();
     if (columns.includes(newName)) {
@@ -307,10 +304,8 @@ export class ColumnManager {
 
       // 2. Update frontmatter for all cards in this column
       if (groupByProp) {
-        const updatePromises = entries.map((entry) => {
-          const filePath = entry.file?.path;
-          if (!filePath) return Promise.resolve();
-          const file = this.view.app.vault.getAbstractFileByPath(filePath);
+        const updatePromises = cards.map((card) => {
+          const file = this.view.app.vault.getAbstractFileByPath(card.filePath);
           if (!file || !(file instanceof TFile)) return Promise.resolve();
           return this.view.app.fileManager.processFrontMatter(
             file,

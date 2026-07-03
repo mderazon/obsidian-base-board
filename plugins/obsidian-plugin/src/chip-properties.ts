@@ -1,4 +1,3 @@
-import { TFile } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import {
   CONFIG_KEY_CHIP_PROPERTIES,
@@ -209,30 +208,21 @@ export class ChipPropertiesManager {
   //  Property discovery
   // ---------------------------------------------------------------------------
 
-  /** Discover all available frontmatter properties from current entries. */
+  /** Discover all available frontmatter properties from current cards. */
   public discoverAvailableProperties(): AvailableProperty[] {
     const groupByProp = this.view.getGroupByProperty();
     const configured = new Set(this.getChipProperties());
     const seen = new Map<string, Set<string>>(); // propName -> Set<values>
 
-    const entries: Array<
-      (typeof this.view.currentGroups)[number]["entries"][number]
-    > = [];
-    for (const group of this.view.currentGroups) {
-      entries.push(...group.entries);
-    }
+    // Flatten all cards from all columns
+    const allCards = this.view.currentGroups.flatMap((col) => col.cards);
 
-    const fallbackEntries = this.view.data?.data ?? [];
-    const entriesToInspect = entries.length > 0 ? entries : fallbackEntries;
-
-    for (const entry of entriesToInspect) {
-      if (!(entry.file instanceof TFile)) continue;
-      const cache = this.view.app.metadataCache.getFileCache(entry.file);
-      const fm = cache?.frontmatter;
-      if (!fm) continue;
+    for (const card of allCards) {
+      const fm = card.properties;
+      if (!fm || Object.keys(fm).length === 0) continue;
 
       for (const key of Object.keys(fm)) {
-        const val = (fm as Record<string, unknown>)[key];
+        const val = fm[key];
         // Skip known file properties and special keys
         if (FILE_PROPS_TO_SKIP.has(key)) continue;
         if (key === ORDER_PROPERTY) continue;

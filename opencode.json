@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "tsa": {
+      "type": "local",
+      "command": ["c:\\Users\\Bjorn\\.config\\opencode\\.venv\\Scripts\\tree-sitter-analyzer-mcp.exe"],
+      "environment": {
+        "TREE_SITTER_PROJECT_ROOT": "C:\\Users\\Bjorn\\Documents\\obsidian-base-board"
+      }
+    }
+  }
+}

@@ -101,10 +101,11 @@ export class Tags {
   public renderFilterBar(container: HTMLElement): void {
     const allTags = new Set<string>();
 
-    for (const group of this.view.currentGroups) {
-      for (const entry of group.entries) {
-        if (entry.file instanceof TFile) {
-          const fileTags = this.extractTagsFromFile(entry.file);
+    for (const column of this.view.currentGroups) {
+      for (const card of column.cards) {
+        const file = this.view.app.vault.getAbstractFileByPath(card.filePath);
+        if (file instanceof TFile) {
+          const fileTags = this.extractTagsFromFile(file);
           fileTags.forEach((t) => allTags.add(t));
         }
       }

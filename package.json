@@ -1,38 +1,22 @@
 {
-  "name": "obsidian-base-board",
-  "version": "2.3.1",
-  "description": "Kanban board view for Bases with drag and drop",
-  "main": "main.js",
+  "name": "obsidian-base-board-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo for Base Board — Kanban board core + Obsidian plugin + Electron app.",
   "scripts": {
-    "dev": "node esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "version": "node version-bump.mjs && git add manifest.json versions.json",
-    "lint": "tsc -noEmit -skipLibCheck && eslint \"src/**/*.ts\"",
-    "format": "prettier --write \"src/**/*.ts\""
+    "build:core": "cd packages/board-core && npm run build",
+    "build:plugin": "cd plugins/obsidian-plugin && npm run build",
+    "build:electron": "cd apps/electron-app && npm run build",
+    "build": "npm run build:core && npm run build:plugin",
+    "dev:plugin": "cd plugins/obsidian-plugin && npm run dev",
+    "dev:electron": "cd apps/electron-app && npm run dev",
+    "lint": "npm run lint:core && npm run lint:plugin",
+    "lint:core": "cd packages/board-core && npm run typecheck",
+    "lint:plugin": "cd plugins/obsidian-plugin && npm run lint",
+    "format": "prettier --write \"packages/*/src/**/*.ts\" \"plugins/*/src/**/*.ts\"",
+    "clean": "rm -rf packages/board-core/dist plugins/obsidian-plugin/main.js apps/electron-app/main.js apps/electron-app/renderer/main.js"
   },
-  "keywords": [
-    "obsidian",
-    "obsidian-plugin",
-    "obsidian-md",
-    "kanban",
-    "board",
-    "bases",
-    "task-management"
-  ],
-  "author": "Michael DeRazon",
-  "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "10.0.1",
-    "@eslint/json": "2.0.0",
-    "esbuild": "0.28.1",
-    "eslint": "10.5.0",
-    "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-obsidianmd": "0.3.0",
-    "eslint-plugin-prettier": "5.5.6",
-    "globals": "17.6.0",
-    "obsidian": "1.13.1",
-    "prettier": "3.8.4",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.61.0"
+    "prettier": "3.8.4"
   }
 }

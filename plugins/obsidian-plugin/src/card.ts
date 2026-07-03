@@ -1,18 +1,5 @@
-import {
-  BasesEntry,
-  BasesPropertyId,
-  BooleanValue,
-  DateValue,
-  LinkValue,
-  ListValue,
-  NullValue,
-  setIcon,
-  TFile,
-  Notice,
-  Menu,
-  Value,
-  Keymap,
-} from "obsidian";
+import { setIcon, TFile, Notice, Menu, Keymap } from "obsidian";
+import type { CardData } from "@base-board/board-core/types";
 import { KanbanView } from "./kanban-view";
 import { InputModal } from "./modals";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
@@ -34,48 +21,42 @@ const IMAGE_EXTENSIONS = new Set([
   "webp",
 ]);
 
-/** Check if a value is present and should be displayed. */
-function isValuePresent(val: Value | null | undefined): val is Value {
-  if (!val) return false;
-  if (val instanceof NullValue) return false;
-  // BooleanValue(false) is an explicit false, not "no value"
-  if (val instanceof BooleanValue) return true;
-  return val.isTruthy();
+/** Check if a raw property value should be displayed. */
+function isValuePresent(val: unknown): boolean {
+  if (val === null || val === undefined) return false;
+  if (typeof val === "string") return val.trim() !== "";
+  if (typeof val === "boolean") return true; // BooleanValue(false) is explicit
+  if (typeof val === "number") return true;
+  if (Array.isArray(val)) return val.length > 0;
+  return false;
 }
 
-// Format a Value for chip display:
-//   - DateValue    → relative ("3 days ago")
-//   - LinkValue    → alias if set, otherwise basename without .md extension
-//                    (e.g. [[folder/Mario]] → "Mario", [[Welcome|Alias]] → "Alias")
-//   - ListValue    → comma-separated list of the above, applied recursively
-//   - everything else → toString() (existing behaviour)
-function formatValueForChip(val: Value): string {
-  if (val instanceof DateValue) {
-    return val.relative();
-  }
-  if (val instanceof LinkValue) {
-    const raw = val.toString();
-    const match = raw.match(/^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/);
-    if (match) {
-      const target = match[1];
-      const alias = match[2];
-      if (alias) return alias;
-      const basename = target.split("/").pop() ?? target;
-      return basename.replace(/\.md$/, "");
-    }
-    return raw;
-  }
-  if (val instanceof ListValue) {
+/** Format a raw property value for chip display. */
+function formatValueForChip(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "boolean" || typeof val === "number") return String(val);
+  if (typeof val === "string") return val;
+  if (Array.isArray(val)) {
     const parts: string[] = [];
-    const len = val.length();
-    for (let i = 0; i < len; i++) {
-      const item = val.get(i);
-      if (!isValuePresent(item)) continue;
-      parts.push(formatValueForChip(item));
+    for (const item of val) {
+      if (isValuePresent(item)) {
+        parts.push(formatValueForChip(item));
+      }
     }
     return parts.join(", ");
   }
-  return val.toString();
+  if (typeof val === "object") return ""; // skip objects
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- val is prIMITIVE at this point
+  return String(val);
+}
+
+/**
+ * Resolve a property value from CardData using a Bases-style property ID.
+ * Strips the "note." prefix if present and looks up the key in properties.
+ */
+function resolvePropertyValue(card: CardData, propId: string): unknown {
+  const key = propId.startsWith("note.") ? propId.slice(5) : propId;
+  return card.properties[key];
 }
 
 // File properties that are redundant (shown as the card title) or are
@@ -104,10 +85,10 @@ export class CardManager {
 
   public renderCard(
     cardsEl: HTMLElement,
-    entry: BasesEntry,
+    card: CardData,
     columnName: string,
   ): void {
-    const filePath = entry.file?.path ?? "";
+    const filePath = card.filePath;
     const cardEl = cardsEl.createDiv({ cls: "base-board-card" });
     cardEl.setAttr("draggable", "true");
     cardEl.dataset.filePath = filePath;
@@ -116,7 +97,7 @@ export class CardManager {
     const file = this.view.app.vault.getAbstractFileByPath(filePath);
     const coverProp = this.view.getCardCoverProperty();
     if (file instanceof TFile && coverProp) {
-      const src = this.getCardCoverSrc(file, entry, coverProp);
+      const src = this.getCardCoverSrc(file, card, coverProp);
       if (src) {
         this.renderCardThumbnail(cardEl, src);
       }
@@ -266,7 +247,7 @@ export class CardManager {
     }
 
     // ---- Chip properties (custom frontmatter value chips) ----
-    this.renderChipProperties(cardEl, entry);
+    this.renderChipProperties(cardEl, card);
 
     // ---- Card border color from configured border property ----
     const borderProp = this.view.chipProperties.getBorderProperty();
@@ -274,7 +255,7 @@ export class CardManager {
       const borderPropId = borderProp.startsWith("note.")
         ? borderProp
         : `note.${borderProp}`;
-      const borderVal = entry.getValue(borderPropId as BasesPropertyId);
+      const borderVal = resolvePropertyValue(card, borderPropId);
       if (isValuePresent(borderVal)) {
         const display = formatValueForChip(borderVal);
         if (display) {
@@ -293,7 +274,7 @@ export class CardManager {
 
     // Respect cardTitleProperty if configured — use a frontmatter property
     // (e.g. "title") as the card heading instead of the filename.
-    let cardTitle = entry.file?.basename ?? "Untitled";
+    let cardTitle = card.displayName;
     const titleProp = this.view.config.get("cardTitleProperty") as
       | string
       | undefined;
@@ -301,7 +282,7 @@ export class CardManager {
       const propId = titleProp.startsWith("note.")
         ? titleProp
         : `note.${titleProp}`;
-      const tv = entry.getValue(propId as BasesPropertyId);
+      const tv = resolvePropertyValue(card, propId);
       if (isValuePresent(tv)) {
         cardTitle = formatValueForChip(tv);
       }
@@ -319,7 +300,7 @@ export class CardManager {
     // ---- Property chips ----
     const propsEl = cardEl.createDiv({ cls: "base-board-card-props" });
     const groupByProp = this.view.getGroupByProperty();
-    const visibleProps: BasesPropertyId[] = this.view.config.getOrder();
+    const visibleProps: string[] = this.view.config.getOrder();
 
     // Collect eligible chip descriptors in one pass so filtering logic lives
     // in one place.  No DOM is created yet.
@@ -344,14 +325,14 @@ export class CardManager {
       if (chipPropNames.has(propName)) continue;
       if (borderPropName && propName === borderPropName) continue;
 
-      const val = entry.getValue(propId);
+      const val = resolvePropertyValue(card, propId);
       if (!isValuePresent(val)) continue;
       const display = formatValueForChip(val);
       if (!display) continue;
 
       chips.push({
         propId,
-        displayName: this.view.config.getDisplayName(propId),
+        displayName: this.view.config.getDisplayName(propId as never),
         display,
       });
     }
@@ -408,7 +389,7 @@ export class CardManager {
   }
 
   /** Render custom frontmatter fields as colored value-only chips. */
-  private renderChipProperties(parent: HTMLElement, entry: BasesEntry): void {
+  private renderChipProperties(parent: HTMLElement, card: CardData): void {
     const chipProps = this.view.chipProperties.getChipProperties();
     if (chipProps.length === 0) return;
 
@@ -420,7 +401,7 @@ export class CardManager {
       const propId = propName.startsWith("note.")
         ? propName
         : `note.${propName}`;
-      const val = entry.getValue(propId as BasesPropertyId);
+      const val = resolvePropertyValue(card, propId);
       if (!isValuePresent(val)) continue;
 
       const display = formatValueForChip(val);
@@ -454,9 +435,9 @@ export class CardManager {
     const showLabels = this.view.chipProperties.getShowLabels();
     if (showLabels[propName] && !chipIconName) {
       const propId = propName.startsWith("note.")
-        ? (propName as BasesPropertyId)
-        : (`note.${propName}` as BasesPropertyId);
-      const displayName = this.view.config.getDisplayName(propId);
+        ? propName
+        : `note.${propName}`;
+      const displayName = this.view.config.getDisplayName(propId as never);
       chip.createSpan({
         text: `${displayName}: `,
         cls: "base-board-chip-property-label",
@@ -846,7 +827,7 @@ export class CardManager {
 
   private getCardCoverSrc(
     file: TFile,
-    entry: BasesEntry,
+    card: CardData,
     coverPropName: string,
   ): string | null {
     if (coverPropName === "__proto__" || coverPropName === "constructor")
@@ -863,14 +844,14 @@ export class CardManager {
       if (src) return src;
     }
 
-    // 2. Try entry.getValue() for Bases property IDs like "formula.cover"
+    // 2. Try card properties for Bases property IDs like "formula.cover"
     const propId = coverPropName.includes(".")
       ? coverPropName
       : `note.${coverPropName}`;
-    const val = entry.getValue(propId as BasesPropertyId);
-    if (!val || val instanceof NullValue || !val.isTruthy()) return null;
+    const val = resolvePropertyValue(card, propId);
+    if (!isValuePresent(val)) return null;
 
-    return this.resolveCoverString(val.toString().trim(), file);
+    return this.resolveCoverString(String(val).trim(), file);
   }
 
   private resolveCoverString(rawValue: string, file: TFile): string | null {

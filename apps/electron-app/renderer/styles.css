@@ -1,0 +1,70 @@
+/* Electron app styles — separate from the Obsidian plugin styles.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  background: var(--background-primary, #1e1e2e);
+  color: var(--text-normal, #cdd6f4);
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.eb-app-header {
+  padding: 12px 20px;
+  background: var(--background-secondary, #181825);
+  border-bottom: 1px solid var(--background-modifier-border, #313244);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  -webkit-app-region: drag;
+}
+
+.eb-app-header h1 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.eb-subtitle {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+}
+
+.eb-board-container {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.eb-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.eb-placeholder p {
+  font-size: 14px;
+}
+
+.eb-muted {
+  font-size: 12px;
+  max-width: 400px;
+  line-height: 1.5;
+}

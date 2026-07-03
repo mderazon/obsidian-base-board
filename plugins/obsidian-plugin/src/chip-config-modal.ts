@@ -181,10 +181,12 @@ export class ChipConfigModal extends Modal {
 
     // Render selected properties first in their configured order, then unselected
     const orderedProps = [
-      ...this.selectedProperties.map(
-        (name) => this.availableProps.find((p) => p.name === name),
+      ...this.selectedProperties.map((name) =>
+        this.availableProps.find((p) => p.name === name),
       ),
-      ...this.availableProps.filter((p) => !this.selectedProperties.includes(p.name)),
+      ...this.availableProps.filter(
+        (p) => !this.selectedProperties.includes(p.name),
+      ),
     ].filter(Boolean) as AvailableProperty[];
 
     for (const prop of orderedProps) {

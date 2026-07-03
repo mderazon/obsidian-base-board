@@ -1,0 +1,100 @@
+// ---------------------------------------------------------------------------
+//  Board-core domain types
+//  Pure Kanban data model — no Obsidian dependencies.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal card representation used throughout board-core.
+ * The Obsidian adapter maps BasesEntry → CardData before passing to managers.
+ */
+export interface CardData {
+  /** Absolute vault path (e.g. "Notes/My Task.md") */
+  filePath: string;
+  /** Display name shown as the card title (usually the file basename) */
+  displayName: string;
+  /** Frontmatter key→value pairs. Used by chips, filters, cover images, etc. */
+  properties: Record<string, unknown>;
+}
+
+/**
+ * A column on the Kanban board.
+ */
+export interface Column {
+  /** Column identifier / group name */
+  name: string;
+  /** Cards in this column, in display order */
+  cards: CardData[];
+  /** Optional accent color for the column header bar */
+  color?: string | null;
+  /** Optional WIP limit (null = unlimited) */
+  wipLimit?: number | null;
+}
+
+/**
+ * Board-level configuration persisted in the .base file.
+ */
+export interface BoardConfig {
+  /** Frontmatter property used to group cards into columns */
+  groupBy: string;
+  /** Ordered list of column names (includes configured + discovered) */
+  columns: string[];
+  /** Per-column accent colors */
+  columnColors: Record<string, string>;
+  /** Per-column WIP limits (null = unlimited) */
+  wipLimits: Record<string, number | null>;
+  /** Where clicking a card opens the note */
+  cardOpenBehavior: "active" | "modal" | "split" | "tab";
+  /** Which column to create new cards in by default */
+  defaultColumn?: string;
+  /** Frontmatter property used as the card title (empty = filename) */
+  cardTitleProperty?: string;
+  /** Frontmatter property containing a cover image path/URL */
+  cardCoverProperty: string;
+  /** Custom tag colors (tag → hex) */
+  tagColors: Record<string, string>;
+  /** Chip properties: frontmatter fields rendered as colored pills */
+  chipProperties: string[];
+  /** Per-property, per-value color overrides for chips */
+  chipColors: Record<string, Record<string, string>>;
+  /** Single fixed color applied to all values of a property */
+  chipFixedColors: Record<string, string>;
+  /** Whether to show the property label on chip pills */
+  chipShowLabels: Record<string, boolean>;
+  /** Icon overrides for chip values (prop → value → icon name) */
+  chipIcons: Record<string, Record<string, string>>;
+  /** Which property controls card border color (empty = none) */
+  borderProperty: string;
+}
+
+/** Default board config values. */
+export const DEFAULT_BOARD_CONFIG: BoardConfig = {
+  groupBy: "",
+  columns: [],
+  columnColors: {},
+  wipLimits: {},
+  cardOpenBehavior: "active",
+  cardCoverProperty: "cover",
+  tagColors: {},
+  chipProperties: [],
+  chipColors: {},
+  chipFixedColors: {},
+  chipShowLabels: {},
+  chipIcons: {},
+  borderProperty: "",
+};
+
+/**
+ * Color mapping types for chip properties.
+ */
+export type ChipColorMap = Record<string, Record<string, string>>;
+export type ChipFixedColorMap = Record<string, string>;
+
+/**
+ * A discovered frontmatter property with its sample values.
+ */
+export interface AvailableProperty {
+  name: string;
+  displayName: string;
+  isConfigured: boolean;
+  sampleValues: string[];
+}

@@ -11,6 +11,7 @@ import {
   TFile,
   WorkspaceLeaf,
 } from "obsidian";
+import type { CardData, Column } from "@base-board/board-core/types";
 import type BaseBoardPlugin from "./main";
 import { DragDropManager } from "./drag-drop";
 import { ColumnManager } from "./column";
@@ -47,7 +48,10 @@ export class KanbanView extends BasesView implements HoverParent {
 
   private dragDropManager: DragDropManager;
   private columnManager: ColumnManager;
-  public currentGroups: BasesEntryGroup[] = [];
+  /** Board-core Column objects derived from BasesEntryGroup data. */
+  public currentGroups: Column[] = [];
+  /** Raw Bases entries (kept for source-column lookups during card drops) */
+  private rawEntries: BasesEntry[] = [];
   public cardManager: CardManager;
   public chipProperties: ChipPropertiesManager;
 
@@ -190,6 +194,41 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   // ---------------------------------------------------------------------------
+  //  Adapters: Obsidian types → board-core types
+  // ---------------------------------------------------------------------------
+
+  /** Convert a BasesEntry to our CardData domain type. */
+  private toCardData(entry: BasesEntry): CardData {
+    const filePath = entry.file?.path ?? "";
+    const displayName =
+      entry.file?.basename ?? filePath.split("/").pop() ?? "Untitled";
+    // Extract frontmatter properties from the metadata cache
+    const file = entry.file instanceof TFile ? entry.file : null;
+    const properties: Record<string, unknown> = {};
+    if (file) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      const fm = cache?.frontmatter;
+      if (fm) {
+        for (const [key, val] of Object.entries(fm)) {
+          properties[key] = val;
+        }
+      }
+    }
+    return { filePath, displayName, properties };
+  }
+
+  /** Convert a BasesEntryGroup to a board-core Column. */
+  private toColumn(group: BasesEntryGroup): Column {
+    const name = this.getColumnName(group.key);
+    const entries = group.entries;
+    const cards = entries.map((e) => this.toCardData(e));
+    // Extract WIP limit and color from the group's stored data if available
+    const wipLimit = this.getWipLimit(name);
+    const color = this.getColumnColor(name);
+    return { name, cards, wipLimit, color };
+  }
+
+  // ---------------------------------------------------------------------------
   //  Base identity
   // ---------------------------------------------------------------------------
 
@@ -210,9 +249,9 @@ export class KanbanView extends BasesView implements HoverParent {
     // ancestor pattern is a reasonable proxy.  This gives us a path-qualified
     // key even when two .base files share the same view name.
     let basePath = "";
-    const entries: BasesEntry[] = this.data?.data ?? [];
-    if (entries.length > 0) {
-      const firstPath = entries[0].file?.path ?? "";
+    const rawEntries: BasesEntry[] = this.data?.data ?? [];
+    if (rawEntries.length > 0) {
+      const firstPath = rawEntries[0].file?.path ?? "";
       const lastSlash = firstPath.lastIndexOf("/");
       basePath = lastSlash > 0 ? firstPath.substring(0, lastSlash) : "";
     }
@@ -339,8 +378,7 @@ export class KanbanView extends BasesView implements HoverParent {
     }
     if (typeof key === "object" && key !== null) {
       if ("value" in key) {
-        const val = (key as Record<string, unknown>).value;
-        return String(val);
+        return String(key.value);
       }
       // Bases group-key objects expose the column name via toString()
       // eslint-disable-next-line @typescript-eslint/no-base-to-string -- Bases-controlled object with custom toString
@@ -398,9 +436,7 @@ export class KanbanView extends BasesView implements HoverParent {
       ? rawStored.map((col) => (col === "" ? NO_VALUE_COLUMN : col))
       : null;
 
-    const dataColumns = this.currentGroups.map((g) =>
-      this.getColumnName(g.key),
-    );
+    const dataColumns = this.currentGroups.map((g) => g.name);
 
     if (stored && stored.length > 0) {
       const result = [...stored];
@@ -415,10 +451,10 @@ export class KanbanView extends BasesView implements HoverParent {
     return dataColumns;
   }
 
-  private getGroupForColumn(columnName: string): BasesEntryGroup | null {
-    for (const group of this.currentGroups) {
-      if (this.getColumnName(group.key) === columnName) {
-        return group;
+  private getGroupForColumn(columnName: string): Column | null {
+    for (const col of this.currentGroups) {
+      if (col.name === columnName) {
+        return col;
       }
     }
     return null;
@@ -484,7 +520,9 @@ export class KanbanView extends BasesView implements HoverParent {
       return;
     }
 
-    this.currentGroups = groupedData;
+    // Map raw BasesEntryGroup → board-core Column
+    this.rawEntries = groupedData.flatMap((g) => g.entries);
+    this.currentGroups = groupedData.map((g) => this.toColumn(g));
     const columns = this.getColumns();
     const boardEl = this.containerEl.createDiv({ cls: "base-board-board" });
 
@@ -497,8 +535,8 @@ export class KanbanView extends BasesView implements HoverParent {
     this.tags.renderFilterBar(this.containerEl);
 
     columns.forEach((columnName, idx) => {
-      const group = this.getGroupForColumn(columnName);
-      this.columnManager.renderColumn(boardEl, columnName, group, idx);
+      const column = this.getGroupForColumn(columnName);
+      this.columnManager.renderColumn(boardEl, columnName, column, idx);
     });
 
     this.columnManager.renderAddColumnButton(boardEl);
@@ -637,10 +675,13 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   private getCardSourceColumn(filePath: string): string | null {
-    for (const group of this.currentGroups) {
-      for (const entry of group.entries) {
-        if (entry.file?.path === filePath) {
-          return this.getColumnName(group.key);
+    for (const entry of this.rawEntries) {
+      if (entry.file?.path === filePath) {
+        // Find which group this entry belongs to
+        for (const group of this.currentGroups) {
+          if (group.cards.some((c: CardData) => c.filePath === filePath)) {
+            return group.name;
+          }
         }
       }
     }

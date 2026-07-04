@@ -789,10 +789,21 @@ export class ChipConfigPanel {
       cls: "mod-cta",
     });
 
+    const insertBeforeBtn = (row: HTMLDivElement) => {
+      addBtn.parentElement?.insertBefore(row, addBtn);
+    };
+
     addBtn.onclick = () => {
       new InputModal(this.app, "New value", "Enter value", (v) => {
         if (!v?.trim()) return;
-        this.createSimplifiedMappingRow(container, prop.name, v.trim(), "", "");
+        const newRow = this.createSimplifiedMappingRow(
+          container,
+          prop.name,
+          v.trim(),
+          "",
+          "",
+        );
+        insertBeforeBtn(newRow);
       }).open();
     };
   }
@@ -812,6 +823,11 @@ export class ChipConfigPanel {
       text: "+ add rule",
       cls: "mod-cta",
     });
+
+    const insertBeforeBtn = (row: HTMLDivElement) => {
+      addBtn.parentElement?.insertBefore(row, addBtn);
+    };
+
     addBtn.onclick = () => {
       const newRule = this.createNewRule(prop.name);
       if (!this.styleRulesState[prop.name])
@@ -820,7 +836,8 @@ export class ChipConfigPanel {
         ...this.styleRulesState[prop.name],
         newRule,
       ];
-      this.createStyleRuleRow(container, prop.name, newRule);
+      const newRow = this.createStyleRuleRow(container, prop.name, newRule);
+      insertBeforeBtn(newRow);
     };
   }
 
@@ -886,6 +903,18 @@ export class ChipConfigPanel {
       );
     };
 
+    // Color swatch
+    const color = row.createEl("input", {
+      type: "color",
+      cls: "base-board-chip-color-swatch",
+    });
+    color.value = rule.color || "#808080";
+    color.oninput = () => {
+      this.styleRulesState[propName] = (
+        this.styleRulesState[propName] || []
+      ).map((r) => (r.id === rule.id ? { ...r, color: color.value } : r));
+    };
+
     // Icon picker button
     const iconBtn = row.createEl("button", {
       cls: "chip-icon-picker-btn",
@@ -911,18 +940,6 @@ export class ChipConfigPanel {
           iconBtn.title = "Choose icon";
         }
       }).open();
-    };
-
-    // Color swatch
-    const color = row.createEl("input", {
-      type: "color",
-      cls: "base-board-chip-color-swatch",
-    });
-    color.value = rule.color || "#808080";
-    color.oninput = () => {
-      this.styleRulesState[propName] = (
-        this.styleRulesState[propName] || []
-      ).map((r) => (r.id === rule.id ? { ...r, color: color.value } : r));
     };
 
     // Delete button

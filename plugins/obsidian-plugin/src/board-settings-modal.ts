@@ -40,6 +40,7 @@ export class BoardSettingsModal extends Modal {
 
   private tabContainer!: HTMLElement;
   private contentContainer!: HTMLElement;
+  private chipPanel: ChipConfigPanel | null = null;
 
   constructor(
     app: App,
@@ -170,14 +171,14 @@ export class BoardSettingsModal extends Modal {
       cls: "base-board-settings-page",
     });
 
-    const panel = new ChipConfigPanel(
+    this.chipPanel = new ChipConfigPanel(
       this.app,
       this.chipManager,
       (config: ChipConfigSnapshot) => {
         this.onSubmit(config);
       },
     );
-    panel.renderInto(page);
+    this.chipPanel.renderInto(page);
   }
 
   private renderBehaviorTab(): void {
@@ -210,7 +211,14 @@ export class BoardSettingsModal extends Modal {
   }
 
   private save(): void {
+    // Collect chip config snapshot from the panel (if chips tab was rendered).
+    let chipConfig: ChipConfigSnapshot | null = null;
+    if (this.chipPanel) {
+      chipConfig = this.chipPanel.getSnapshot();
+    }
+
     this.close();
+    this.onSubmit(chipConfig);
   }
 
   onClose(): void {
@@ -302,6 +310,17 @@ export class ChipConfigPanel {
     void this.refreshAndRender();
   }
 
+  /** Collect current config state for persistence. */
+  getSnapshot(): ChipConfigSnapshot {
+    return {
+      properties: [...this.selectedProperties],
+      borderProperty: this.borderProperty,
+      colors: { ...this.colorState },
+      fixedColors: { ...this.fixedColors },
+      icons: { ...this.chipIcons },
+    };
+  }
+
   // ----------------------------
   // DATA REFRESH
   // ----------------------------
@@ -350,13 +369,16 @@ export class ChipConfigPanel {
     });
     card.draggable = true;
 
+    // Header row (drag handle, checkbox, label, expand button)
+    const header = card.createDiv({ cls: "chip-card-header" });
+
     // Drag handle
-    const dragHandle = card.createDiv({ cls: "chip-drag-handle" });
+    const dragHandle = header.createDiv({ cls: "chip-drag-handle" });
     dragHandle.textContent = "⠿";
     dragHandle.title = "Drag to reorder";
 
     // Checkbox
-    const checkbox = card.createEl("input", { type: "checkbox" });
+    const checkbox = header.createEl("input", { type: "checkbox" });
     checkbox.checked = this.selectedProperties.includes(prop.name);
     checkbox.onchange = () => {
       if (checkbox.checked) {
@@ -376,14 +398,14 @@ export class ChipConfigPanel {
     };
 
     // Label
-    const label = card.createEl("span", {
+    const label = header.createEl("span", {
       text: prop.displayName,
       cls: "chip-card-label",
     });
     label.title = prop.name;
 
     // Expand toggle
-    const expandBtn = card.createEl("button", {
+    const expandBtn = header.createEl("button", {
       text: this.activeProperty === prop.name ? "▾" : "▸",
       cls: "chip-expand-btn",
     });

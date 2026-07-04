@@ -80,7 +80,7 @@ apps/electron-app/          Standalone Electron app (skeleton)
 ### Entry Points
 
 - **`plugins/obsidian-plugin/src/main.ts`** — Plugin class extending `Plugin`. Registers the Kanban view via `registerBasesView()`, handles "Create new board" command, and syncs `.base` file references on folder renames. Only one command is registered: "Create new board".
-- **`plugins/obsidian-plugin/src/kanban-view.ts`** — Extends `BasesView` (the Bases API view class). Acts as the adapter layer: maps Obsidian's `BasesEntry`/`BasesEntryGroup` → board-core's `CardData`/`Column`. Orchestrates all sub-managers and implements the rendering pipeline.
+- **`plugins/obsidian-plugin/src/kanban-view.ts`** — Extends `BasesView` (the Bases API view class). Acts as the adapter layer: maps Obsidian's `BasesEntry`/`BasesEntryGroup` → board-core's `CardData`/`Column`. Orchestrates all sub-managers, implements the rendering pipeline, and provides `getFileOrder()` — the Obsidian adapter for the `PositionContext` interface used by `src/order.ts`.
 - **`plugins/obsidian-plugin/src/board-settings-modal.ts`** — Multi-page settings modal (Cover images, Chips & borders, Behavior). Opened via the gear icon button rendered in the KanbanView's filter bar. No separate command registration needed.
 
 ### Board-Core Types (`packages/board-core/src/types.ts`)
@@ -185,7 +185,30 @@ Column order is persisted in one place:
 
 ### Card Drop Logic
 
-Dragging a card to a different column updates the frontmatter `groupBy` property via `processFrontMatter()`. Card ordering within a column uses the `kanban_order` frontmatter key. Multi-drag (Alt+click selection) is supported — co-selected cards move together and maintain relative order.
+Dragging a card to a different column updates the frontmatter `groupBy` property via `processFrontMatter()`. Card ordering within a column uses Trello-style **float positioning** via the `kanban_order` frontmatter key (stored as a JS `number` — IEEE 754 double).
+
+Position scheme (in `src/order.ts`):
+- **First card**: `prev / 2` (or `-1_000_000` if prepending before a legacy card at position 0)
+- **Between two cards**: `(prev + next) / 2` — midpoints, e.g. `(100_000 + 200_000) / 2 = 150_000`
+- **Last card**: `last + 1_000_000`
+
+Only the dropped card(s) get frontmatter writes — no column-wide renumbering. Repeated midpoint insertions halve the gap each time (`1M → 500k → 250k → ...`), so a **re-index safeguard** (`REINDEX_THRESHOLD = 1.0`) renormalizes the column back to clean multiples of 1_000_000 whenever adjacent gaps shrink below 1.0 (typically after ~20 midpoints in the same slot).
+
+Multi-drag (Alt+click selection) is supported — co-selected cards move together and maintain relative order.
+
+#### The `order.ts` module
+
+Pure positioning logic, separated from Obsidian concerns:
+
+| Export | Purpose |
+|--------|---------|
+| `ORDER_PROPERTY` | Re-export of `"kanban_order"` from `constants.ts` |
+| `REINDEX_THRESHOLD` | Gap threshold (1.0) triggering renormalization |
+| `PositionContext` | Interface: `{ getFileOrder(filePath): number }` — abstracts the Obsidian adapter |
+| `getDropPosition()` | Computes float position for a dropped card given `index`, `orderedPaths`, `allCards`, and a `PositionContext` |
+| `renormalizeColumn()` | Renumber all cards in a column with fresh multiples of 1_000_000 |
+
+`KanbanView.getFileOrder()` is the Obsidian adapter that implements `PositionContext.getFileOrder` by reading frontmatter via `metadataCache`. It stays in `kanban-view.ts` since it depends on `app.vault` and `app.metadataCache`.
 
 ### Folder Rename Sync
 
@@ -194,7 +217,8 @@ When a folder is moved/renamed, `handleFolderRename()` debounces (250ms burst wi
 ### Key Constants
 
 - `NO_VALUE_COLUMN = "(No value)"` — column label for entries missing the groupBy property
-- `ORDER_PROPERTY = "kanban_order"` — frontmatter key for card ordering
+- `ORDER_PROPERTY = "kanban_order"` — frontmatter key for card ordering (re-exported from `src/order.ts`)
+- `REINDEX_THRESHOLD = 1.0` — gap threshold triggering column renormalization (`src/order.ts`)
 - `UNSAFE_FILENAME_CHARS` / `sanitizeFilename()` — regex + helper for stripping invalid file name characters
 - Config keys are all defined in `packages/board-core/src/constants.ts` (`CONFIG_KEY_*`)
   - `CONFIG_KEY_COLUMNS = "boardColumns"` — persisted column order
@@ -220,7 +244,7 @@ Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 - **`ChipConfigPanel`** (`src/board-settings-modal.ts`) — card-based chip configuration UI with drag-and-drop reordering. Renders inside the Settings modal's Chips tab. Each property is an expandable card with drag handle, checkbox, and editor section.
 - **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid of all Obsidian icons. Used when configuring icon overrides for chip properties. Each tile uses `setIcon()` for pixel-accurate previews.
 - **Toolbar Button**: Boards render a persistent `Settings` button (gear icon) in the filter bar to open the multi-page settings modal directly from the board UI
-- **Storage**: All settings persisted in `.base` file via `BasesViewConfig`: `boardCoverProperty`, `boardUseFirstEmbed`, `boardOpenBehavior`, `chipProperties`, `chipColors`, `chipFixedColors`, `chipShowLabels`, `chipIcons`, `borderProperty`
+- **Storage**: All settings persisted in `.base` file via `BasesViewConfig`: `boardCoverProperty`, `boardUseFirstEmbed`, `boardOpenBehavior`, `chipProperties`, `chipColors`, `chipFixedColors`, `chipShowLabels`, `chipIcons`, `borderProperty`. Cover/behavior changes persist immediately on input; chip config persists on Save button press.
 - **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color. The border property is excluded from chip rendering logic to prevent it from appearing as a visible chip. If an icon override is configured, the chip renders the icon instead of the text value using the chip color.
 - **Color resolution**: Checks fixed colors first (one color for all values of a property), then per-value mappings, then falls back to deterministic hash (same as tags).
 - **Discovery behavior**: Property discovery now includes booleans like `false`, keeps configured properties visible even when they are not currently selected, and preserves color-map edits for unsaved properties until Save is pressed.
@@ -256,7 +280,7 @@ Multi-page modal with three tabs:
 2. **Chips & borders** — ChipConfigPanel (card-based with drag-and-drop)
 3. **Behavior** — open behavior dropdown (active/modal/split/tab)
 
-Settings persist immediately via callbacks to `KanbanView.config.set()`. No separate "Save" action needed — changes are written as the user types.
+**Persistence model**: Cover images and behavior settings persist immediately via callbacks to `KanbanView.config.set()` as the user types. Chip configuration (including property reorder, colors, icons, border property) persists when the user presses Save — the modal collects a `ChipConfigSnapshot` from the panel and submits it through `onSubmit`. No separate "Save" action for cover/behavior changes; chip config requires explicit Save.
 
 ## Build Output
 

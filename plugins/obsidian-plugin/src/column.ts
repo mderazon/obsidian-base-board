@@ -106,7 +106,7 @@ export class ColumnManager {
         this.view.cardManager.startInlineCardCreation(
           addCardHeaderBtn!,
           columnName,
-          cards.length,
+          sorted,
         );
       });
     }

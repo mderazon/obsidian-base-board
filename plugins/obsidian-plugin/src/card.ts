@@ -3,6 +3,7 @@ import type { CardData } from "@base-board/board-core/types";
 import { KanbanView } from "./kanban-view";
 import { InputModal } from "./modals";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
+import { getDropPosition, type PositionContext } from "./order";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
 
@@ -671,7 +672,7 @@ export class CardManager {
   public startInlineCardCreation(
     btnEl: HTMLElement,
     columnName: string,
-    existingCount: number,
+    existingCards: CardData[],
   ): void {
     // Find the cards list for this column.
     // The trigger button may be in the header OR in the footer, so we walk
@@ -700,7 +701,7 @@ export class CardManager {
       inputWrapper.remove();
       btnEl.classList.remove("base-board-hidden");
       if (name) {
-        await this.createNewCard(name, columnName, existingCount);
+        await this.createNewCard(name, columnName, existingCards);
       }
     };
 
@@ -723,7 +724,7 @@ export class CardManager {
   private async createNewCard(
     title: string,
     columnName: string,
-    orderIndex: number,
+    existingCards: CardData[],
   ): Promise<void> {
     const groupByProp = this.view.getGroupByProperty();
     if (!groupByProp) {
@@ -731,9 +732,20 @@ export class CardManager {
       return;
     }
 
+    // Compute position based on neighbors (Trello-style float positioning).
+    // New cards append at the end, so position = last + 1_000_000.
+    let position = 1_000_000;
+    for (const card of existingCards) {
+      const order = this.view.getFileOrder(card.filePath);
+      if (order > position) {
+        position = order;
+      }
+    }
+    position += 1_000_000;
+
     const overrides = (fm: Record<string, unknown>) => {
       fm[groupByProp] = columnName;
-      fm[ORDER_PROPERTY] = orderIndex;
+      fm[ORDER_PROPERTY] = position;
     };
 
     try {
@@ -852,19 +864,34 @@ export class CardManager {
     groupByProp: string,
   ): Promise<void> {
     await this.view.applyBatchUpdate(async () => {
+      // Get the target column's cards so we can compute float positions
+      // based on neighbors (Trello-style).
+      const targetGroup = this.view.currentGroups.find(
+        (g) => g.name === targetColumn,
+      );
+      const allCardsInColumn = targetGroup?.cards ?? [];
+
+      const ctx: PositionContext = {
+        getFileOrder: (fp: string) => this.view.getFileOrder(fp),
+      };
+
       const updates = filePaths.map((fp, i) => {
         const file = this.view.app.vault.getAbstractFileByPath(fp);
         if (!file || !(file instanceof TFile)) return Promise.resolve();
+        // Compute position from neighbors in the target column
+        const position = getDropPosition(i, filePaths, allCardsInColumn, ctx);
         return this.view.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
             fm[groupByProp] = targetColumn;
-            // Preserve relative order by assigning sequential indices
-            fm[ORDER_PROPERTY] = i;
+            fm[ORDER_PROPERTY] = position;
           },
         );
       });
       await Promise.all(updates);
+
+      // Check if adjacent gaps shrank too small and renormalize if needed.
+      await this.view.checkAndRenormalize(targetColumn);
     });
     this.clearSelection();
     new Notice(

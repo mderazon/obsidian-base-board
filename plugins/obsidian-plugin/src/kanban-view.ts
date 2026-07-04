@@ -38,6 +38,12 @@ import {
   CONFIG_KEY_CHIP_FIXED_COLORS,
   CONFIG_KEY_CHIP_ICONS,
 } from "./constants";
+import {
+  REINDEX_THRESHOLD,
+  getDropPosition,
+  renormalizeColumn,
+  type PositionContext,
+} from "./order";
 
 // ---------------------------------------------------------------------------
 //  Kanban View
@@ -571,6 +577,53 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   // ---------------------------------------------------------------------------
+  //  Re-index safeguard
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check if any adjacent pair in the column has a gap below the threshold.
+   * Renormalizes if needed.
+   */
+  public async checkAndRenormalize(columnName: string): Promise<void> {
+    const column = this.currentGroups.find((g) => g.name === columnName);
+    if (!column || column.cards.length < 2) return;
+
+    const sorted = [...column.cards].sort(
+      (a, b) => this.getFileOrder(a.filePath) - this.getFileOrder(b.filePath),
+    );
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = this.getFileOrder(sorted[i - 1].filePath);
+      const curr = this.getFileOrder(sorted[i].filePath);
+      if (
+        prev !== Infinity &&
+        curr !== Infinity &&
+        curr - prev < REINDEX_THRESHOLD
+      ) {
+        await renormalizeColumn(sorted, (fp, pos) =>
+          this.updateCardOrder(fp, pos),
+        );
+        return;
+      }
+    }
+  }
+
+  /** Update a single card's kanban_order frontmatter field. */
+  private async updateCardOrder(
+    filePath: string,
+    position: number,
+  ): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!file || !(file instanceof TFile)) return;
+    await this.app.fileManager.processFrontMatter(
+      file,
+      (fm: Record<string, unknown>) => {
+        fm[ORDER_PROPERTY] = position;
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   //  Card drop handler (column move + reordering)
   // ---------------------------------------------------------------------------
 
@@ -604,6 +657,13 @@ export class KanbanView extends BasesView implements HoverParent {
       fullOrderedPaths.splice(insertAt, 0, ...otherSelected);
     }
 
+    // Collect the target column's current cards so we can compute positions
+    // based on neighbors (Trello-style float positioning).
+    const targetColumn = this.currentGroups.find(
+      (g) => g.name === targetColumnName,
+    );
+    const allCardsInColumn = targetColumn?.cards ?? [];
+
     await this.applyBatchUpdate(async () => {
       // 1. Move all cards to the target column (dragged card + any co-selected)
       const pathsToMove = isMultiDrag
@@ -628,18 +688,39 @@ export class KanbanView extends BasesView implements HoverParent {
       });
       await Promise.all(movePromises);
 
-      // 2. Update kanban_order for all cards in the target column
-      const orderPromises = fullOrderedPaths.map((cardPath, i) => {
-        const file = this.app.vault.getAbstractFileByPath(cardPath);
+      // 2. Update kanban_order ONLY for the cards that actually moved.
+      //    Each gets a float position computed from its neighbors in the
+      //    target column — no other cards are touched.
+      const movedPaths = isMultiDrag
+        ? [filePath, ...otherSelected]
+        : [filePath];
+
+      const ctx: PositionContext = {
+        getFileOrder: (fp: string) => this.getFileOrder(fp),
+      };
+
+      const orderPromises = movedPaths.map((movedPath) => {
+        const idx = fullOrderedPaths.indexOf(movedPath);
+        if (idx === -1) return Promise.resolve();
+        const file = this.app.vault.getAbstractFileByPath(movedPath);
         if (!file || !(file instanceof TFile)) return Promise.resolve();
+        const position = getDropPosition(
+          idx,
+          fullOrderedPaths,
+          allCardsInColumn,
+          ctx,
+        );
         return this.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
-            fm[ORDER_PROPERTY] = i;
+            fm[ORDER_PROPERTY] = position;
           },
         );
       });
       await Promise.all(orderPromises);
+
+      // Check if adjacent gaps shrank too small and renormalize if needed.
+      await this.checkAndRenormalize(targetColumnName);
     });
 
     // Always ensure a re-render, even if Bases hasn't fired onDataUpdated yet.

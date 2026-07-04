@@ -130,6 +130,10 @@
   background-color: var(--background-secondary);
 }
 
+.chip-property-card-body.is-hidden {
+  display: none;
+}
+
 /* Drop target highlight during drag */
 .chip-drop-target {
   border-color: var(--interactive-accent) !important;

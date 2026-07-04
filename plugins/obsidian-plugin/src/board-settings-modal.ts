@@ -423,6 +423,8 @@ export class ChipConfigPanel {
     const body = card.createDiv({ cls: "chip-property-card-body" });
     if (this.activeProperty === prop.name) {
       this.renderPropertyEditor(body, prop);
+    } else {
+      body.classList.add("is-hidden");
     }
 
     // Drag handlers

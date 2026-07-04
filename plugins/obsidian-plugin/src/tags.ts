@@ -173,11 +173,10 @@ export class Tags {
     }
 
     if (this.chipConfigCallback) {
-      const configBtn = barEl.createEl("button", {
+      const configBtn = barEl.createDiv({
         cls: "base-board-chip-config-btn",
       });
-      setIcon(configBtn, "lucide-gear");
-      configBtn.createSpan({ text: "Settings" });
+      setIcon(configBtn, "settings");
       configBtn.addEventListener("click", () => {
         this.chipConfigCallback!();
       });

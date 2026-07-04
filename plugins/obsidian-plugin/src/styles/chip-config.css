@@ -132,6 +132,10 @@
 
 .chip-property-card-body.is-hidden {
   display: none;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
 }
 
 /* Drop target highlight during drag */

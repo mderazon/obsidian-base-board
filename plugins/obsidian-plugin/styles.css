@@ -1634,9 +1634,30 @@
 
 .base-board-settings-modal {
   max-width: 720px;
+  height: 90vh;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.base-board-settings-modal .modal-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .base-board-settings-modal {
+    height: 95vh;
+    max-height: 95vh;
+  }
 }
 
 .base-board-settings-header {
+  flex-shrink: 0;
   padding: 16px 24px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
@@ -1648,6 +1669,7 @@
 }
 
 .base-board-settings-tabs {
+  flex-shrink: 0;
   display: flex;
   border-bottom: 1px solid var(--background-modifier-border);
   padding: 0 24px;
@@ -1677,10 +1699,18 @@
 }
 
 .base-board-settings-content {
-  padding: 24px;
-  min-height: 400px;
-  max-height: 60vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.base-board-settings-modal .modal-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
 }
 
 .base-board-settings-page {

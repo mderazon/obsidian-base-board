@@ -291,6 +291,10 @@ export class ChipConfigPanel {
 
     const propSection = container.createDiv({ cls: "chip-config-section" });
     propSection.createEl("h3", { text: "Properties" });
+    propSection.createEl("p", {
+      text: "Select which frontmatter fields appear as colored chips on cards. Drag to reorder the chips on the card.",
+      cls: "setting-item-description",
+    });
 
     this.propsContainerEl = propSection.createDiv({
       cls: "chip-property-list",
@@ -298,6 +302,10 @@ export class ChipConfigPanel {
 
     const borderSection = container.createDiv({ cls: "chip-config-section" });
     borderSection.createEl("h3", { text: "Card border" });
+    borderSection.createEl("p", {
+      text: "Choose a frontmatter field to control card border color.",
+      cls: "setting-item-description",
+    });
 
     this.borderSelectEl = borderSection.createEl("select");
 

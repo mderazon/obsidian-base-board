@@ -179,13 +179,15 @@ export class BoardSettingsModal extends Modal {
       cls: "base-board-settings-page",
     });
 
-    this.chipPanel = new ChipConfigPanel(
-      this.app,
-      this.chipManager,
-      (config: ChipConfigSnapshot) => {
-        this.onSubmit(config);
-      },
-    );
+    if (!this.chipPanel) {
+      this.chipPanel = new ChipConfigPanel(
+        this.app,
+        this.chipManager,
+        (config: ChipConfigSnapshot) => {
+          this.onSubmit(config);
+        },
+      );
+    }
     this.chipPanel.renderInto(page);
   }
 

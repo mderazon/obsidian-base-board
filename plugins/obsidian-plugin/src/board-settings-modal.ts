@@ -1,10 +1,11 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Setting, setIcon } from "obsidian";
 import {
   ChipPropertiesManager,
   AvailableProperty,
   ChipStyleRule,
 } from "./chip-properties";
 import { InputModal } from "./modals";
+import { IconPickerModal } from "./icon-picker-modal";
 
 type TabId = "cover" | "chips" | "behavior";
 
@@ -865,6 +866,31 @@ export class ChipConfigPanel {
     color.value = currentColor || "#808080";
     color.oninput = () => {
       this.updateMapping(propName, currentValue, color.value);
+    };
+
+    // Icon picker button
+    const iconBtn = row.createEl("button", {
+      cls: "chip-icon-picker-btn",
+    });
+    if (currentIcon) {
+      setIcon(iconBtn, currentIcon);
+      iconBtn.title = `Icon: ${currentIcon}`;
+    } else {
+      iconBtn.textContent = "🎨";
+      iconBtn.title = "Choose icon";
+    }
+    iconBtn.onclick = () => {
+      new IconPickerModal(this.app, currentIcon || "", (iconId: string) => {
+        this.updateIconMapping(propName, currentValue, iconId);
+        // Update button display
+        if (iconId) {
+          setIcon(iconBtn, iconId);
+          iconBtn.title = `Icon: ${iconId}`;
+        } else {
+          iconBtn.textContent = "🎨";
+          iconBtn.title = "Choose icon";
+        }
+      }).open();
     };
 
     // Delete button

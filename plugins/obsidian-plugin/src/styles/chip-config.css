@@ -301,6 +301,30 @@
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
+.chip-mapping-row-simple .chip-icon-picker-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-normal);
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.chip-mapping-row-simple .chip-icon-picker-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
 /* ============================================================
    Mode selector (radio group)
    ============================================================ */

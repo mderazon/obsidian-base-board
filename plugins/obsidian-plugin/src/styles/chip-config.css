@@ -284,6 +284,23 @@
   color: var(--text-normal);
 }
 
+.chip-mapping-row-simple .chip-mapping-value-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  outline: none;
+}
+
+.chip-mapping-row-simple .chip-mapping-value-input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
 /* ============================================================
    Mode selector (radio group)
    ============================================================ */

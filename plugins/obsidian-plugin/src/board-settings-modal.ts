@@ -838,12 +838,24 @@ export class ChipConfigPanel {
 
     let currentValue = String(value);
 
-    // Value display
-    const valueEl = row.createEl("span", {
-      text: currentValue,
-      cls: "chip-mapping-value",
+    // Value input (editable)
+    const valueInput = row.createEl("input", {
+      type: "text",
+      cls: "chip-mapping-value-input",
     });
-    valueEl.title = currentValue;
+    valueInput.value = currentValue;
+    valueInput.placeholder = "Value";
+    valueInput.oninput = () => {
+      const newValue = valueInput.value.trim();
+      if (newValue !== currentValue) {
+        // Update the mapping with new value
+        this.updateMapping(propName, currentValue, "");
+        this.updateIconMapping(propName, currentValue, "");
+        this.updateMapping(propName, newValue, color.value || "#808080");
+        this.updateIconMapping(propName, newValue, currentIcon);
+        currentValue = newValue;
+      }
+    };
 
     // Color swatch
     const color = row.createEl("input", {

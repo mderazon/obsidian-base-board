@@ -95,7 +95,11 @@ export type ChipFixedColorMap = Record<string, string>;
 /**
  * Style rule operators for conditional chip coloring.
  */
-export type StyleRuleOperator = "contains" | "equals" | "starts-with" | "ends-with";
+export type StyleRuleOperator =
+  | "contains"
+  | "equals"
+  | "starts-with"
+  | "ends-with";
 
 /**
  * A conditional style rule: when a property value matches the operator/pattern,

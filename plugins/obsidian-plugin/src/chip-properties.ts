@@ -7,6 +7,7 @@ import {
   CONFIG_KEY_CHIP_ICONS,
   CONFIG_KEY_CHIP_STYLERULES,
   CONFIG_KEY_BORDER_PROPERTY,
+  CONFIG_KEY_CHIP_PROPERTY_MODES,
   ORDER_PROPERTY,
 } from "./constants";
 
@@ -44,20 +45,6 @@ const FILE_PROPS_TO_SKIP = new Set([
   "embeds",
   "tags",
 ]);
-
-// Default deterministic colors for chip values — same palette as Tags.
-const DEFAULT_COLORS = [
-  "#f87168", // Red
-  "#fbbc04", // Orange
-  "#fcc934", // Yellow
-  "#34a853", // Green
-  "#4285f4", // Blue
-  "#a142f4", // Purple
-  "#f442a1", // Pink
-  "#20c997", // Teal
-  "#fd7e14", // Orange
-  "#6f42c1", // Indigo
-];
 
 /** A discovered frontmatter property with its sample values. */
 export interface AvailableProperty {
@@ -217,32 +204,46 @@ export class ChipPropertiesManager {
   }
 
   // ---------------------------------------------------------------------------
+  //  Property mode (fixed / per-value / style-rules)
+  // ---------------------------------------------------------------------------
+
+  public getPropertyModes(): Record<string, string> {
+    const raw = this.view.config?.get(CONFIG_KEY_CHIP_PROPERTY_MODES);
+    return raw && typeof raw === "object"
+      ? (raw as Record<string, string>)
+      : {};
+  }
+
+  public setPropertyMode(propName: string, mode: string): void {
+    const modes = this.getPropertyModes();
+    modes[propName] = mode;
+    this.view.config?.set(CONFIG_KEY_CHIP_PROPERTY_MODES, modes);
+  }
+
+  // ---------------------------------------------------------------------------
   //  Color resolution
   // ---------------------------------------------------------------------------
 
   /** Get the color for a specific value of a property. */
-  public getColorForValue(propName: string, value: string): string {
-    // 1. Fixed color takes precedence over everything
-    const fixed = this.getFixedColors();
-    if (fixed[propName]) {
-      return fixed[propName];
+  public getColorForValue(propName: string, value: string): string | null {
+    const mode = this.getPropertyModes()[propName];
+
+    if (mode === "fixed") {
+      return this.getFixedColors()[propName] ?? null;
     }
 
-    // 2. Style rules (first matching rule wins)
-    const ruleColor = this.getColorFromStyleRules(propName, value);
-    if (ruleColor) {
-      return ruleColor;
+    if (mode === "style-rules") {
+      const ruleColor = this.getColorFromStyleRules(propName, value);
+      if (ruleColor) return ruleColor;
+      return this.getChipColors()[propName]?.[value] ?? null;
     }
 
-    // 3. Per-property, per-value override
+    // per-value (default / unknown mode)
     const colors = this.getChipColors();
-    const propColors = colors[propName];
-    if (propColors && propColors[value]) {
-      return propColors[value];
+    if (colors[propName]?.[value]) {
+      return colors[propName][value];
     }
-
-    // 4. Fallback to deterministic hash
-    return this.getDeterministicColor(value);
+    return this.getFixedColors()[propName] ?? null;
   }
 
   /** Check style rules for a property value and return color if any rule matches. */
@@ -279,38 +280,10 @@ export class ChipPropertiesManager {
     return null;
   }
 
-  /** Set a custom color for a specific value of a property. */
-  public setCustomColor(propName: string, value: string, color: string): void {
-    const colors = this.getChipColors();
-    if (!colors[propName]) colors[propName] = {};
-    if (color) {
-      colors[propName][value] = color;
-    } else {
-      delete colors[propName][value];
-      // Clean up empty property entries
-      if (Object.keys(colors[propName]).length === 0) {
-        delete colors[propName];
-      }
-    }
-    this.view.config?.set(CONFIG_KEY_CHIP_COLORS, colors);
-    this.view.scheduleRender();
-  }
-
   /** Get all color mappings for a property. */
   public getColorsForProperty(propName: string): Record<string, string> {
     const colors = this.getChipColors();
     return colors[propName] || {};
-  }
-
-  private getDeterministicColor(value: string): string {
-    let hash = 0;
-    for (let i = 0; i < value.length; i++) {
-      hash = value.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return (
-      DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length] ||
-      DEFAULT_COLORS[0]
-    );
   }
 
   // ---------------------------------------------------------------------------

@@ -259,9 +259,10 @@ export class ChipConfigPanel {
   private colorState: Record<string, Record<string, string>> = {};
   private fixedColors: Record<string, string> = {};
   private chipIcons: Record<string, Record<string, string>> = {};
-  private useFixedColor: boolean = false;
-  private currentMode: "fixed" | "per-value" | "style-rules" = "per-value";
+
   private styleRulesState: Record<string, ChipStyleRule[]> = {};
+  private propertyModes: Record<string, "fixed" | "per-value" | "style-rules"> =
+    {};
 
   // Layout refs
   private propsContainerEl!: HTMLDivElement;
@@ -287,6 +288,16 @@ export class ChipConfigPanel {
     this.styleRulesState = JSON.parse(
       JSON.stringify(this.chipManager.getStyleRules()),
     ) as Record<string, ChipStyleRule[]>;
+    const savedModes = chipManager.getPropertyModes();
+    for (const [key, value] of Object.entries(savedModes)) {
+      if (
+        value === "fixed" ||
+        value === "per-value" ||
+        value === "style-rules"
+      ) {
+        this.propertyModes[key] = value;
+      }
+    }
   }
 
   renderInto(container: HTMLElement): void {
@@ -533,21 +544,22 @@ export class ChipConfigPanel {
 
     // Mode radio group
     const modeSection = wrapper.createDiv({ cls: "chip-mode-section" });
+    const radioName = `chipColorMode-${prop.name}`;
     const fixedRadio = this.buildRadio(
       modeSection,
-      "chipColorMode",
+      radioName,
       "fixed",
       "One color for all values",
     );
     const perValueRadio = this.buildRadio(
       modeSection,
-      "chipColorMode",
+      radioName,
       "per-value",
       "Separate color per value",
     );
     const styleRulesRadio = this.buildRadio(
       modeSection,
-      "chipColorMode",
+      radioName,
       "style-rules",
       "Conditional style rules",
     );
@@ -562,7 +574,11 @@ export class ChipConfigPanel {
       type: "color",
       cls: "base-board-chip-color-swatch",
     });
-    fixedColorInput.value = this.fixedColors[prop.name] || "#808080";
+    const initialFixedColor = this.fixedColors[prop.name] || "#808080";
+    fixedColorInput.value = initialFixedColor;
+    if (!this.fixedColors[prop.name]) {
+      this.fixedColors[prop.name] = initialFixedColor;
+    }
     fixedColorInput.oninput = () => {
       this.fixedColors[prop.name] = fixedColorInput.value;
     };
@@ -579,74 +595,48 @@ export class ChipConfigPanel {
     });
     this.renderStyleRulesEditor(styleRulesSection, prop);
 
-    // Wire radio toggling
-    fixedRadio.onchange = () => {
-      if (fixedRadio.checked) {
-        this.useFixedColor = true;
-        this.currentMode = "fixed";
+    // Wire radio toggling (per-property mode stored in closure)
+    let mode: "fixed" | "per-value" | "style-rules" =
+      this.propertyModes[prop.name] ?? "style-rules";
+    const setMode = (newMode: "fixed" | "per-value" | "style-rules") => {
+      mode = newMode;
+      this.propertyModes[prop.name] = newMode;
+      this.chipManager.setPropertyMode(prop.name, newMode);
+      if (newMode === "fixed") {
         fixedSection.classList.remove("is-hidden");
         perValueSection.classList.add("is-hidden");
         styleRulesSection.classList.add("is-hidden");
-      }
-    };
-    perValueRadio.onchange = () => {
-      if (perValueRadio.checked) {
-        this.useFixedColor = false;
-        this.currentMode = "per-value";
+      } else if (newMode === "per-value") {
+        delete this.fixedColors[prop.name];
         fixedSection.classList.add("is-hidden");
         perValueSection.classList.remove("is-hidden");
         styleRulesSection.classList.add("is-hidden");
-      }
-    };
-    styleRulesRadio.onchange = () => {
-      if (styleRulesRadio.checked) {
-        this.useFixedColor = false;
-        this.currentMode = "style-rules";
+      } else {
+        delete this.fixedColors[prop.name];
         fixedSection.classList.add("is-hidden");
         perValueSection.classList.add("is-hidden");
         styleRulesSection.classList.remove("is-hidden");
       }
     };
+    fixedRadio.onchange = () => {
+      if (fixedRadio.checked) setMode("fixed");
+    };
+    perValueRadio.onchange = () => {
+      if (perValueRadio.checked) setMode("per-value");
+    };
+    styleRulesRadio.onchange = () => {
+      if (styleRulesRadio.checked) setMode("style-rules");
+    };
 
-    // Set initial visibility
-    const hasFixed = !!this.fixedColors[prop.name];
-    const hasPerValue =
-      Object.keys(this.colorState[prop.name] || {}).length > 0 ||
-      prop.sampleValues.length > 0;
-    const hasStyleRules =
-      this.chipManager.getStyleRulesForProperty(prop.name).length > 0;
-
-    if (hasFixed) {
+    // Apply saved mode
+    if (mode === "fixed") {
       fixedRadio.checked = true;
-      this.useFixedColor = true;
-      this.currentMode = "fixed";
-    } else if (hasStyleRules) {
-      styleRulesRadio.checked = true;
-      this.useFixedColor = false;
-      this.currentMode = "style-rules";
-    } else if (hasPerValue) {
+    } else if (mode === "per-value") {
       perValueRadio.checked = true;
-      this.useFixedColor = false;
-      this.currentMode = "per-value";
     } else {
       styleRulesRadio.checked = true;
-      this.useFixedColor = false;
-      this.currentMode = "style-rules";
     }
-
-    if (this.currentMode === "fixed") {
-      fixedSection.classList.remove("is-hidden");
-      perValueSection.classList.add("is-hidden");
-      styleRulesSection.classList.add("is-hidden");
-    } else if (this.currentMode === "per-value") {
-      fixedSection.classList.add("is-hidden");
-      perValueSection.classList.remove("is-hidden");
-      styleRulesSection.classList.add("is-hidden");
-    } else {
-      fixedSection.classList.add("is-hidden");
-      perValueSection.classList.add("is-hidden");
-      styleRulesSection.classList.remove("is-hidden");
-    }
+    setMode(mode);
   }
 
   private buildRadio(
@@ -715,11 +705,14 @@ export class ChipConfigPanel {
       cls: "mod-cta",
     });
     addBtn.onclick = () => {
-      this.createStyleRuleRow(
-        container,
-        prop.name,
-        this.createNewRule(prop.name),
-      );
+      const newRule = this.createNewRule(prop.name);
+      if (!this.styleRulesState[prop.name])
+        this.styleRulesState[prop.name] = [];
+      this.styleRulesState[prop.name] = [
+        ...this.styleRulesState[prop.name],
+        newRule,
+      ];
+      this.createStyleRuleRow(container, prop.name, newRule);
     };
   }
 

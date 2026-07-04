@@ -46,6 +46,9 @@ export const CONFIG_KEY_CHIP_STYLERULES = "chipStyleRules";
 /** Key used by BasesViewConfig.set/get to persist which property controls card border color. */
 export const CONFIG_KEY_BORDER_PROPERTY = "borderProperty";
 
+/** Key used by BasesViewConfig.set/get to persist per-property chip color mode. */
+export const CONFIG_KEY_CHIP_PROPERTY_MODES = "chipPropertyModes";
+
 /**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.

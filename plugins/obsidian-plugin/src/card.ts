@@ -1,7 +1,6 @@
 import { setIcon, TFile, Notice, Menu, Keymap } from "obsidian";
 import type { CardData } from "@base-board/board-core/types";
 import { KanbanView } from "./kanban-view";
-import { InputModal } from "./modals";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { getDropPosition, type PositionContext } from "./order";
 import { relativeLuminance } from "./color-utils";
@@ -504,39 +503,6 @@ export class CardManager {
     } else {
       chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
     }
-
-    // Right-click → context menu for color editing
-    chip.addEventListener("contextmenu", (e: MouseEvent) => {
-      e.preventDefault();
-      this.showChipContextMenu(e, propName, value);
-    });
-  }
-
-  /** Show context menu on a chip property (right-click). */
-  private showChipContextMenu(
-    e: MouseEvent,
-    propName: string,
-    value: string,
-  ): void {
-    const currentColor = this.view.chipProperties.getColorForValue(
-      propName,
-      value,
-    );
-    new InputModal(
-      this.view.app,
-      `Color for "${value}"`,
-      "Enter hex color (e.g. #ff0000)",
-      (newColor) => {
-        if (newColor && newColor.trim()) {
-          this.view.chipProperties.setCustomColor(
-            propName,
-            value,
-            newColor.trim(),
-          );
-        }
-      },
-      currentColor || "",
-    ).open();
   }
 
   private showCardActionMenu(

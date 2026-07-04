@@ -178,25 +178,27 @@ When a folder is moved/renamed, `handleFolderRename()` debounces (250ms burst wi
   - `CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels"` — per-property label toggle
   - `CONFIG_KEY_CHIP_ICONS = "chipIcons"` — per-property value→icon mappings
   - `CONFIG_KEY_CHIP_STYLERULES = "chipStyleRules"` — per-property conditional style rules map
+  - `CONFIG_KEY_CHIP_PROPERTY_MODES = "chipPropertyModes"` — per-property active mode (fixed/per-value/style-rules)
   - `CONFIG_KEY_BORDER_PROPERTY = "borderProperty"` — which field controls card border color
 
 ### Chip Properties Feature
 
 Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 
-- **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, icon overrides, conditional style rules, and property discovery. Exposes `getStyleRules()`, `setStyleRules()`, `getStyleRulesForProperty()`, `addStyleRule()`, `updateStyleRule()`, `removeStyleRule()` for rule CRUD.
+- **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, icon overrides, conditional style rules, per-property mode tracking, and property discovery. Exposes `getStyleRules()`, `setStyleRules()`, `getStyleRulesForProperty()`, `addStyleRule()`, `updateStyleRule()`, `removeStyleRule()`, `getPropertyModes()`, `setPropertyMode()`.
 - **`BoardSettingsModal`** (`src/board-settings-modal.ts`) — multi-page settings modal with tabs: Cover images, Chips & borders, Behavior. Replaces standalone `ChipConfigModal`.
 - **`ChipConfigPanel`** (`src/board-settings-modal.ts`) — card-based chip configuration UI with drag-and-drop reordering. Renders inside the Settings modal's Chips tab. Each property is an expandable card with drag handle, checkbox, and editor section.
 - **Mode selector**: Three radio options — "Fixed color", "Per-value mapping", and "Conditional style rules". Selecting "Conditional style rules" reveals a rule editor below the mode group: each rule row has an operator dropdown (`contains` / `equals` / `starts-with` / `ends-with`), a pattern text input, a color swatch picker, and a delete button. A "+ add rule" button appends new rows. Rules are evaluated top-to-bottom; the first matching rule's color is applied.
 - **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid of all Obsidian icons. Used when configuring icon overrides for chip properties. Each tile uses `setIcon()` for pixel-accurate previews.
 - **Toolbar Button**: Boards render a persistent `Settings` button (gear icon) in the filter bar to open the multi-page settings modal directly from the board UI
-- **Storage**: All settings persisted in `.base` file via `BasesViewConfig`: `boardCoverProperty`, `boardUseFirstEmbed`, `boardOpenBehavior`, `chipProperties`, `chipColors`, `chipFixedColors`, `chipStyleRules`, `chipShowLabels`, `chipIcons`, `borderProperty`. Cover/behavior changes persist immediately on input; chip config persists on Save button press.
+- **Storage**: All settings persisted in `.base` file via `BasesViewConfig`: `boardCoverProperty`, `boardUseFirstEmbed`, `boardOpenBehavior`, `chipProperties`, `chipColors`, `chipFixedColors`, `chipStyleRules`, `chipShowLabels`, `chipIcons`, `chipPropertyModes`, `borderProperty`. Cover/behavior changes persist immediately on input; chip config and mode selections persist on Save button press.
 - **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color. The border property is excluded from chip rendering logic to prevent it from appearing as a visible chip. If an icon override is configured, the chip renders the icon instead of the text value using the chip color.
-- **Color resolution priority** (checked in order):
-  1. Fixed color (`chipFixedColors` — one color for all values of a property)
-  2. Conditional style rules (`chipStyleRules` — first matching rule wins; operator can be `contains`, `equals`, `starts-with`, or `ends-with`)
-  3. Per-value mapping (`chipColors` — explicit value → hex override)
-  4. Deterministic hash fallback (same as tags)
+- **Color resolution** is driven by the per-property mode (`chipPropertyModes`):
+  - `fixed` — uses `chipFixedColors` only (one color for all values)
+  - `style-rules` — evaluates `chipStyleRules` first (first matching rule wins; operator can be `contains`, `equals`, `starts-with`, or `ends-with`), falls back to `chipColors`
+  - `per-value` — uses `chipColors` (explicit value → hex override), falls back to `chipFixedColors`
+  - Only the active mode's data is consulted; old data for other modes is retained in the `.base` file but ignored.
+  - Unmapped values render without custom color.
 - **Discovery behavior**: Property discovery now includes booleans like `false`, keeps configured properties visible even when they are not currently selected, and preserves color-map edits for unsaved properties until Save is pressed.
 
 ### Chip Config Panel Layout
@@ -233,4 +235,4 @@ Multi-page modal with three tabs:
 2. **Chips & borders** — ChipConfigPanel (card-based with drag-and-drop)
 3. **Behavior** — open behavior dropdown (active/modal/split/tab)
 
-**Persistence model**: Cover images and behavior settings persist immediately via callbacks to `KanbanView.config.set()` as the user types. Chip configuration (including property reorder, colors, icons, border property) persists when the user presses Save — the modal collects a `ChipConfigSnapshot` from the panel and submits it through `onSubmit`. No separate "Save" action for cover/behavior changes; chip config requires explicit Save.
+**Persistence model**: Cover images and behavior settings persist immediately via callbacks to `KanbanView.config.set()` as the user types. Chip configuration (including property reorder, colors, icons, border property, and per-property mode) persists when the user presses Save — the modal collects a `ChipConfigSnapshot` from the panel and submits it through `onSubmit`. Mode changes are also persisted immediately as the user switches radios. No separate "Save" action for cover/behavior changes; chip config requires explicit Save.

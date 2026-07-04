@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Project-specific instructions on top of the global AGENTS.md.
+  "instructions": ["AGENTS.md"],
+
+  // Navigation (goToDefinition, findReferences, diagnostics, etc.) comes
+  // from the native `lsp` integration enabled globally — no project-specific
+  // config needed for that, which is what keeps this file portable.
+  //
+  // "tsa" (tree-sitter-analyzer) is kept here as OPTIONAL, only if you want
+  // structural/syntax queries the LSP doesn't give you. It's the one piece
+  // that is NOT portable — the command path and TREE_SITTER_PROJECT_ROOT
+  // are both machine- and project-specific. Uncomment and edit only if you
+  // actually use it; otherwise leave it out and rely on native lsp.
+  //
+  // "mcp": {
+  //   "tsa": {
+  //     "type": "local",
+  //     "command": ["C:\\Users\\Bjorn\\.config\\opencode\\.venv\\Scripts\\tree-sitter-analyzer-mcp.exe"],
+  //     "environment": {
+  //       "TREE_SITTER_PROJECT_ROOT": "C:\\Users\\Bjorn\\Documents\\obsidian-base-board"
+  //     }
+  //   }
+  // },
+
+  // Project-specific bash allowances layered on top of the global defaults.
+  // Add your package manager's test/lint/build commands here so the
+  // orchestrator can actually verify work without asking every time.
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git add*": "allow",
+      "git commit*": "allow",
+      "git push*": "ask"
+      // e.g. "npm test*": "allow", "npm run lint*": "allow"
+    }
+  }
+
+  // The orchestrator/subagent tree and default model live in the global
+  // config and don't need to be repeated here. Only override "agent" or
+  // "model" in this file if this specific project needs a different model
+  // or a project-only agent.
+}

@@ -345,7 +345,7 @@ export class CardManager {
     const chipPropNames = new Set(this.view.chipProperties.getChipProperties());
     const borderPropName = this.view.chipProperties.getBorderProperty();
     for (const propId of visibleProps) {
-      if (chips.length >= 6) break;
+      if (chips.length >= 0) break;
       if (propId.startsWith("file.")) {
         if (FILE_PROPS_TO_SKIP.has(propId.slice(5))) continue;
       }

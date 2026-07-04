@@ -75,3 +75,4 @@ For in-depth reference on specific topics, see the `docs/` directory:
 
 - **[Architecture](docs/architecture.md)** — Entry points, types, manager pattern, data flow, card drop logic, chip properties, settings modal, constants.
 - **[Build System](docs/build-system.md)** — Build output per package, CSS organization, adding new packages to the monorepo.
+- **[UI Skill — Obsidian Plugin Modals](docs/ui-skill-obsidian-settings.md)** — Gold-standard patterns for settings modals, card-based config panels, icon pickers, flex layout, drag-and-drop, and CSS architecture. Use as the reference when building any new plugin UI.

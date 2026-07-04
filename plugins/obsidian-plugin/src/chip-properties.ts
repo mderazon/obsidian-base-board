@@ -4,6 +4,7 @@ import {
   CONFIG_KEY_CHIP_COLORS,
   CONFIG_KEY_CHIP_FIXED_COLORS,
   CONFIG_KEY_CHIP_SHOW_LABELS,
+  CONFIG_KEY_CHIP_ICON_SHOW_LABELS,
   CONFIG_KEY_CHIP_ICONS,
   CONFIG_KEY_CHIP_STYLERULES,
   CONFIG_KEY_BORDER_PROPERTY,
@@ -120,6 +121,18 @@ export class ChipPropertiesManager {
 
   public setShowLabels(labels: Record<string, boolean>): void {
     this.view.config?.set(CONFIG_KEY_CHIP_SHOW_LABELS, labels);
+    this.view.scheduleRender();
+  }
+
+  public getIconShowLabels(): Record<string, boolean> {
+    const raw = this.view.config?.get(CONFIG_KEY_CHIP_ICON_SHOW_LABELS);
+    return raw && typeof raw === "object"
+      ? (raw as Record<string, boolean>)
+      : {};
+  }
+
+  public setIconShowLabels(labels: Record<string, boolean>): void {
+    this.view.config?.set(CONFIG_KEY_CHIP_ICON_SHOW_LABELS, labels);
     this.view.scheduleRender();
   }
 

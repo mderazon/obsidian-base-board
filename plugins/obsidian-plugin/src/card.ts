@@ -1,7 +1,11 @@
 import { setIcon, TFile, Notice, Menu, Keymap } from "obsidian";
 import type { CardData } from "@base-board/board-core/types";
 import { KanbanView } from "./kanban-view";
-import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
+import {
+  ORDER_PROPERTY,
+  sanitizeFilename,
+  DEFAULT_CHIP_COLOR,
+} from "./constants";
 import { getDropPosition, type PositionContext } from "./order";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
@@ -469,18 +473,21 @@ export class CardManager {
 
     // Resolve color from manager (mapped or deterministic fallback)
     const color = this.view.chipProperties.getColorForValue(propName, value);
-    if (color) {
-      chip.style.setProperty("--chip-color", color);
-      if (relativeLuminance(color) === "dark") {
+    const chipIconName = this.view.chipProperties.getChipIcon(propName, value);
+    const resolvedColor = color ?? (chipIconName ? DEFAULT_CHIP_COLOR : null);
+    if (resolvedColor) {
+      chip.style.setProperty("--chip-color", resolvedColor);
+      if (relativeLuminance(resolvedColor) === "dark") {
         chip.addClass("base-board-chip-property-light");
       } else {
         chip.addClass("base-board-chip-property-dark");
       }
     }
 
-    const chipIconName = this.view.chipProperties.getChipIcon(propName, value);
     const showLabels = this.view.chipProperties.getShowLabels();
-    if (showLabels[propName] && !chipIconName) {
+    const showIconLabels = this.view.chipProperties.getIconShowLabels();
+    const showLabelBeforeIcon = chipIconName && showIconLabels[propName];
+    if ((showLabels[propName] && !chipIconName) || showLabelBeforeIcon) {
       const propId = propName.startsWith("note.")
         ? propName
         : `note.${propName}`;

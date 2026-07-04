@@ -561,6 +561,28 @@ export class ChipConfigPanel {
     showLabelWrapper.appendChild(showLabelCheckbox);
     showLabelWrapper.appendChild(showLabelSpan);
 
+    // Show label in front of icon toggle
+    const showIconLabelWrapper = wrapper.createDiv({
+      cls: "chip-show-label-wrapper",
+    });
+    const showIconLabelCheckbox = showIconLabelWrapper.createEl("input", {
+      type: "checkbox",
+      cls: "chip-show-label-checkbox",
+    });
+    showIconLabelCheckbox.checked =
+      this.chipManager.getIconShowLabels()[prop.name] || false;
+    showIconLabelCheckbox.onchange = () => {
+      const labels = this.chipManager.getIconShowLabels();
+      labels[prop.name] = showIconLabelCheckbox.checked;
+      this.chipManager.setIconShowLabels(labels);
+    };
+    const showIconLabelSpan = showIconLabelWrapper.createEl("span", {
+      text: "Show label in front of icon",
+      cls: "chip-show-label-text",
+    });
+    showIconLabelWrapper.appendChild(showIconLabelCheckbox);
+    showIconLabelWrapper.appendChild(showIconLabelSpan);
+
     // Mode radio group
     const modeSection = wrapper.createDiv({ cls: "chip-mode-section" });
     const radioName = `chipColorMode-${prop.name}`;
@@ -877,7 +899,7 @@ export class ChipConfigPanel {
       iconBtn.title = `Icon: ${currentIcon}`;
     } else {
       iconBtn.textContent = "🎨";
-      iconBtn.title = "Choose icon";
+      iconBtn.title = "Choose icon to override shown value";
     }
     iconBtn.onclick = () => {
       new IconPickerModal(this.app, currentIcon || "", (iconId: string) => {
@@ -888,7 +910,7 @@ export class ChipConfigPanel {
           iconBtn.title = `Icon: ${iconId}`;
         } else {
           iconBtn.textContent = "🎨";
-          iconBtn.title = "Choose icon";
+          iconBtn.title = "Choose icon to override shown value";
         }
       }).open();
     };

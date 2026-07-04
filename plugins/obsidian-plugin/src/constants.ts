@@ -37,8 +37,11 @@ export const CONFIG_KEY_CHIP_COLORS = "chipColors";
 /** Key used by BasesViewConfig.set/get to persist one fixed color per chip property. */
 export const CONFIG_KEY_CHIP_FIXED_COLORS = "chipFixedColors";
 
-/** Key used by BasesViewConfig.set/get to persist per-property "show label" toggles. */
+/** Key used by BasesViewConfig.set/get to persist per-property "show label in front of value" toggles. */
 export const CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels";
+
+/** Key used by BasesViewConfig.set/get to persist per-property "show label in front of icon" toggles. */
+export const CONFIG_KEY_CHIP_ICON_SHOW_LABELS = "chipIconShowLabels";
 
 /** Key used by BasesViewConfig.set/get to persist per-property value→icon mappings. */
 export const CONFIG_KEY_CHIP_ICONS = "chipIcons";
@@ -51,6 +54,9 @@ export const CONFIG_KEY_BORDER_PROPERTY = "borderProperty";
 
 /** Key used by BasesViewConfig.set/get to persist per-property chip color mode. */
 export const CONFIG_KEY_CHIP_PROPERTY_MODES = "chipPropertyModes";
+
+/** Default color used for chip icons when no explicit color is mapped. */
+export const DEFAULT_CHIP_COLOR = "#808080";
 
 /**
  * Regex matching characters that are invalid in file/folder names.

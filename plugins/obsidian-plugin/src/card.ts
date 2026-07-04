@@ -477,11 +477,18 @@ export class CardManager {
     let color: string | null = null;
     let chipIconName: string | null = null;
 
+    let skipValueText = false;
     if (mode === "style-rules") {
       const match = this.view.chipProperties.getStyleRuleMatch(propName, value);
       if (match) {
         color = match.color;
         chipIconName = match.icon || null;
+      } else if (
+        this.view.chipProperties
+          .getStyleRulesForProperty(propName)
+          .some((r) => r.icon)
+      ) {
+        skipValueText = true;
       }
     } else {
       color = this.view.chipProperties.getColorForValue(propName, value);
@@ -501,7 +508,10 @@ export class CardManager {
     const showLabels = this.view.chipProperties.getShowLabels();
     const showIconLabels = this.view.chipProperties.getIconShowLabels();
     const showLabelBeforeIcon = chipIconName && showIconLabels[propName];
-    if ((showLabels[propName] && !chipIconName) || showLabelBeforeIcon) {
+    if (
+      !skipValueText &&
+      ((showLabels[propName] && !chipIconName) || showLabelBeforeIcon)
+    ) {
       const propId = propName.startsWith("note.")
         ? propName
         : `note.${propName}`;
@@ -519,9 +529,9 @@ export class CardManager {
         cls: "base-board-chip-property-icon",
       });
       setIcon(iconEl, chipIconName);
-    } else if (!showLabels[propName]) {
+    } else if (!skipValueText && !showLabels[propName]) {
       chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
-    } else {
+    } else if (!skipValueText) {
       chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
     }
   }

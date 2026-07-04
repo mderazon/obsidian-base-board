@@ -421,7 +421,9 @@ export class ChipConfigPanel {
     index: number,
   ): HTMLDivElement {
     const card = this.propsContainerEl.createDiv({
-      cls: "chip-property-card",
+      cls:
+        "chip-property-card" +
+        (this.activeProperty === prop.name ? " is-expanded" : ""),
     });
 
     // Header row (drag handle, checkbox, label, expand button)
@@ -436,17 +438,6 @@ export class ChipConfigPanel {
       dragHandle.addClass("is-hidden");
     }
     dragHandle.onclick = (e) => e.stopPropagation();
-
-    // Store property name for drag-and-drop (more stable than index)
-    dragHandle.ondragstart = (e) => {
-      this.draggedPropertyName = prop.name;
-      e.dataTransfer?.setData("text/plain", prop.name);
-      card.classList.add("is-dragging");
-    };
-    dragHandle.ondragend = () => {
-      this.draggedPropertyName = null;
-      card.classList.remove("is-dragging");
-    };
 
     // Checkbox
     const checkbox = header.createEl("input", { type: "checkbox" });
@@ -515,8 +506,43 @@ export class ChipConfigPanel {
     // Drag handlers — only on the drag handle
     dragHandle.ondragstart = (e) => {
       this.draggedPropertyName = prop.name;
-      e.dataTransfer?.setData("text/plain", prop.name);
+      e.dataTransfer!.setData("text/plain", prop.name);
       card.classList.add("is-dragging");
+
+      // Custom floating ghost card
+      const rect = card.getBoundingClientRect();
+      const wrapper = activeDocument.createElement("div");
+      wrapper.style.cssText = `
+        position: fixed;
+        top: ${e.clientY - 12}px;
+        left: ${e.clientX - 12}px;
+        transform: rotate(3deg);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        opacity: 0.85;
+        border-radius: var(--radius-m, 6px);
+        pointer-events: none;
+        z-index: 9999;
+      `;
+
+      // Clone the card content (header + body) into the ghost
+      const ghost = card.cloneNode(true) as HTMLElement;
+      ghost.style.cssText = `
+        width: ${rect.width}px;
+        border-radius: var(--radius-m, 6px);
+        background-color: var(--background-primary);
+        border: 1px solid var(--background-modifier-border);
+      `;
+      // Hide the expanded body in the ghost (just show the header row)
+      const ghostBody = ghost.querySelector(".chip-property-card-body");
+      if (ghostBody) ghostBody.classList.add("is-hidden");
+      wrapper.appendChild(ghost);
+      activeDocument.body.appendChild(wrapper);
+
+      e.dataTransfer!.setDragImage(wrapper, 12, 12);
+      e.dataTransfer!.effectAllowed = "move";
+
+      // Clean up ghost after browser captures it
+      window.requestAnimationFrame(() => wrapper.remove());
     };
     dragHandle.ondragend = () => {
       this.draggedPropertyName = null;

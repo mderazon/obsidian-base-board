@@ -55,6 +55,7 @@
   color: var(--text-muted);
   border-bottom: 2px solid transparent;
   transition: all 0.15s ease;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
 }
 
 .base-board-settings-tab-item:hover {

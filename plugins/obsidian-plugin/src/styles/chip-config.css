@@ -79,6 +79,7 @@
   cursor: pointer;
   border-bottom: 1px solid transparent;
   transition: background-color 0.12s ease;
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
 }
 
 .chip-card-header:hover {
@@ -147,6 +148,12 @@
 /* Dragging state */
 .chip-property-card.is-dragging {
   opacity: 0.5;
+}
+
+/* Expanded/active state */
+.chip-property-card.is-expanded {
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  outline-offset: -2px;
 }
 
 /* Empty state */

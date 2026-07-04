@@ -471,9 +471,23 @@ export class CardManager {
     const chip = parent.createSpan({ cls: "base-board-chip-property" });
     chip.setAttr("data-property-name", propName);
 
-    // Resolve color from manager (mapped or deterministic fallback)
-    const color = this.view.chipProperties.getColorForValue(propName, value);
-    const chipIconName = this.view.chipProperties.getChipIcon(propName, value);
+    const mode = this.view.chipProperties.getPropertyModes()[propName];
+
+    // Resolve color and icon based on property mode
+    let color: string | null = null;
+    let chipIconName: string | null = null;
+
+    if (mode === "style-rules") {
+      const match = this.view.chipProperties.getStyleRuleMatch(propName, value);
+      if (match) {
+        color = match.color;
+        chipIconName = match.icon || null;
+      }
+    } else {
+      color = this.view.chipProperties.getColorForValue(propName, value);
+      chipIconName = this.view.chipProperties.getChipIcon(propName, value);
+    }
+
     const resolvedColor = color ?? (chipIconName ? DEFAULT_CHIP_COLOR : null);
     if (resolvedColor) {
       chip.style.setProperty("--chip-color", resolvedColor);

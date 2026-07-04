@@ -288,7 +288,8 @@ export class ChipConfigPanel {
   private borderSelectEl!: HTMLSelectElement;
 
   // Drag state
-  private draggedPropertyIndex: number | null = null;
+  private propertyOrder: string[] = [];
+  private draggedPropertyName: string | null = null;
 
   constructor(
     app: App,
@@ -317,6 +318,8 @@ export class ChipConfigPanel {
         this.propertyModes[key] = value;
       }
     }
+    // Initialize property order from selected properties
+    this.propertyOrder = [...this.selectedProperties];
   }
 
   renderInto(container: HTMLElement): void {
@@ -354,8 +357,12 @@ export class ChipConfigPanel {
 
   /** Collect current config state for persistence. */
   getSnapshot(): ChipConfigSnapshot {
+    // Preserve order from propertyOrder, filtered to only selected properties
+    const properties = this.propertyOrder.filter((name) =>
+      this.selectedProperties.includes(name),
+    );
     return {
-      properties: [...this.selectedProperties],
+      properties,
       borderProperty: this.borderProperty,
       colors: { ...this.colorState },
       fixedColors: { ...this.fixedColors },
@@ -389,14 +396,17 @@ export class ChipConfigPanel {
       return;
     }
 
-    const orderedProps = [
-      ...this.selectedProperties.map((name) =>
-        this.availableProps.find((p) => p.name === name),
-      ),
-      ...this.availableProps.filter(
-        (p) => !this.selectedProperties.includes(p.name),
-      ),
-    ].filter(Boolean) as AvailableProperty[];
+    // Build ordered list from propertyOrder, adding any new available props at the end
+    const orderedNames = [...this.propertyOrder];
+    for (const prop of this.availableProps) {
+      if (!orderedNames.includes(prop.name)) {
+        orderedNames.push(prop.name);
+      }
+    }
+
+    const orderedProps = orderedNames
+      .map((name) => this.availableProps.find((p) => p.name === name))
+      .filter(Boolean) as AvailableProperty[];
 
     for (let i = 0; i < orderedProps.length; i++) {
       const prop = orderedProps[i];
@@ -413,15 +423,30 @@ export class ChipConfigPanel {
     const card = this.propsContainerEl.createDiv({
       cls: "chip-property-card",
     });
-    card.draggable = true;
 
     // Header row (drag handle, checkbox, label, expand button)
     const header = card.createDiv({ cls: "chip-card-header" });
 
-    // Drag handle
+    // Drag handle (only drag handle is draggable, only when selected)
     const dragHandle = header.createDiv({ cls: "chip-drag-handle" });
     dragHandle.textContent = "⠿";
     dragHandle.title = "Drag to reorder";
+    dragHandle.draggable = this.selectedProperties.includes(prop.name);
+    if (!this.selectedProperties.includes(prop.name)) {
+      dragHandle.addClass("is-hidden");
+    }
+    dragHandle.onclick = (e) => e.stopPropagation();
+
+    // Store property name for drag-and-drop (more stable than index)
+    dragHandle.ondragstart = (e) => {
+      this.draggedPropertyName = prop.name;
+      e.dataTransfer?.setData("text/plain", prop.name);
+      card.classList.add("is-dragging");
+    };
+    dragHandle.ondragend = () => {
+      this.draggedPropertyName = null;
+      card.classList.remove("is-dragging");
+    };
 
     // Checkbox
     const checkbox = header.createEl("input", { type: "checkbox" });
@@ -430,18 +455,25 @@ export class ChipConfigPanel {
       if (checkbox.checked) {
         if (!this.selectedProperties.includes(prop.name)) {
           this.selectedProperties.push(prop.name);
+          // Also add to property order if not already there
+          if (!this.propertyOrder.includes(prop.name)) {
+            this.propertyOrder.push(prop.name);
+          }
+          this.activeProperty = prop.name;
         }
-        this.activeProperty = prop.name;
       } else {
         this.selectedProperties = this.selectedProperties.filter(
           (p) => p !== prop.name,
         );
+        // Remove from property order
+        this.propertyOrder = this.propertyOrder.filter((n) => n !== prop.name);
         if (this.activeProperty === prop.name) {
           this.activeProperty = null;
         }
       }
       this.renderPropertyList();
     };
+    checkbox.onclick = (e) => e.stopPropagation();
 
     // Label
     const label = header.createEl("span", {
@@ -465,6 +497,13 @@ export class ChipConfigPanel {
       this.renderPropertyList();
     };
 
+    // Click on header to toggle expanded/collapsed
+    header.onclick = () => {
+      this.activeProperty =
+        this.activeProperty === prop.name ? null : prop.name;
+      this.renderPropertyList();
+    };
+
     // Body (expanded content)
     const body = card.createDiv({ cls: "chip-property-card-body" });
     if (this.activeProperty === prop.name) {
@@ -473,16 +512,18 @@ export class ChipConfigPanel {
       body.classList.add("is-hidden");
     }
 
-    // Drag handlers
-    card.ondragstart = (e) => {
-      this.draggedPropertyIndex = index;
+    // Drag handlers — only on the drag handle
+    dragHandle.ondragstart = (e) => {
+      this.draggedPropertyName = prop.name;
       e.dataTransfer?.setData("text/plain", prop.name);
       card.classList.add("is-dragging");
     };
-    card.ondragend = () => {
-      this.draggedPropertyIndex = null;
+    dragHandle.ondragend = () => {
+      this.draggedPropertyName = null;
       card.classList.remove("is-dragging");
     };
+
+    // Drop target handlers on card
     card.ondragover = (e) => {
       e.preventDefault();
       card.classList.add("chip-drop-target");
@@ -493,14 +534,14 @@ export class ChipConfigPanel {
     card.ondrop = (e) => {
       e.preventDefault();
       card.classList.remove("chip-drop-target");
-      if (this.draggedPropertyIndex === null) return;
+      if (!this.draggedPropertyName) return;
 
-      const fromIndex = this.draggedPropertyIndex;
-      const toIndex = index;
+      const fromIndex = this.propertyOrder.indexOf(this.draggedPropertyName);
+      const toIndex = this.propertyOrder.indexOf(prop.name);
 
-      if (fromIndex !== toIndex) {
-        const [moved] = this.selectedProperties.splice(fromIndex, 1);
-        this.selectedProperties.splice(toIndex, 0, moved);
+      if (fromIndex !== -1 && fromIndex !== toIndex) {
+        const [moved] = this.propertyOrder.splice(fromIndex, 1);
+        this.propertyOrder.splice(toIndex, 0, moved);
         this.renderPropertyList();
       }
     };
@@ -763,6 +804,7 @@ export class ChipConfigPanel {
       operator: "contains",
       pattern: "",
       color: "#808080",
+      icon: "",
     };
   }
 
@@ -816,6 +858,33 @@ export class ChipConfigPanel {
       ).map((r) =>
         r.id === rule.id ? { ...r, pattern: patternInput.value } : r,
       );
+    };
+
+    // Icon picker button
+    const iconBtn = row.createEl("button", {
+      cls: "chip-icon-picker-btn",
+    });
+    if (rule.icon) {
+      setIcon(iconBtn, rule.icon);
+      iconBtn.title = `Icon: ${rule.icon}`;
+    } else {
+      iconBtn.textContent = "🎨";
+      iconBtn.title = "Choose icon";
+    }
+    iconBtn.onclick = () => {
+      new IconPickerModal(this.app, rule.icon || "", (iconId: string) => {
+        this.styleRulesState[propName] = (
+          this.styleRulesState[propName] || []
+        ).map((r) => (r.id === rule.id ? { ...r, icon: iconId } : r));
+        // Update button display
+        if (iconId) {
+          setIcon(iconBtn, iconId);
+          iconBtn.title = `Icon: ${iconId}`;
+        } else {
+          iconBtn.textContent = "🎨";
+          iconBtn.title = "Choose icon";
+        }
+      }).open();
     };
 
     // Color swatch

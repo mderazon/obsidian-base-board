@@ -54,11 +54,11 @@ TSA skill files in `.claude/skills/` have detailed workflows for each capability
 
 ```bash
 npm install          # Install root dependencies
+npm run format       # Prettier across all packages
+npm run lint         # Type-check core + lint plugin
 npm run build        # Build core → plugin (full chain)
 npm run dev:plugin   # Watch-mode build for Obsidian dev vault
 npm run dev:electron # Launch Electron app
-npm run lint         # Type-check core + lint plugin
-npm run format       # Prettier across all packages
 ```
 
 There are no tests. The `lint` script is the closest thing to a quality gate — it combines TypeScript type-checking (`tsc -noEmit`) with ESLint. Run `npm run build` before committing.

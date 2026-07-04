@@ -25,6 +25,7 @@ export interface ChipStyleRule {
   operator: StyleRuleOperator;
   pattern: string;
   color: string;
+  icon?: string;
 }
 
 /** Per-property style rules map. */
@@ -283,6 +284,40 @@ export class ChipPropertiesManager {
 
       if (matches && rule.color) {
         return rule.color;
+      }
+    }
+    return null;
+  }
+
+  /** Check style rules and return matching color + icon, or null. */
+  public getStyleRuleMatch(
+    propName: string,
+    value: string,
+  ): { color: string; icon?: string } | null {
+    const rules = this.getStyleRulesForProperty(propName);
+    for (const rule of rules) {
+      if (!rule.pattern) continue;
+      const lowerValue = value.toLowerCase();
+      const lowerPattern = rule.pattern.toLowerCase();
+
+      let matches = false;
+      switch (rule.operator) {
+        case "equals":
+          matches = lowerValue === lowerPattern;
+          break;
+        case "contains":
+          matches = lowerValue.includes(lowerPattern);
+          break;
+        case "starts-with":
+          matches = lowerValue.startsWith(lowerPattern);
+          break;
+        case "ends-with":
+          matches = lowerValue.endsWith(lowerPattern);
+          break;
+      }
+
+      if (matches) {
+        return { color: rule.color, icon: rule.icon };
       }
     }
     return null;

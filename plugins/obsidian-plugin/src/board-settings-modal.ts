@@ -12,6 +12,7 @@ export interface BoardSettingsState {
   coverProperty: string;
   useFirstEmbed: boolean;
   openBehavior: "active" | "modal" | "split" | "tab";
+  cardTitleProperty: string;
 }
 
 /** Snapshot of chip configuration state, returned when the user saves. */
@@ -31,6 +32,7 @@ export interface BoardSettingsCallbacks {
   onOpenBehaviorChange?: (
     behavior: "active" | "modal" | "split" | "tab",
   ) => void;
+  onCardTitlePropertyChange?: (property: string) => void;
 }
 
 export type BoardSettingsSubmit = (
@@ -211,6 +213,22 @@ export class BoardSettingsModal extends Modal {
           this.callbacks.onOpenBehaviorChange?.(
             value as "active" | "modal" | "split" | "tab",
           );
+        });
+      });
+
+    new Setting(page)
+      .setName("Card title property")
+      .setDesc(
+        "Frontmatter field to use as the card heading instead of the filename. Leave empty to use the filename.",
+      )
+      .addText((text) => {
+        text
+          .setPlaceholder("Title")
+          .setValue(this.state.cardTitleProperty || "");
+        text.inputEl.addClass("base-board-settings-card-title-input");
+        text.inputEl.addEventListener("input", () => {
+          this.state.cardTitleProperty = text.getValue();
+          this.callbacks.onCardTitlePropertyChange?.(text.getValue());
         });
       });
   }

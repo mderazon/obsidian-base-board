@@ -591,9 +591,30 @@ export class CardManager {
     const titleSpan = titleEl.querySelector("span");
     if (!titleSpan) return;
 
+    // Check if cardTitleProperty is configured and has a value
+    const titleProp = this.view.config.get("cardTitleProperty") as
+      | string
+      | undefined;
+    let isFrontmatterEdit = false;
+    let fieldValue = "";
+
+    if (titleProp && titleProp.trim()) {
+      // Read frontmatter to check if the property has a value
+      const cache = this.view.app.metadataCache.getFileCache(file);
+      const propValue = cache?.frontmatter?.[titleProp] as string | undefined;
+      if (
+        propValue !== undefined &&
+        propValue !== null &&
+        String(propValue).trim() !== ""
+      ) {
+        fieldValue = String(propValue).trim();
+        isFrontmatterEdit = true;
+      }
+    }
+
     const input = activeDocument.createElement("input");
     input.type = "text";
-    input.value = file.basename;
+    input.value = isFrontmatterEdit ? fieldValue : file.basename;
     input.className = "base-board-card-rename-input";
 
     titleSpan.replaceWith(input);
@@ -604,11 +625,25 @@ export class CardManager {
     const commit = async () => {
       if (committed) return;
       committed = true;
-      const newName = input.value.trim();
-      if (newName && newName !== file.basename) {
+      const newValue = input.value.trim();
+
+      if (isFrontmatterEdit && titleProp && newValue !== fieldValue) {
+        // Update frontmatter field instead of renaming file
+        try {
+          await this.view.app.fileManager.processFrontMatter(
+            file,
+            (fm: Record<string, unknown>) => {
+              fm[titleProp] = newValue;
+            },
+          );
+        } catch (err) {
+          new Notice(`Failed to update title: ${String(err)}`);
+        }
+      } else if (!isFrontmatterEdit && newValue && newValue !== file.basename) {
+        // Rename the file
         const newPath = file.path.replace(
           /[^/]+\.md$/,
-          `${sanitizeFilename(newName)}.md`,
+          `${sanitizeFilename(newValue)}.md`,
         );
         try {
           await this.view.app.fileManager.renameFile(file, newPath);

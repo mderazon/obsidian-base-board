@@ -32,6 +32,7 @@ import {
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_BOARD_COVER_PROPERTY,
   CONFIG_KEY_BOARD_USE_FIRST_EMBED,
+  CONFIG_KEY_CARD_TITLE_PROPERTY,
   CONFIG_KEY_BORDER_PROPERTY,
   CONFIG_KEY_CHIP_PROPERTIES,
   CONFIG_KEY_CHIP_COLORS,
@@ -108,6 +109,7 @@ export class KanbanView extends BasesView implements HoverParent {
         coverProperty: this.getCardCoverProperty() ?? "",
         useFirstEmbed: this.shouldUseFirstEmbed(),
         openBehavior: this.getCardOpenBehavior(),
+        cardTitleProperty: this.getCardTitleProperty() ?? "",
       };
       new BoardSettingsModal(
         this.app,
@@ -139,6 +141,9 @@ export class KanbanView extends BasesView implements HoverParent {
           },
           onOpenBehaviorChange: (behavior) => {
             this.config?.set(CONFIG_KEY_BOARD_OPEN_BEHAVIOR, behavior);
+          },
+          onCardTitlePropertyChange: (property) => {
+            this.config?.set(CONFIG_KEY_CARD_TITLE_PROPERTY, property);
           },
         },
       ).open();
@@ -325,6 +330,11 @@ export class KanbanView extends BasesView implements HoverParent {
   public shouldUseFirstEmbed(): boolean {
     const val = this.config?.get(CONFIG_KEY_BOARD_USE_FIRST_EMBED);
     return val === true;
+  }
+
+  public getCardTitleProperty(): string | null {
+    const val = this.config?.get(CONFIG_KEY_CARD_TITLE_PROPERTY);
+    return typeof val === "string" && val.trim() !== "" ? val.trim() : null;
   }
 
   public isLeafAttached(leaf: WorkspaceLeaf): boolean {

@@ -13,6 +13,9 @@ export const CONFIG_KEY_TAG_COLORS = "tagColors";
 /** Key used by BasesViewConfig.set/get to persist card open behavior in the .base file. */
 export const CONFIG_KEY_BOARD_OPEN_BEHAVIOR = "boardOpenBehavior";
 
+/** Key used by BasesViewConfig.set/get to persist frontmatter field for card title. */
+export const CONFIG_KEY_CARD_TITLE_PROPERTY = "cardTitleProperty";
+
 /** Key used by BasesViewConfig.set/get to persist column colors in the .base file. */
 export const CONFIG_KEY_COLUMN_COLORS = "columnColors";
 

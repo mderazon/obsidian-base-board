@@ -233,17 +233,12 @@ export class ChipPropertiesManager {
     }
 
     if (mode === "style-rules") {
-      const ruleColor = this.getColorFromStyleRules(propName, value);
-      if (ruleColor) return ruleColor;
-      return this.getChipColors()[propName]?.[value] ?? null;
+      // Only style rules apply in this mode — no fallback to per-value or fixed
+      return this.getColorFromStyleRules(propName, value);
     }
 
-    // per-value (default / unknown mode)
-    const colors = this.getChipColors();
-    if (colors[propName]?.[value]) {
-      return colors[propName][value];
-    }
-    return this.getFixedColors()[propName] ?? null;
+    // per-value (default / unknown mode) — only per-value mapping applies
+    return this.getChipColors()[propName]?.[value] ?? null;
   }
 
   /** Check style rules for a property value and return color if any rule matches. */

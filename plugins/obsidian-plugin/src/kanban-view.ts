@@ -18,15 +18,17 @@ import { ColumnManager } from "./column";
 import { CardManager } from "./card";
 import { Tags } from "./tags";
 import { ChipPropertiesManager } from "./chip-properties";
-import { ChipConfigModal, ChipConfigSnapshot } from "./chip-config-modal";
+import { ChipConfigSnapshot } from "./chip-config-modal";
+import { BoardSettingsModal, BoardSettingsState } from "./board-settings-modal";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
-  CONFIG_KEY_OPEN_BEHAVIOR,
+  CONFIG_KEY_BOARD_OPEN_BEHAVIOR,
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
-  CONFIG_KEY_COVER_PROPERTY,
+  CONFIG_KEY_BOARD_COVER_PROPERTY,
+  CONFIG_KEY_BOARD_USE_FIRST_EMBED,
   CONFIG_KEY_BORDER_PROPERTY,
   CONFIG_KEY_CHIP_PROPERTIES,
   CONFIG_KEY_CHIP_COLORS,
@@ -92,16 +94,41 @@ export class KanbanView extends BasesView implements HoverParent {
 
     this.tags = new Tags(this);
     this.tags.setChipConfigCallback(() => {
-      new ChipConfigModal(
+      const state: BoardSettingsState = {
+        coverProperty: this.getCardCoverProperty() ?? "",
+        useFirstEmbed: this.shouldUseFirstEmbed(),
+        openBehavior: this.getCardOpenBehavior(),
+      };
+      new BoardSettingsModal(
         this.app,
         this.chipProperties,
-        (config: ChipConfigSnapshot) => {
-          this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, config.properties);
-          this.config?.set(CONFIG_KEY_BORDER_PROPERTY, config.borderProperty);
-          this.config?.set(CONFIG_KEY_CHIP_COLORS, config.colors);
-          this.config?.set(CONFIG_KEY_CHIP_FIXED_COLORS, config.fixedColors);
-          this.config?.set(CONFIG_KEY_CHIP_ICONS, config.icons);
+        state,
+        (chipConfig: ChipConfigSnapshot | null) => {
+          if (chipConfig) {
+            this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, chipConfig.properties);
+            this.config?.set(
+              CONFIG_KEY_BORDER_PROPERTY,
+              chipConfig.borderProperty,
+            );
+            this.config?.set(CONFIG_KEY_CHIP_COLORS, chipConfig.colors);
+            this.config?.set(
+              CONFIG_KEY_CHIP_FIXED_COLORS,
+              chipConfig.fixedColors,
+            );
+            this.config?.set(CONFIG_KEY_CHIP_ICONS, chipConfig.icons);
+          }
           this.scheduleRender();
+        },
+        {
+          onCoverPropertyChange: (property) => {
+            this.config?.set(CONFIG_KEY_BOARD_COVER_PROPERTY, property);
+          },
+          onUseFirstEmbedChange: (useFirstEmbed) => {
+            this.config?.set(CONFIG_KEY_BOARD_USE_FIRST_EMBED, useFirstEmbed);
+          },
+          onOpenBehaviorChange: (behavior) => {
+            this.config?.set(CONFIG_KEY_BOARD_OPEN_BEHAVIOR, behavior);
+          },
         },
       ).open();
     });
@@ -164,33 +191,7 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   static getViewOptions(): BasesAllOptions[] {
-    return [
-      {
-        type: "group" as const,
-        displayName: "Display",
-        items: [
-          {
-            key: CONFIG_KEY_OPEN_BEHAVIOR,
-            type: "dropdown" as const,
-            displayName: "Open card in",
-            default: "active",
-            options: {
-              active: "Active pane / tab",
-              modal: "Floating modal",
-              split: "Split to the right",
-              tab: "New tab",
-            },
-          },
-          {
-            key: CONFIG_KEY_COVER_PROPERTY,
-            type: "text" as const,
-            displayName: "Cover property",
-            default: "cover",
-            placeholder: "E.g. cover",
-          },
-        ],
-      },
-    ];
+    return [];
   }
 
   // ---------------------------------------------------------------------------
@@ -300,17 +301,19 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   public getCardOpenBehavior(): "active" | "modal" | "split" | "tab" {
-    const val = this.config?.get(CONFIG_KEY_OPEN_BEHAVIOR);
+    const val = this.config?.get(CONFIG_KEY_BOARD_OPEN_BEHAVIOR);
     if (val === "modal" || val === "split" || val === "tab") return val;
     return "active";
   }
 
   public getCardCoverProperty(): string | null {
-    const val = this.config?.get(CONFIG_KEY_COVER_PROPERTY);
-    if (val === undefined || val === null) {
-      return "cover";
-    }
+    const val = this.config?.get(CONFIG_KEY_BOARD_COVER_PROPERTY);
     return typeof val === "string" && val.trim() !== "" ? val.trim() : null;
+  }
+
+  public shouldUseFirstEmbed(): boolean {
+    const val = this.config?.get(CONFIG_KEY_BOARD_USE_FIRST_EMBED);
+    return val === true;
   }
 
   public isLeafAttached(leaf: WorkspaceLeaf): boolean {
@@ -403,37 +406,22 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   // ---------------------------------------------------------------------------
-  //  Column config  (dual-layer: .base file via config API + plugin data.json)
+  //  Column config  (single-layer: .base file via config API)
   // ---------------------------------------------------------------------------
 
   /**
-   * Read the persisted column order.
-   *
-   * Priority:
-   *  1. View-level config stored inside the .base file (via BasesViewConfig)
-   *  2. Legacy plugin data.json (for backwards-compat with existing boards)
-   *  3. Fall back to whatever columns the data naturally produces
+   * Read the persisted column order from the .base file.
    *
    * Any columns present in the live data but missing from the stored list
    * are appended at the end so they are never silently hidden.
    */
   public getColumns(): string[] {
-    // 1. Try .base file config first (new preferred storage)
     const fromConfig = this.config?.get(CONFIG_KEY_COLUMNS) as
       | string[]
       | undefined;
 
-    // 2. Fallback: legacy plugin data.json
-    const fromPlugin = this.plugin.getColumnConfig(this.getBaseId());
-
-    const rawStored = fromConfig?.length
-      ? fromConfig
-      : fromPlugin?.columns?.length
-        ? fromPlugin.columns
-        : null;
-
-    const stored = rawStored
-      ? rawStored.map((col) => (col === "" ? NO_VALUE_COLUMN : col))
+    const stored = fromConfig?.length
+      ? fromConfig.map((col) => (col === "" ? NO_VALUE_COLUMN : col))
       : null;
 
     const dataColumns = this.currentGroups.map((g) => g.name);
@@ -496,13 +484,12 @@ export class KanbanView extends BasesView implements HoverParent {
         groupedData[0].key !== undefined &&
         !(groupedData[0].key instanceof NullValue));
 
-    // If the board has configured columns (from .base or data.json) but
-    // no cards exist yet, render the empty columns so users can see and
-    // add cards instead of showing an opaque placeholder.
+    // If the board has configured columns but no cards exist yet, render
+    // the empty columns so users can see and add cards instead of showing
+    // an opaque placeholder.
     const stored =
-      (this.config?.get(CONFIG_KEY_COLUMNS) as string[] | undefined) ??
-      this.plugin.getColumnConfig(this.getBaseId())?.columns;
-    const hasStoredColumns = stored && stored.length > 0;
+      (this.config?.get(CONFIG_KEY_COLUMNS) as string[] | undefined) ?? [];
+    const hasStoredColumns = stored.length > 0;
     const shouldShowPlaceholder =
       !hasGroupBy && groupedData.length <= 1 && !hasStoredColumns;
 
@@ -573,19 +560,11 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   /**
-   * Persist the column list.
-   *
-   * Writes to two locations for compatibility:
-   *  - BasesViewConfig (stored inside the .base file itself — portable)
-   *  - Plugin data.json (legacy, kept so older board setups still work)
+   * Persist the column list to the .base file via BasesViewConfig.
    */
   public saveColumns(columns: string[]): void {
-    // Primary: persist in .base file via the official config API
     const toSave = columns.map((col) => (col === NO_VALUE_COLUMN ? "" : col));
     this.config?.set(CONFIG_KEY_COLUMNS, toSave);
-
-    // Legacy fallback: also write to plugin data.json
-    void this.plugin.saveColumnConfig(this.getBaseId(), { columns });
   }
 
   // ---------------------------------------------------------------------------

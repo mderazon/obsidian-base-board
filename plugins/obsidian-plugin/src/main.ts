@@ -11,26 +11,11 @@ import { sanitizeFilename } from "./constants";
 import { CreateBoardModal, BoardConfig } from "./modals";
 import { updateBaseFolderReferences } from "./folder-rename";
 
-/** Per-base column configuration */
-export interface ColumnConfig {
-  columns: string[];
-}
-
-export interface PluginData {
-  columnConfigs: Record<string, ColumnConfig>;
-}
-
-const DEFAULT_DATA: PluginData = {
-  columnConfigs: {},
-};
-
 // ---------------------------------------------------------------------------
 //  Plugin
 // ---------------------------------------------------------------------------
 
 export default class BaseBoardPlugin extends Plugin {
-  data_: PluginData = DEFAULT_DATA;
-
   /** Folder rename mappings collected during one rename burst, pending flush. */
   private pendingFolderRenames: Array<{ oldPath: string; newPath: string }> =
     [];
@@ -38,8 +23,6 @@ export default class BaseBoardPlugin extends Plugin {
   private folderRenameFlushTimer: number | null = null;
 
   async onload() {
-    await this.loadPluginData();
-
     this.registerBasesView("kanban", {
       name: "Kanban",
       icon: "lucide-kanban",
@@ -246,26 +229,8 @@ export default class BaseBoardPlugin extends Plugin {
     }
   }
 
-  // -- Column config helpers --------------------------------------------------
-
-  getColumnConfig(baseId: string): ColumnConfig | null {
-    return this.data_.columnConfigs[baseId] ?? null;
-  }
-
-  async saveColumnConfig(baseId: string, config: ColumnConfig): Promise<void> {
-    this.data_.columnConfigs[baseId] = config;
-    await this.savePluginData();
-  }
-
   // -- Persistence ------------------------------------------------------------
 
-  async loadPluginData(): Promise<void> {
-    const saved = (await this.loadData()) as PluginData | null | undefined;
-    this.data_ = Object.assign({}, DEFAULT_DATA, saved ?? {});
-    if (!this.data_.columnConfigs) this.data_.columnConfigs = {};
-  }
-
-  async savePluginData(): Promise<void> {
-    await this.saveData(this.data_);
-  }
+  // No plugin data needed — all board settings live in .base files via
+  // BasesViewConfig. Legacy data.json is intentionally not migrated.
 }

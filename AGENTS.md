@@ -61,6 +61,12 @@ npm run format       # Prettier across all packages
 
 There are no tests. The `lint` script is the closest thing to a quality gate — it combines TypeScript type-checking (`tsc -noEmit`) with ESLint. Run `npm run build` before committing.
 
+### Registered Commands
+
+Only one command is registered in `main.ts`:
+
+- **`create-board`** ("Create new board") — opens `CreateBoardModal`, creates a `.base` file with sample tasks, and opens it.
+
 ## Architecture
 
 ### Monorepo Structure
@@ -73,40 +79,67 @@ apps/electron-app/          Standalone Electron app (skeleton)
 
 ### Entry Points
 
-- **`plugins/obsidian-plugin/src/main.ts`** — Plugin class extending `Plugin`. Registers the Kanban view via `registerBasesView()`, handles "Create new board" command, and syncs `.base` file references on folder renames.
+- **`plugins/obsidian-plugin/src/main.ts`** — Plugin class extending `Plugin`. Registers the Kanban view via `registerBasesView()`, handles "Create new board" command, and syncs `.base` file references on folder renames. Only one command is registered: "Create new board".
 - **`plugins/obsidian-plugin/src/kanban-view.ts`** — Extends `BasesView` (the Bases API view class). Acts as the adapter layer: maps Obsidian's `BasesEntry`/`BasesEntryGroup` → board-core's `CardData`/`Column`. Orchestrates all sub-managers and implements the rendering pipeline.
+- **`plugins/obsidian-plugin/src/board-settings-modal.ts`** — Multi-page settings modal (Cover images, Chips & borders, Behavior). Opened via the gear icon button rendered in the KanbanView's filter bar. No separate command registration needed.
 
 ### Board-Core Types (`packages/board-core/src/types.ts`)
 
 ```typescript
 interface CardData {
-  filePath: string;          // Absolute vault path (e.g. "Notes/My Task.md")
-  displayName: string;       // Display name shown as card title
-  properties: Record<string, unknown>;  // Frontmatter key→value pairs
+  filePath: string;                    // Absolute vault path (e.g. "Notes/My Task.md")
+  displayName: string;                 // Display name shown as card title (usually file basename)
+  properties: Record<string, unknown>; // Frontmatter key→value pairs
 }
 
 interface Column {
   name: string;
   cards: CardData[];
-  color?: string | null;
-  wipLimit?: number | null;
+  color?: string | null;               // Optional accent color for column header
+  wipLimit?: number | null;            // null = unlimited
 }
 
 interface BoardConfig {
-  groupBy: string;
-  columns: string[];
-  columnColors: Record<string, string>;
-  wipLimits: Record<string, number | null>;
+  groupBy: string;                     // Property used to group cards into columns
+  columns: string[];                   // Ordered list of column names (configured + discovered)
+  columnColors: Record<string, string>; // Per-column accent colors
+  wipLimits: Record<string, number | null>; // Per-column WIP limits
   cardOpenBehavior: "active" | "modal" | "split" | "tab";
-  cardTitleProperty?: string;
-  cardCoverProperty: string;
-  tagColors: Record<string, string>;
-  chipProperties: string[];
-  chipColors: Record<string, Record<string, string>>;
-  chipFixedColors: Record<string, string>;
-  chipShowLabels: Record<string, boolean>;
-  chipIcons: Record<string, Record<string, string>>;
-  borderProperty: string;
+  defaultColumn?: string;              // Column to create new cards in by default
+  cardTitleProperty?: string;          // Frontmatter property for card title (empty = filename)
+  cardCoverProperty: string;           // Frontmatter property containing cover image path/URL
+  tagColors: Record<string, string>;   // Custom tag colors (tag → hex)
+  chipProperties: string[];            // Frontmatter fields rendered as colored chips
+  chipColors: Record<string, Record<string, string>>; // Per-property, per-value color overrides
+  chipFixedColors: Record<string, string>; // Single fixed color per property (one color for all values)
+  chipShowLabels: Record<string, boolean>; // Whether to show property label on chip pills
+  chipIcons: Record<string, Record<string, string>>; // Icon overrides for chip values
+  borderProperty: string;              // Property controlling card border color (empty = none)
+}
+
+// Default config values (used when no .base file exists yet)
+const DEFAULT_BOARD_CONFIG: BoardConfig = {
+  groupBy: "",
+  columns: [],
+  columnColors: {},
+  wipLimits: {},
+  cardOpenBehavior: "active",
+  cardCoverProperty: "cover",
+  tagColors: {},
+  chipProperties: [],
+  chipColors: {},
+  chipFixedColors: {},
+  chipShowLabels: {},
+  chipIcons: {},
+  borderProperty: "",
+};
+
+// Discovered frontmatter property with sample values
+interface AvailableProperty {
+  name: string;
+  displayName: string;
+  isConfigured: boolean;
+  sampleValues: string[];
 }
 ```
 
@@ -127,7 +160,8 @@ All managers accept `CardData` (not `BasesEntry`) and access Obsidian-specific o
 ### Modals
 
 - **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid over every icon Obsidian knows about. Each tile rendered with `setIcon()` for pixel-accurate previews. Used when configuring chip icon overrides.
-- **`ChipConfigModal`** (`src/chip-config-modal.ts`) — UI for configuring which properties become chips and their color mappings.
+- **`ChipConfigModal`** (`src/chip-config-modal.ts`) — Legacy standalone chip config modal (kept for backward compat, no longer used). Replaced by `BoardSettingsModal`.
+- **`TagEditModal`** (`src/tag-edit-modal.ts`) — Modal for editing tags on a single file. Opens via right-click on tag pills in the filter bar.
 - **`InputModal` / `WipLimitModal`** (`src/modals.ts`) — Generic input modals for column names, WIP limits, etc.
 
 ### Layout
@@ -142,14 +176,13 @@ The main board container (`base-board-container`) is positioned to fill availabl
 4. `render()` clears the container, iterates columns from `getColumns()`, delegates each to `columnManager.renderColumn()`.
 5. Each column renders its cards via `cardManager.renderCard()`.
 
-### Column Config — Dual-Layer Storage
+### Column Config — Single-Layer Storage
 
-Column order is persisted in two places for compatibility:
+Column order is persisted in one place:
 
 1. **Primary**: `BasesViewConfig.set("boardColumns", ...)` → written into the `.base` file as a custom view config key. Portable and version-controlled.
-2. **Fallback**: Plugin `data.json` (`columnConfigs` record keyed by board ID). Used for legacy boards created before this dual-layer was added.
 
-`getColumns()` merges both: stored list takes priority, live data columns are appended if missing. This means new columns never silently disappear.
+`getColumns()` reads only from `BasesViewConfig`. Legacy `data.json` column configs are intentionally not migrated — boards lose column ordering on first render after upgrade, columns regenerate in discovery order.
 
 ### Card Drop Logic
 
@@ -163,7 +196,17 @@ When a folder is moved/renamed, `handleFolderRename()` debounces (250ms burst wi
 
 - `NO_VALUE_COLUMN = "(No value)"` — column label for entries missing the groupBy property
 - `ORDER_PROPERTY = "kanban_order"` — frontmatter key for card ordering
+- `UNSAFE_FILENAME_CHARS` / `sanitizeFilename()` — regex + helper for stripping invalid file name characters
 - Config keys are all defined in `packages/board-core/src/constants.ts` (`CONFIG_KEY_*`)
+  - `CONFIG_KEY_COLUMNS = "boardColumns"` — persisted column order
+  - `CONFIG_KEY_TAG_COLORS = "tagColors"` — custom tag color overrides (tag → hex)
+  - `CONFIG_KEY_COLUMN_COLORS = "columnColors"` — per-column accent colors
+  - `CONFIG_KEY_WIP_LIMITS = "wipLimits"` — per-column WIP limits
+  - `CONFIG_KEY_BOARD_OPEN_BEHAVIOR = "boardOpenBehavior"` — card open behavior (active/modal/split/tab)
+  - `CONFIG_KEY_BOARD_COVER_PROPERTY = "boardCoverProperty"` — frontmatter field holding cover image path/URL
+  - `CONFIG_KEY_BOARD_USE_FIRST_EMBED = "boardUseFirstEmbed"` — use first `![[image]]` as cover fallback
+  - `CONFIG_KEY_CHIP_PROPERTIES = "chipProperties"` — selected chip property names
+  - `CONFIG_KEY_CHIP_COLORS = "chipColors"` — per-property, per-value color overrides
   - `CONFIG_KEY_CHIP_FIXED_COLORS = "chipFixedColors"` — persisted fixed color per chip property (one color applied to all values)
   - `CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels"` — per-property label toggle
   - `CONFIG_KEY_CHIP_ICONS = "chipIcons"` — per-property value→icon mappings
@@ -174,18 +217,19 @@ When a folder is moved/renamed, `handleFolderRename()` debounces (250ms burst wi
 Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 
 - **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, icon overrides, and property discovery
-- **`ChipConfigModal`** (`src/chip-config-modal.ts`) — UI for configuring which properties become chips and their color mappings. Uses a two-column grid layout with header at top, radio toggle between "One color for all values" (fixed) and "Separate color per value" modes, and a Save button in the footer.
+- **`BoardSettingsModal`** (`src/board-settings-modal.ts`) — multi-page settings modal with tabs: Cover images, Chips & borders, Behavior. Replaces standalone `ChipConfigModal`.
+- **`ChipConfigPanel`** (`src/board-settings-modal.ts`) — reusable two-panel chip configuration UI extracted from `ChipConfigModal`. Renders inside the Settings modal's Chips tab.
+- **`ChipConfigModal`** (`src/chip-config-modal.ts`) — legacy standalone chip config modal (kept for backward compat, no longer used).
 - **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid of all Obsidian icons. Used when configuring icon overrides for chip properties. Each tile uses `setIcon()` for pixel-accurate previews.
-- **Toolbar Button**: Boards render a persistent `Configure chip properties` button in the board toolbar to open the modal directly from the board UI
-- **Command**: `Configure chip properties` remains available as a fallback from the command palette
-- **Storage**: `chipProperties` (array of property names), `chipColors` (object of property→value→color mappings), `chipFixedColors` (object of property→single-color mappings), `chipShowLabels` (per-property label toggle), `chipIcons` (per-property icon override), `borderProperty` (which field controls card border color)
+- **Toolbar Button**: Boards render a persistent `Settings` button (gear icon) in the filter bar to open the multi-page settings modal directly from the board UI
+- **Storage**: All settings persisted in `.base` file via `BasesViewConfig`: `boardCoverProperty`, `boardUseFirstEmbed`, `boardOpenBehavior`, `chipProperties`, `chipColors`, `chipFixedColors`, `chipShowLabels`, `chipIcons`, `borderProperty`
 - **Rendering**: Chips appear between tags and title on cards. Card borders use the configured field's mapped color. The border property is excluded from chip rendering logic to prevent it from appearing as a visible chip. If an icon override is configured, the chip renders the icon instead of the text value using the chip color.
 - **Color resolution**: Checks fixed colors first (one color for all values of a property), then per-value mappings, then falls back to deterministic hash (same as tags).
 - **Discovery behavior**: Property discovery now includes booleans like `false`, keeps configured properties visible even when they are not currently selected, and preserves color-map edits for unsaved properties until Save is pressed.
 
-### Chip Config Modal Layout
+### Chip Config Panel Layout
 
-The modal uses a CSS Grid layout:
+The chip config panel (used inside BoardSettingsModal) uses a CSS Grid layout:
 ```
 chip-config-layout (grid: auto 1fr / 260px 1fr)
 ├── chip-config-header (spans both columns)
@@ -193,12 +237,23 @@ chip-config-layout (grid: auto 1fr / 260px 1fr)
 └── chip-config-right (editor panel, 1fr)
 ```
 
-The header is a grid child (not a sibling), ensuring it appears at the top. The Save button is appended to `contentEl` after the grid as a `modal-footer` div.
+The header is a grid child (not a sibling), ensuring it appears at the top. The ChipConfigPanel renders into any container element and does not manage its own modal lifecycle.
+
+### Board Settings Modal
+
+Multi-page modal with three tabs:
+1. **Cover images** — cover property name input, first-embed toggle
+2. **Chips & borders** — ChipConfigPanel (two-panel master-detail)
+3. **Behavior** — open behavior dropdown (active/modal/split/tab)
+
+Settings persist immediately via callbacks to `KanbanView.config.set()`. No separate "Save" action needed — changes are written as the user types.
 
 ## Build Output
 
 ### board-core
 esbuild bundles `src/index.ts` into `dist/index.js` (ESM) and `dist/index.cjs` (CJS). Declarations in `dist/*.d.ts`.
+
+Exports: types (`CardData`, `Column`, `BoardConfig`, `AvailableProperty`), constants (`CONFIG_KEY_*`, `NO_VALUE_COLUMN`, `ORDER_PROPERTY`, `UNSAFE_FILENAME_CHARS`, `sanitizeFilename`), color utilities (`relativeLuminance`), and folder rename helpers (`updateBaseFolderReferences`).
 
 ### obsidian-plugin
 esbuild bundles `src/main.ts` into a single `main.js` (CJS, ES2018 target). Externalized modules: `obsidian`, `electron`, CodeMirror packages, Lezer packages, Node built-ins. Source maps only in dev mode.

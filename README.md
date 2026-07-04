@@ -24,7 +24,7 @@
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).
 - **One-Click Creation**: Add new notes directly to a specific column without leaving the board view.
 - **WIP Limits**: Set per-column work-in-progress limits via the column header context menu. Columns that exceed their limit are highlighted in red.
-- **Card Cover Images**: Display cover images at the top of cards by specifying an image frontmatter property (e.g., `cover: "[[image.png]]"` or a web URL). Defaults to the `cover` property.
+- **Card Cover Images**: Display cover images at the top of cards by specifying an image frontmatter property (e.g., `cover: "[[image.png]]"` or a web URL). Configure the property name and enable first-embed fallback in board settings.
 - **Data First**: All changes are written directly to your Markdown files.
 
 ## Usage
@@ -43,7 +43,7 @@ By default, card interaction respects native Obsidian conventions:
 
 You can customize the default click behavior (e.g. to always open in a floating modal, split pane, or new tab) via the board toolbar under the view options menu.
 
-To configure chip properties, open any board and use the toolbar button labeled "Configure chip properties" to select frontmatter fields, assign colors, choose a border-color property, and optionally define an icon override for a chip.
+To configure chip properties, open any board and click the gear icon in the filter bar to open Board Settings. The "Chips & borders" tab lets you select frontmatter fields, assign colors, choose a border-color property, and optionally define an icon override for a chip.
 
 ## Installation
 

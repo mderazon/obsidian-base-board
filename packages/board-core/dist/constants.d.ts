@@ -6,14 +6,16 @@ export declare const ORDER_PROPERTY = "kanban_order";
 export declare const CONFIG_KEY_COLUMNS = "boardColumns";
 /** Key used by BasesViewConfig.set/get to persist custom tag colors in the .base file. */
 export declare const CONFIG_KEY_TAG_COLORS = "tagColors";
-/** Key used by BasesViewConfig.set/get to persist card click behavior in the .base file. */
-export declare const CONFIG_KEY_OPEN_BEHAVIOR = "cardOpenBehavior";
+/** Key used by BasesViewConfig.set/get to persist card open behavior in the .base file. */
+export declare const CONFIG_KEY_BOARD_OPEN_BEHAVIOR = "boardOpenBehavior";
 /** Key used by BasesViewConfig.set/get to persist column colors in the .base file. */
 export declare const CONFIG_KEY_COLUMN_COLORS = "columnColors";
 /** Key used by BasesViewConfig.set/get to persist per-column WIP limits. */
 export declare const CONFIG_KEY_WIP_LIMITS = "wipLimits";
-/** Key used by BasesViewConfig.set/get to persist card cover property key in the .base file. */
-export declare const CONFIG_KEY_COVER_PROPERTY = "cardCoverProperty";
+/** Key used by BasesViewConfig.set/get to persist the frontmatter cover property name in the .base file. */
+export declare const CONFIG_KEY_BOARD_COVER_PROPERTY = "boardCoverProperty";
+/** Key used by BasesViewConfig.set/get to persist whether to use first embed as cover fallback. */
+export declare const CONFIG_KEY_BOARD_USE_FIRST_EMBED = "boardUseFirstEmbed";
 /** Key used by BasesViewConfig.set/get to persist selected chip property names. */
 export declare const CONFIG_KEY_CHIP_PROPERTIES = "chipProperties";
 /** Key used by BasesViewConfig.set/get to persist per-property value→color mappings. */

@@ -59,6 +59,50 @@ function resolvePropertyValue(card: CardData, propId: string): unknown {
   return card.properties[key];
 }
 
+/**
+ * Extract the first image embed path from a TFile's markdown source.
+ *
+ * Matches `![[path]]` wiki-links, capturing only the file path before any
+ * size modifier (e.g. `![[image|400]]`). Resolves via metadataCache and
+ * checks against IMAGE_EXTENSIONS.
+ */
+function extractFirstEmbed(view: KanbanView, file: TFile): string | null {
+  const cache = view.app.metadataCache.getFileCache(file);
+  const links = cache?.links ?? [];
+
+  // Try wikilinks first ([[...]])
+  for (const link of links) {
+    const resolved = view.app.metadataCache.getFirstLinkpathDest(
+      link.link,
+      file.path,
+    );
+    if (
+      resolved instanceof TFile &&
+      IMAGE_EXTENSIONS.has(resolved.extension.toLowerCase())
+    ) {
+      return view.app.vault.getResourcePath(resolved);
+    }
+  }
+
+  // Try embeds (![[...]]) — Obsidian stores these separately from wikilinks
+  const embeds = cache?.embeds ?? [];
+  for (const embed of embeds) {
+    if (!embed?.link) continue;
+    const resolved = view.app.metadataCache.getFirstLinkpathDest(
+      embed.link,
+      file.path,
+    );
+    if (
+      resolved instanceof TFile &&
+      IMAGE_EXTENSIONS.has(resolved.extension.toLowerCase())
+    ) {
+      return view.app.vault.getResourcePath(resolved);
+    }
+  }
+
+  return null;
+}
+
 // File properties that are redundant (shown as the card title) or are
 // complex list types that don't render usefully as a short chip value.
 const FILE_PROPS_TO_SKIP = new Set([
@@ -96,7 +140,10 @@ export class CardManager {
 
     const file = this.view.app.vault.getAbstractFileByPath(filePath);
     const coverProp = this.view.getCardCoverProperty();
-    if (file instanceof TFile && coverProp) {
+    if (
+      file instanceof TFile &&
+      (coverProp || this.view.shouldUseFirstEmbed())
+    ) {
       const src = this.getCardCoverSrc(file, card, coverProp);
       if (src) {
         this.renderCardThumbnail(cardEl, src);
@@ -828,30 +875,32 @@ export class CardManager {
   private getCardCoverSrc(
     file: TFile,
     card: CardData,
-    coverPropName: string,
+    coverPropName: string | null,
   ): string | null {
+    // Guard against prototype pollution keys even if coverPropName is set
     if (coverPropName === "__proto__" || coverPropName === "constructor")
       return null;
 
-    // 1. Try frontmatter first (plain property like "cover")
-    const cache = this.view.app.metadataCache.getFileCache(file);
-    const rawValue: unknown = cache?.frontmatter?.[coverPropName];
-    if (
-      rawValue &&
-      (typeof rawValue === "string" || typeof rawValue === "number")
-    ) {
-      const src = this.resolveCoverString(String(rawValue), file);
-      if (src) return src;
+    // 1. Try frontmatter first (only if a property name is configured)
+    if (coverPropName) {
+      const cache = this.view.app.metadataCache.getFileCache(file);
+      const rawValue: unknown = cache?.frontmatter?.[coverPropName];
+      if (
+        rawValue &&
+        (typeof rawValue === "string" || typeof rawValue === "number")
+      ) {
+        const src = this.resolveCoverString(String(rawValue), file);
+        if (src) return src;
+      }
     }
 
-    // 2. Try card properties for Bases property IDs like "formula.cover"
-    const propId = coverPropName.includes(".")
-      ? coverPropName
-      : `note.${coverPropName}`;
-    const val = resolvePropertyValue(card, propId);
-    if (!isValuePresent(val)) return null;
+    // 2. Try first embed if enabled
+    if (this.view.shouldUseFirstEmbed()) {
+      const embedSrc = extractFirstEmbed(this.view, file);
+      if (embedSrc) return embedSrc;
+    }
 
-    return this.resolveCoverString(String(val).trim(), file);
+    return null;
   }
 
   private resolveCoverString(rawValue: string, file: TFile): string | null {

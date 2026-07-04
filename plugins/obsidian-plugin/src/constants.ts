@@ -40,6 +40,9 @@ export const CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels";
 /** Key used by BasesViewConfig.set/get to persist per-property value→icon mappings. */
 export const CONFIG_KEY_CHIP_ICONS = "chipIcons";
 
+/** Key used by BasesViewConfig.set/get to persist per-property conditional style rules. */
+export const CONFIG_KEY_CHIP_STYLERULES = "chipStyleRules";
+
 /** Key used by BasesViewConfig.set/get to persist which property controls card border color. */
 export const CONFIG_KEY_BORDER_PROPERTY = "borderProperty";
 

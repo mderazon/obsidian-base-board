@@ -1,5 +1,9 @@
 import { App, Modal, Setting } from "obsidian";
-import { ChipPropertiesManager, AvailableProperty } from "./chip-properties";
+import {
+  ChipPropertiesManager,
+  AvailableProperty,
+  ChipStyleRule,
+} from "./chip-properties";
 import { InputModal } from "./modals";
 
 type TabId = "cover" | "chips" | "behavior";
@@ -17,6 +21,7 @@ export interface ChipConfigSnapshot {
   colors: Record<string, Record<string, string>>;
   fixedColors: Record<string, string>;
   icons: Record<string, Record<string, string>>;
+  styleRules: Record<string, ChipStyleRule[]>;
 }
 
 export interface BoardSettingsCallbacks {
@@ -255,6 +260,8 @@ export class ChipConfigPanel {
   private fixedColors: Record<string, string> = {};
   private chipIcons: Record<string, Record<string, string>> = {};
   private useFixedColor: boolean = false;
+  private currentMode: "fixed" | "per-value" | "style-rules" = "per-value";
+  private styleRulesState: Record<string, ChipStyleRule[]> = {};
 
   // Layout refs
   private propsContainerEl!: HTMLDivElement;
@@ -277,6 +284,9 @@ export class ChipConfigPanel {
     this.colorState = { ...chipManager.getChipColors() };
     this.fixedColors = { ...chipManager.getFixedColors() };
     this.chipIcons = { ...chipManager.getChipIcons() };
+    this.styleRulesState = JSON.parse(
+      JSON.stringify(this.chipManager.getStyleRules()),
+    ) as Record<string, ChipStyleRule[]>;
   }
 
   renderInto(container: HTMLElement): void {
@@ -320,6 +330,10 @@ export class ChipConfigPanel {
       colors: { ...this.colorState },
       fixedColors: { ...this.fixedColors },
       icons: { ...this.chipIcons },
+      styleRules: JSON.parse(JSON.stringify(this.styleRulesState)) as Record<
+        string,
+        ChipStyleRule[]
+      >,
     };
   }
 
@@ -531,6 +545,12 @@ export class ChipConfigPanel {
       "per-value",
       "Separate color per value",
     );
+    const styleRulesRadio = this.buildRadio(
+      modeSection,
+      "chipColorMode",
+      "style-rules",
+      "Conditional style rules",
+    );
 
     // Fixed color picker
     const fixedSection = wrapper.createDiv({ cls: "chip-fixed-section" });
@@ -553,19 +573,38 @@ export class ChipConfigPanel {
     });
     this.renderPerValueRows(perValueSection, prop);
 
+    // Style rules editor
+    const styleRulesSection = wrapper.createDiv({
+      cls: "chip-style-rules-section",
+    });
+    this.renderStyleRulesEditor(styleRulesSection, prop);
+
     // Wire radio toggling
     fixedRadio.onchange = () => {
       if (fixedRadio.checked) {
         this.useFixedColor = true;
+        this.currentMode = "fixed";
         fixedSection.classList.remove("is-hidden");
         perValueSection.classList.add("is-hidden");
+        styleRulesSection.classList.add("is-hidden");
       }
     };
     perValueRadio.onchange = () => {
       if (perValueRadio.checked) {
         this.useFixedColor = false;
-        perValueSection.classList.remove("is-hidden");
+        this.currentMode = "per-value";
         fixedSection.classList.add("is-hidden");
+        perValueSection.classList.remove("is-hidden");
+        styleRulesSection.classList.add("is-hidden");
+      }
+    };
+    styleRulesRadio.onchange = () => {
+      if (styleRulesRadio.checked) {
+        this.useFixedColor = false;
+        this.currentMode = "style-rules";
+        fixedSection.classList.add("is-hidden");
+        perValueSection.classList.add("is-hidden");
+        styleRulesSection.classList.remove("is-hidden");
       }
     };
 
@@ -574,24 +613,39 @@ export class ChipConfigPanel {
     const hasPerValue =
       Object.keys(this.colorState[prop.name] || {}).length > 0 ||
       prop.sampleValues.length > 0;
+    const hasStyleRules =
+      this.chipManager.getStyleRulesForProperty(prop.name).length > 0;
 
     if (hasFixed) {
       fixedRadio.checked = true;
       this.useFixedColor = true;
+      this.currentMode = "fixed";
+    } else if (hasStyleRules) {
+      styleRulesRadio.checked = true;
+      this.useFixedColor = false;
+      this.currentMode = "style-rules";
     } else if (hasPerValue) {
       perValueRadio.checked = true;
       this.useFixedColor = false;
+      this.currentMode = "per-value";
     } else {
-      perValueRadio.checked = true;
+      styleRulesRadio.checked = true;
       this.useFixedColor = false;
+      this.currentMode = "style-rules";
     }
 
-    if (this.useFixedColor) {
+    if (this.currentMode === "fixed") {
       fixedSection.classList.remove("is-hidden");
       perValueSection.classList.add("is-hidden");
-    } else {
+      styleRulesSection.classList.add("is-hidden");
+    } else if (this.currentMode === "per-value") {
       fixedSection.classList.add("is-hidden");
       perValueSection.classList.remove("is-hidden");
+      styleRulesSection.classList.add("is-hidden");
+    } else {
+      fixedSection.classList.add("is-hidden");
+      perValueSection.classList.add("is-hidden");
+      styleRulesSection.classList.remove("is-hidden");
     }
   }
 
@@ -643,6 +697,121 @@ export class ChipConfigPanel {
         this.createSimplifiedMappingRow(container, prop.name, v.trim(), "", "");
       }).open();
     };
+  }
+
+  // -- Style rules editor ----------------------------------------------------
+  private renderStyleRulesEditor(
+    container: HTMLElement,
+    prop: AvailableProperty,
+  ): void {
+    const rules = this.styleRulesState[prop.name] || [];
+
+    for (const rule of rules) {
+      this.createStyleRuleRow(container, prop.name, rule);
+    }
+
+    const addBtn = container.createEl("button", {
+      text: "+ add rule",
+      cls: "mod-cta",
+    });
+    addBtn.onclick = () => {
+      this.createStyleRuleRow(
+        container,
+        prop.name,
+        this.createNewRule(prop.name),
+      );
+    };
+  }
+
+  private createNewRule(propName: string): ChipStyleRule {
+    return {
+      id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      operator: "contains",
+      pattern: "",
+      color: "#808080",
+    };
+  }
+
+  private createStyleRuleRow(
+    container: HTMLElement,
+    propName: string,
+    rule: ChipStyleRule,
+  ): HTMLDivElement {
+    const row = container.createDiv({ cls: "chip-style-rule-row" });
+
+    // Operator select
+    const operatorSelect = row.createEl("select", {
+      cls: "chip-style-rule-operator",
+    });
+    const operators: Array<{ value: string; label: string }> = [
+      { value: "contains", label: "contains" },
+      { value: "equals", label: "equals" },
+      { value: "starts-with", label: "starts with" },
+      { value: "ends-with", label: "ends with" },
+    ];
+    for (const op of operators) {
+      const opt = operatorSelect.createEl("option", {
+        value: op.value,
+        text: op.label,
+      });
+      if (op.value === rule.operator) opt.selected = true;
+    }
+    operatorSelect.onchange = () => {
+      this.styleRulesState[propName] = (
+        this.styleRulesState[propName] || []
+      ).map((r) =>
+        r.id === rule.id
+          ? {
+              ...r,
+              operator: operatorSelect.value as ChipStyleRule["operator"],
+            }
+          : r,
+      );
+    };
+
+    // Pattern input
+    const patternInput = row.createEl("input", {
+      type: "text",
+      cls: "chip-style-rule-pattern",
+      placeholder: "e.g. P07",
+    });
+    patternInput.value = rule.pattern;
+    patternInput.oninput = () => {
+      this.styleRulesState[propName] = (
+        this.styleRulesState[propName] || []
+      ).map((r) =>
+        r.id === rule.id ? { ...r, pattern: patternInput.value } : r,
+      );
+    };
+
+    // Color swatch
+    const color = row.createEl("input", {
+      type: "color",
+      cls: "base-board-chip-color-swatch",
+    });
+    color.value = rule.color || "#808080";
+    color.oninput = () => {
+      this.styleRulesState[propName] = (
+        this.styleRulesState[propName] || []
+      ).map((r) => (r.id === rule.id ? { ...r, color: color.value } : r));
+    };
+
+    // Delete button
+    const del = row.createEl("button", {
+      text: "×",
+      cls: "base-board-chip-mapping-delete",
+    });
+    del.onclick = () => {
+      this.styleRulesState[propName] = (
+        this.styleRulesState[propName] || []
+      ).filter((r) => r.id !== rule.id);
+      if (this.styleRulesState[propName].length === 0) {
+        delete this.styleRulesState[propName];
+      }
+      row.remove();
+    };
+
+    return row;
   }
 
   private createSimplifiedMappingRow(

@@ -5,9 +5,28 @@ import {
   CONFIG_KEY_CHIP_FIXED_COLORS,
   CONFIG_KEY_CHIP_SHOW_LABELS,
   CONFIG_KEY_CHIP_ICONS,
+  CONFIG_KEY_CHIP_STYLERULES,
   CONFIG_KEY_BORDER_PROPERTY,
   ORDER_PROPERTY,
 } from "./constants";
+
+/** Style rule operators for conditional chip coloring. */
+export type StyleRuleOperator =
+  | "contains"
+  | "equals"
+  | "starts-with"
+  | "ends-with";
+
+/** A conditional style rule. */
+export interface ChipStyleRule {
+  id: string;
+  operator: StyleRuleOperator;
+  pattern: string;
+  color: string;
+}
+
+/** Per-property style rules map. */
+export type ChipStyleRulesMap = Record<string, ChipStyleRule[]>;
 
 // File properties that are redundant (shown as the card title) or are
 // complex list types that don't render usefully as a short chip value.
@@ -150,24 +169,114 @@ export class ChipPropertiesManager {
   }
 
   // ---------------------------------------------------------------------------
+  //  Style rules
+  // ---------------------------------------------------------------------------
+
+  public getStyleRules(): ChipStyleRulesMap {
+    const raw = this.view.config?.get(CONFIG_KEY_CHIP_STYLERULES);
+    return raw && typeof raw === "object" ? (raw as ChipStyleRulesMap) : {};
+  }
+
+  public setStyleRules(rules: ChipStyleRulesMap): void {
+    this.view.config?.set(CONFIG_KEY_CHIP_STYLERULES, rules);
+    this.view.scheduleRender();
+  }
+
+  public getStyleRulesForProperty(propName: string): ChipStyleRule[] {
+    return this.getStyleRules()[propName] || [];
+  }
+
+  public addStyleRule(propName: string, rule: ChipStyleRule): void {
+    const rules = this.getStyleRules();
+    if (!rules[propName]) rules[propName] = [];
+    rules[propName] = [...rules[propName], rule];
+    this.setStyleRules(rules);
+  }
+
+  public updateStyleRule(
+    propName: string,
+    ruleId: string,
+    updates: Partial<ChipStyleRule>,
+  ): void {
+    const rules = this.getStyleRules();
+    if (!rules[propName]) return;
+    rules[propName] = rules[propName].map((r) =>
+      r.id === ruleId ? { ...r, ...updates } : r,
+    );
+    this.setStyleRules(rules);
+  }
+
+  public removeStyleRule(propName: string, ruleId: string): void {
+    const rules = this.getStyleRules();
+    if (!rules[propName]) return;
+    rules[propName] = rules[propName].filter((r) => r.id !== ruleId);
+    if (rules[propName].length === 0) {
+      delete rules[propName];
+    }
+    this.setStyleRules(rules);
+  }
+
+  // ---------------------------------------------------------------------------
   //  Color resolution
   // ---------------------------------------------------------------------------
 
   /** Get the color for a specific value of a property. */
   public getColorForValue(propName: string, value: string): string {
-    // Fixed color takes precedence over per-value mapping
+    // 1. Fixed color takes precedence over everything
     const fixed = this.getFixedColors();
     if (fixed[propName]) {
       return fixed[propName];
     }
 
+    // 2. Style rules (first matching rule wins)
+    const ruleColor = this.getColorFromStyleRules(propName, value);
+    if (ruleColor) {
+      return ruleColor;
+    }
+
+    // 3. Per-property, per-value override
     const colors = this.getChipColors();
     const propColors = colors[propName];
     if (propColors && propColors[value]) {
       return propColors[value];
     }
-    // Fallback to deterministic hash
+
+    // 4. Fallback to deterministic hash
     return this.getDeterministicColor(value);
+  }
+
+  /** Check style rules for a property value and return color if any rule matches. */
+  private getColorFromStyleRules(
+    propName: string,
+    value: string,
+  ): string | null {
+    const rules = this.getStyleRulesForProperty(propName);
+    for (const rule of rules) {
+      if (!rule.pattern) continue;
+      const lowerValue = value.toLowerCase();
+      const lowerPattern = rule.pattern.toLowerCase();
+
+      let matches = false;
+      switch (rule.operator) {
+        case "equals":
+          matches = lowerValue === lowerPattern;
+          break;
+        case "contains":
+          matches = lowerValue.includes(lowerPattern);
+          break;
+        case "starts-with":
+          matches = lowerValue.startsWith(lowerPattern);
+          break;
+        case "ends-with":
+          matches = lowerValue.endsWith(lowerPattern);
+          break;
+      }
+
+      if (matches && rule.color) {
+        return rule.color;
+      }
+    }
+    return null;
   }
 
   /** Set a custom color for a specific value of a property. */

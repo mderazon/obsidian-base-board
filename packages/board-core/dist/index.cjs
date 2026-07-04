@@ -29,6 +29,7 @@ __export(index_exports, {
   CONFIG_KEY_CHIP_ICONS: () => CONFIG_KEY_CHIP_ICONS,
   CONFIG_KEY_CHIP_PROPERTIES: () => CONFIG_KEY_CHIP_PROPERTIES,
   CONFIG_KEY_CHIP_SHOW_LABELS: () => CONFIG_KEY_CHIP_SHOW_LABELS,
+  CONFIG_KEY_CHIP_STYLERULES: () => CONFIG_KEY_CHIP_STYLERULES,
   CONFIG_KEY_COLUMNS: () => CONFIG_KEY_COLUMNS,
   CONFIG_KEY_COLUMN_COLORS: () => CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_TAG_COLORS: () => CONFIG_KEY_TAG_COLORS,
@@ -58,6 +59,7 @@ var CONFIG_KEY_CHIP_COLORS = "chipColors";
 var CONFIG_KEY_CHIP_FIXED_COLORS = "chipFixedColors";
 var CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels";
 var CONFIG_KEY_CHIP_ICONS = "chipIcons";
+var CONFIG_KEY_CHIP_STYLERULES = "chipStyleRules";
 var CONFIG_KEY_BORDER_PROPERTY = "borderProperty";
 var UNSAFE_FILENAME_CHARS = /[\\/:*?"<>|]/g;
 function sanitizeFilename(name) {
@@ -119,6 +121,7 @@ var DEFAULT_BOARD_CONFIG = {
   chipFixedColors: {},
   chipShowLabels: {},
   chipIcons: {},
+  chipStyleRules: {},
   borderProperty: ""
 };
 //# sourceMappingURL=index.cjs.map

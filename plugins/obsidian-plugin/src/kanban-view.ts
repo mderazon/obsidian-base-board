@@ -37,6 +37,7 @@ import {
   CONFIG_KEY_CHIP_COLORS,
   CONFIG_KEY_CHIP_FIXED_COLORS,
   CONFIG_KEY_CHIP_ICONS,
+  CONFIG_KEY_CHIP_STYLERULES,
 } from "./constants";
 import {
   REINDEX_THRESHOLD,
@@ -125,6 +126,7 @@ export class KanbanView extends BasesView implements HoverParent {
               chipConfig.fixedColors,
             );
             this.config?.set(CONFIG_KEY_CHIP_ICONS, chipConfig.icons);
+            this.config?.set(CONFIG_KEY_CHIP_STYLERULES, chipConfig.styleRules);
           }
           this.scheduleRender();
         },

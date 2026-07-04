@@ -385,3 +385,51 @@
   border: 1px solid var(--background-modifier-border);
   background-color: var(--background-primary);
 }
+
+/* ============================================================
+   Style rules editor
+   ============================================================ */
+
+.chip-style-rules-section {
+  margin-top: 8px;
+}
+
+.chip-style-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 160px) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.chip-style-rule-operator {
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+}
+
+.chip-style-rule-operator:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.chip-style-rule-pattern {
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+}
+
+.chip-style-rule-pattern:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.chip-style-rule-pattern::placeholder {
+  color: var(--text-faint);
+}

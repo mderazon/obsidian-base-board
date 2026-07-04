@@ -55,6 +55,8 @@ export interface BoardConfig {
     chipShowLabels: Record<string, boolean>;
     /** Icon overrides for chip values (prop → value → icon name) */
     chipIcons: Record<string, Record<string, string>>;
+    /** Conditional style rules per property (prop → ordered rules) */
+    chipStyleRules: ChipStyleRulesMap;
     /** Which property controls card border color (empty = none) */
     borderProperty: string;
 }
@@ -65,6 +67,26 @@ export declare const DEFAULT_BOARD_CONFIG: BoardConfig;
  */
 export type ChipColorMap = Record<string, Record<string, string>>;
 export type ChipFixedColorMap = Record<string, string>;
+/**
+ * Style rule operators for conditional chip coloring.
+ */
+export type StyleRuleOperator = "contains" | "equals" | "starts-with" | "ends-with";
+/**
+ * A conditional style rule: when a property value matches the operator/pattern,
+ * apply the given color instead of the per-value or fallback color.
+ */
+export interface ChipStyleRule {
+    /** Unique identifier for this rule (e.g. UUID). */
+    id: string;
+    /** How to match the property value against the pattern. */
+    operator: StyleRuleOperator;
+    /** The text pattern to match against. */
+    pattern: string;
+    /** Hex color to apply when the rule matches. */
+    color: string;
+}
+/** Per-property style rules map: property name → ordered list of rules. */
+export type ChipStyleRulesMap = Record<string, ChipStyleRule[]>;
 /**
  * A discovered frontmatter property with its sample values.
  */

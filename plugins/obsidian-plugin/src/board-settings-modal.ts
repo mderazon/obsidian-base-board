@@ -292,12 +292,6 @@ export class ChipConfigPanel {
     const propSection = container.createDiv({ cls: "chip-config-section" });
     propSection.createEl("h3", { text: "Properties" });
 
-    const refreshBtn = propSection.createEl("button", {
-      text: "Refresh",
-      cls: "mod-cta",
-    });
-    refreshBtn.onclick = () => this.refreshAndRender();
-
     this.propsContainerEl = propSection.createDiv({
       cls: "chip-property-list",
     });

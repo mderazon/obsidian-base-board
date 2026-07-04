@@ -66,3 +66,11 @@
 .base-board-settings-behavior-select {
   min-width: 200px;
 }
+
+.base-board-settings-modal .modal-footer {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}

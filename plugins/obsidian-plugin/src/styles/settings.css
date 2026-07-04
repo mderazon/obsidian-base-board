@@ -29,7 +29,6 @@
 .base-board-settings-header {
   flex-shrink: 0;
   padding: 16px 24px;
-  border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .base-board-settings-header h2 {
@@ -41,13 +40,13 @@
 .base-board-settings-tabs {
   flex-shrink: 0;
   display: flex;
-  border-bottom: 1px solid var(--background-modifier-border);
   padding: 0 24px;
-  background-color: var(--background-secondary-alt);
+  background-color: transparent;
+  border-bottom: 2px solid color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 }
 
 .base-board-settings-tab-item {
-  background: none;
+  background: var(--background-secondary-alt);
   border: none;
   padding: 12px 16px;
   cursor: pointer;

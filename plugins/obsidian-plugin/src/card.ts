@@ -195,27 +195,7 @@ export class CardManager {
         return;
       }
 
-      const openBehavior = this.view.getCardOpenBehavior();
-      if (openBehavior === "split") {
-        if (
-          this.view.detailLeaf &&
-          this.view.isLeafAttached(this.view.detailLeaf)
-        ) {
-          void this.view.detailLeaf.openFile(file);
-        } else {
-          this.view.detailLeaf = this.view.app.workspace.getLeaf(
-            "split",
-            "vertical",
-          );
-          void this.view.detailLeaf.openFile(file);
-        }
-      } else if (openBehavior === "tab") {
-        void this.view.app.workspace.getLeaf("tab").openFile(file);
-      } else if (openBehavior === "active") {
-        void this.view.app.workspace.getLeaf(false).openFile(file);
-      } else {
-        new CardDetailModal(this.view.app, file, this.view).open();
-      }
+      this.openFileWithBehavior(file);
     });
 
     // Middle-click → always open in new tab
@@ -366,7 +346,6 @@ export class CardManager {
     const borderPropName = this.view.chipProperties.getBorderProperty();
     for (const propId of visibleProps) {
       if (chips.length >= 6) break;
-      if (chips.length >= 10) break;
       if (propId.startsWith("file.")) {
         if (FILE_PROPS_TO_SKIP.has(propId.slice(5))) continue;
       }
@@ -468,16 +447,13 @@ export class CardManager {
     propName: string,
     value: string,
   ): void {
-    const chip = parent.createSpan({ cls: "base-board-chip-property" });
-    chip.setAttr("data-property-name", propName);
-
     const mode = this.view.chipProperties.getPropertyModes()[propName];
 
     // Resolve color and icon based on property mode
     let color: string | null = null;
     let chipIconName: string | null = null;
-
     let skipValueText = false;
+
     if (mode === "style-rules") {
       const match = this.view.chipProperties.getStyleRuleMatch(propName, value);
       if (match) {
@@ -493,7 +469,20 @@ export class CardManager {
     } else {
       color = this.view.chipProperties.getColorForValue(propName, value);
       chipIconName = this.view.chipProperties.getChipIcon(propName, value);
+
+      // If any value for this property has an icon, skip non-matching values
+      const icons = this.view.chipProperties.getChipIcons();
+      const propIcons = icons[propName] || {};
+      if (Object.values(propIcons).some((v) => v) && !chipIconName) {
+        skipValueText = true;
+      }
     }
+
+    // Skip rendering entirely when there's nothing to show (icon-only mode with no match)
+    if (skipValueText && !chipIconName) return;
+
+    const chip = parent.createSpan({ cls: "base-board-chip-property" });
+    chip.setAttr("data-property-name", propName);
 
     const resolvedColor = color ?? (chipIconName ? DEFAULT_CHIP_COLOR : null);
     if (resolvedColor) {
@@ -508,10 +497,7 @@ export class CardManager {
     const showLabels = this.view.chipProperties.getShowLabels();
     const showIconLabels = this.view.chipProperties.getIconShowLabels();
     const showLabelBeforeIcon = chipIconName && showIconLabels[propName];
-    if (
-      !skipValueText &&
-      ((showLabels[propName] && !chipIconName) || showLabelBeforeIcon)
-    ) {
+    if ((showLabels[propName] && !chipIconName) || showLabelBeforeIcon) {
       const propId = propName.startsWith("note.")
         ? propName
         : `note.${propName}`;
@@ -529,10 +515,42 @@ export class CardManager {
         cls: "base-board-chip-property-icon",
       });
       setIcon(iconEl, chipIconName);
-    } else if (!skipValueText && !showLabels[propName]) {
+    } else {
       chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
-    } else if (!skipValueText) {
-      chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+    }
+  }
+
+  private openFileWithBehavior(file: TFile): void {
+    const behavior = this.view.getCardOpenBehavior();
+    if (behavior === "split") {
+      if (
+        this.view.detailLeaf &&
+        this.view.isLeafAttached(this.view.detailLeaf)
+      ) {
+        this.view.detailLeaf
+          .openFile(file)
+          .catch((err) => new Notice(`Failed to open note: ${String(err)}`));
+      } else {
+        this.view.detailLeaf = this.view.app.workspace.getLeaf(
+          "split",
+          "vertical",
+        );
+        this.view.detailLeaf
+          .openFile(file)
+          .catch((err) => new Notice(`Failed to open note: ${String(err)}`));
+      }
+    } else if (behavior === "tab") {
+      this.view.app.workspace
+        .getLeaf("tab")
+        .openFile(file)
+        .catch((err) => new Notice(`Failed to open note: ${String(err)}`));
+    } else if (behavior === "active") {
+      this.view.app.workspace
+        .getLeaf(false)
+        .openFile(file)
+        .catch((err) => new Notice(`Failed to open note: ${String(err)}`));
+    } else {
+      new CardDetailModal(this.view.app, file, this.view).open();
     }
   }
 
@@ -560,27 +578,7 @@ export class CardManager {
         .setTitle("Open")
         .setIcon("lucide-file-text")
         .onClick(() => {
-          const openBehavior = this.view.getCardOpenBehavior();
-          if (openBehavior === "split") {
-            if (
-              this.view.detailLeaf &&
-              this.view.isLeafAttached(this.view.detailLeaf)
-            ) {
-              void this.view.detailLeaf.openFile(file);
-            } else {
-              this.view.detailLeaf = this.view.app.workspace.getLeaf(
-                "split",
-                "vertical",
-              );
-              void this.view.detailLeaf.openFile(file);
-            }
-          } else if (openBehavior === "tab") {
-            void this.view.app.workspace.getLeaf("tab").openFile(file);
-          } else if (openBehavior === "active") {
-            void this.view.app.workspace.getLeaf(false).openFile(file);
-          } else {
-            new CardDetailModal(this.view.app, file, this.view).open();
-          }
+          this.openFileWithBehavior(file);
         });
     });
 

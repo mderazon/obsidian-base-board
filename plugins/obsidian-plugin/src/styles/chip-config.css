@@ -1,0 +1,379 @@
+/* ============================================================
+   Base Board — Chip Config Panel (settings editor)
+   ============================================================ */
+
+/* Chip Config Modal header */
+.chip-config-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+.chip-config-header h2 {
+  font-size: 18px;
+  font-weight: var(--font-semibold);
+  margin: 0 0 4px 0;
+}
+
+.chip-config-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* ============================================================
+   Chip Config Panel — Card-based layout with drag-and-drop
+   ============================================================ */
+
+/* Section blocks */
+.chip-config-section {
+  margin-bottom: 16px;
+}
+
+/* Property list container */
+.chip-property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Individual property card */
+.chip-property-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-primary);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.chip-property-card:hover {
+  border-color: var(--background-modifier-border-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Drag handle */
+.chip-drag-handle {
+  cursor: grab;
+  color: var(--text-faint);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 6px;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.chip-drag-handle:active {
+  cursor: grabbing;
+}
+
+.chip-drag-handle:hover {
+  color: var(--text-muted);
+}
+
+/* Card header (interactive row) */
+.chip-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.12s ease;
+}
+
+.chip-card-header:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.chip-card-header.is-expanded {
+  border-bottom-color: var(--background-modifier-border);
+}
+
+/* Checkbox */
+.chip-property-card input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Property label */
+.chip-card-label {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Expand toggle button */
+.chip-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.chip-expand-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Card body (expanded content) */
+.chip-property-card-body {
+  padding: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+/* Drop target highlight during drag */
+.chip-drop-target {
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent) !important;
+}
+
+/* Dragging state */
+.chip-property-card.is-dragging {
+  opacity: 0.5;
+}
+
+/* Empty state */
+.chip-empty-state {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+}
+
+/* ============================================================
+   Right panel — editor
+   ============================================================ */
+
+.chip-property-editor {
+  max-width: none;
+  width: 100%;
+}
+
+/* Title feels like a section header, not a modal header */
+.chip-property-editor h3 {
+  font-size: 16px;
+  font-weight: var(--font-semibold);
+  margin-bottom: 12px;
+}
+
+/* Empty state now centered + calm */
+.chip-empty-state {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+}
+
+/* ============================================================
+   Color mapping editor — modern inspector style
+   ============================================================ */
+
+.base-board-chip-mapping-section {
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background-color: var(--background-secondary);
+  margin-bottom: 12px;
+}
+
+.base-board-chip-mapping-section h4 {
+  margin: 0 0 10px 0;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  opacity: 0.9;
+}
+
+/* Each row becomes a mini "property editor row" */
+.base-board-chip-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto auto minmax(120px, 220px) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+/* Value label */
+.base-board-chip-mapping-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+}
+
+.base-board-chip-mapping-edit {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+}
+
+.base-board-chip-mapping-edit:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+/* Color picker becomes cleaner */
+.base-board-chip-color-swatch {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+/* Delete button becomes subtle until hover */
+.base-board-chip-mapping-delete {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  opacity: 0.4;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.base-board-chip-mapping-delete:hover {
+  opacity: 1;
+}
+
+/* Simplified mapping row (color + delete only) */
+.chip-mapping-row-simple {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.chip-mapping-row-simple .chip-mapping-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+   Mode selector (radio group)
+   ============================================================ */
+
+.chip-mode-section {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chip-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.chip-radio-label input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Fixed color section (single picker) */
+.chip-fixed-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chip-fixed-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+/* Per-value section */
+.chip-per-value-section {
+  margin-top: 8px;
+}
+
+/* Utility class to hide elements */
+.is-hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   Improved button style (less "settings plugin energy")
+   ============================================================ */
+
+.base-board-chip-add-mapping-btn {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--background-modifier-border);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.base-board-chip-add-mapping-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+   Small but important UX fixes
+   ============================================================ */
+
+/* Better section spacing rhythm */
+.base-board-chip-config-section {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.base-board-chip-config-section:last-child {
+  border-bottom: none;
+}
+
+/* Make border selector feel less "form field" */
+.base-board-chip-border-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}

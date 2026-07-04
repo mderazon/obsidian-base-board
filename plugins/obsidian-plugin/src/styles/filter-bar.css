@@ -1,0 +1,154 @@
+/* ============================================================
+   Base Board — Filter Bar / Toolbar
+   ============================================================ */
+
+/* ---- Filter Bar ---- */
+
+.base-board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 0.35em 0.9em;
+  background-color: var(--background-modifier-surface);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.base-board-toolbar-button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-toolbar-button-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+}
+
+.base-board-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-filter-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+}
+
+.base-board-filter-pill {
+  position: relative;
+  font-size: var(--font-ui-smaller);
+  padding: 4px 10px;
+  border-radius: 12px;
+  background-color: var(--tag-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
+  border: 1px solid transparent;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.base-board-filter-pill:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+}
+
+.base-board-filter-pill.is-active {
+  box-shadow:
+    0 0 0 2px var(--background-secondary),
+    0 0 0 4px var(--interactive-accent);
+  font-weight: var(--font-bold);
+}
+
+.base-board-chip-config-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 0.35em;
+  background-color: var(--background-modifier-surface);
+  color: var(--text-normal);
+  cursor: pointer;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+}
+
+.base-board-chip-config-btn:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-filter-clear {
+  margin-left: auto;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+}
+
+.base-board-filter-clear:hover {
+  color: var(--text-error);
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.base-board-card-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--tag-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.base-board-filter-pill.base-board-filter-pill-light {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-filter-pill.base-board-filter-pill-dark {
+  color: #1c212b;
+  text-shadow: none;
+}
+
+.base-board-card-tag.base-board-card-tag-light {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-card-tag.base-board-card-tag-dark {
+  color: #1c212b;
+  text-shadow: none;
+}

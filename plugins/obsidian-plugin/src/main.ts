@@ -23,6 +23,9 @@ export default class BaseBoardPlugin extends Plugin {
   private folderRenameFlushTimer: number | null = null;
 
   async onload() {
+    // -- Styles are auto-loaded by Obsidian from the plugin root:
+    //    board.css, column.css, card.css, filter-bar.css, modals.css,
+    //    chip-properties.css, chip-config.css, icon-picker.css, settings.css
     this.registerBasesView("kanban", {
       name: "Kanban",
       icon: "lucide-kanban",

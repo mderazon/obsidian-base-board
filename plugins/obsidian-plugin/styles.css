@@ -1,5 +1,9 @@
 /* ============================================================
-   Base Board — Styles
+   board.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Container / Board Layout
    ============================================================ */
 
 /* ---- Container / Board ---- */
@@ -27,25 +31,6 @@
    avoids inline style mutations and keeps theming consistent. */
 .base-board-positioned-root {
   position: relative;
-}
-
-/* Chip Config Modal header */
-.chip-config-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  background-color: var(--background-primary);
-}
-
-.chip-config-header h2 {
-  font-size: 18px;
-  font-weight: var(--font-semibold);
-  margin: 0 0 4px 0;
-}
-
-.chip-config-header p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
 }
 
 /* Inline embed: .bases-embed wraps the view with no defined height,
@@ -86,6 +71,870 @@
 .base-board-placeholder-icon {
   opacity: 0.4;
 }
+
+
+/* ============================================================
+   card.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Cards
+   ============================================================ */
+
+/* ---- Card ---- */
+
+@keyframes base-board-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.base-board-card {
+  position: relative;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    border-color 0.15s ease;
+  user-select: none;
+}
+
+.base-board-card-thumbnail {
+  margin: -10px -12px 8px;
+  height: 120px;
+  overflow: hidden;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-card-thumbnail-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Only animate cards on initial board mount */
+.base-board-board--animate .base-board-card {
+  animation: base-board-card-enter 0.25s ease both;
+}
+
+.base-board-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: var(--interactive-accent);
+}
+
+.base-board-card:active {
+  cursor: grabbing;
+}
+
+.base-board-card--dragging {
+  display: none;
+}
+
+/* Multi-select highlight */
+.base-board-card--selected {
+  border-color: var(--interactive-accent);
+  box-shadow:
+    0 0 0 2px var(--interactive-accent),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 6%,
+    var(--background-primary)
+  );
+}
+
+/* Other selected cards dimmed during a multi-drag */
+.base-board-card--drag-ghost {
+  opacity: 0.35;
+  transform: scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+/* ---- Card title ---- */
+
+.base-board-card-title {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  padding-right: 24px; /* leave room for the edit button */
+}
+
+/* ---- Card edit button ---- */
+
+.base-board-card-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+  color: var(--text-muted);
+}
+
+.base-board-card-edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-card:hover .base-board-card-edit-btn {
+  opacity: 1;
+}
+
+.base-board-card-edit-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ---- Card rename input ---- */
+
+.base-board-card-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  padding: 1px 2px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  outline: none;
+}
+
+/* ---- Card property chips ---- */
+
+.base-board-card-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.base-board-card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.base-board-chip-label {
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.base-board-chip-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Overflow chips — hidden until expanded */
+.base-board-card-chips-overflow {
+  display: none;
+}
+
+.base-board-card-chips-overflow--expanded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* "Show more" toggle button */
+.base-board-card-chip-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-accent);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.base-board-card-chip-more:hover {
+  color: var(--text-normal);
+}
+
+/* ---- Card drop placeholder ---- */
+
+@keyframes base-board-placeholder-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.base-board-card-placeholder {
+  border: 2px dashed var(--interactive-accent);
+  border-radius: var(--radius-s);
+  box-sizing: border-box;
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 8%,
+    transparent
+  );
+  transition: height 0.15s ease;
+  flex-shrink: 0;
+  animation: base-board-placeholder-pulse 1.5s ease-in-out infinite;
+}
+
+/* ---- Add card button ---- */
+
+.base-board-add-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 4px 8px 8px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.base-board-add-card-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.base-board-add-card-icon {
+  display: flex;
+  align-items: center;
+}
+
+.base-board-add-card-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-add-card-input-wrapper {
+  padding: 4px 8px 8px;
+}
+
+.base-board-add-card-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  padding: 8px 10px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  outline: none;
+}
+
+.base-board-add-card-input::placeholder {
+  color: var(--text-faint);
+}
+
+/* ---- Card border via CSS variable (applied after base card border) ---- */
+
+.base-board-card {
+  border-left: 3px solid var(--card-border-color, transparent);
+}
+
+.base-board-card-thumbnail-img,
+.base-board-card img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+
+/* ============================================================
+   chip-config.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Chip Config Panel (settings editor)
+   ============================================================ */
+
+/* Chip Config Modal header */
+.chip-config-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+.chip-config-header h2 {
+  font-size: 18px;
+  font-weight: var(--font-semibold);
+  margin: 0 0 4px 0;
+}
+
+.chip-config-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* ============================================================
+   Chip Config Panel — Card-based layout with drag-and-drop
+   ============================================================ */
+
+/* Section blocks */
+.chip-config-section {
+  margin-bottom: 16px;
+}
+
+/* Property list container */
+.chip-property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Individual property card */
+.chip-property-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-primary);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.chip-property-card:hover {
+  border-color: var(--background-modifier-border-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Drag handle */
+.chip-drag-handle {
+  cursor: grab;
+  color: var(--text-faint);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 6px;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.chip-drag-handle:active {
+  cursor: grabbing;
+}
+
+.chip-drag-handle:hover {
+  color: var(--text-muted);
+}
+
+/* Card header (interactive row) */
+.chip-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.12s ease;
+}
+
+.chip-card-header:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.chip-card-header.is-expanded {
+  border-bottom-color: var(--background-modifier-border);
+}
+
+/* Checkbox */
+.chip-property-card input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Property label */
+.chip-card-label {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Expand toggle button */
+.chip-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.chip-expand-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Card body (expanded content) */
+.chip-property-card-body {
+  padding: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+/* Drop target highlight during drag */
+.chip-drop-target {
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent) !important;
+}
+
+/* Dragging state */
+.chip-property-card.is-dragging {
+  opacity: 0.5;
+}
+
+/* Empty state */
+.chip-empty-state {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+}
+
+/* ============================================================
+   Right panel — editor
+   ============================================================ */
+
+.chip-property-editor {
+  max-width: none;
+  width: 100%;
+}
+
+/* Title feels like a section header, not a modal header */
+.chip-property-editor h3 {
+  font-size: 16px;
+  font-weight: var(--font-semibold);
+  margin-bottom: 12px;
+}
+
+/* Empty state now centered + calm */
+.chip-empty-state {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+}
+
+/* ============================================================
+   Color mapping editor — modern inspector style
+   ============================================================ */
+
+.base-board-chip-mapping-section {
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background-color: var(--background-secondary);
+  margin-bottom: 12px;
+}
+
+.base-board-chip-mapping-section h4 {
+  margin: 0 0 10px 0;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  opacity: 0.9;
+}
+
+/* Each row becomes a mini "property editor row" */
+.base-board-chip-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto auto minmax(120px, 220px) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+/* Value label */
+.base-board-chip-mapping-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+}
+
+.base-board-chip-mapping-edit {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+}
+
+.base-board-chip-mapping-edit:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+/* Color picker becomes cleaner */
+.base-board-chip-color-swatch {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+/* Delete button becomes subtle until hover */
+.base-board-chip-mapping-delete {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  opacity: 0.4;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.base-board-chip-mapping-delete:hover {
+  opacity: 1;
+}
+
+/* Simplified mapping row (color + delete only) */
+.chip-mapping-row-simple {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.chip-mapping-row-simple .chip-mapping-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+   Mode selector (radio group)
+   ============================================================ */
+
+.chip-mode-section {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chip-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.chip-radio-label input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Fixed color section (single picker) */
+.chip-fixed-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chip-fixed-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+/* Per-value section */
+.chip-per-value-section {
+  margin-top: 8px;
+}
+
+/* Utility class to hide elements */
+.is-hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   Improved button style (less "settings plugin energy")
+   ============================================================ */
+
+.base-board-chip-add-mapping-btn {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--background-modifier-border);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.base-board-chip-add-mapping-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+   Small but important UX fixes
+   ============================================================ */
+
+/* Better section spacing rhythm */
+.base-board-chip-config-section {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.base-board-chip-config-section:last-child {
+  border-bottom: none;
+}
+
+/* Make border selector feel less "form field" */
+.base-board-chip-border-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+
+/* ============================================================
+   chip-properties.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Chip Properties (on-card rendering)
+   ============================================================ */
+
+/* ---- Chip Properties (custom frontmatter value chips) ---- */
+
+.base-board-chip-property-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.base-board-chip-property {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--chip-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  cursor: default;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.base-board-chip-property:hover {
+  opacity: 0.85;
+}
+
+.base-board-chip-property-light {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-chip-property-dark {
+  color: #1c212b;
+  text-shadow: none;
+}
+
+.base-board-chip-property .base-board-chip-property-label {
+  opacity: 0.75;
+  margin-right: 3px;
+  font-weight: var(--font-normal);
+}
+
+.base-board-chip-property-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--chip-color, var(--interactive-accent));
+  line-height: 1;
+}
+
+.base-board-chip-property-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  line-height: 1;
+}
+
+.base-board-chip-property-icon svg {
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+
+/* Chip config modal — show label toggle */
+.chip-show-label-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip-show-label-wrapper:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.chip-show-label-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.chip-icon-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 112px;
+  max-width: 220px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chip-icon-picker-btn:hover {
+  border-color: var(--background-modifier-border-hover);
+  background-color: var(--background-modifier-hover);
+}
+
+.chip-icon-picker-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-normal);
+}
+
+.chip-icon-picker-preview.is-empty {
+  width: 14px;
+  height: 14px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+  margin: 3px;
+}
+
+.chip-icon-picker-preview svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chip-icon-picker-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.chip-icon-help {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.chip-show-label-text {
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+
+/* ============================================================
+   column.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Columns
+   ============================================================ */
 
 /* ---- Column ---- */
 
@@ -346,239 +1195,6 @@
   );
 }
 
-/* ---- Card ---- */
-
-@keyframes base-board-card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.base-board-card {
-  position: relative;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  padding: 10px 12px;
-  cursor: pointer;
-  transition:
-    box-shadow 0.2s ease,
-    transform 0.2s ease,
-    opacity 0.2s ease,
-    border-color 0.15s ease;
-  user-select: none;
-}
-
-.base-board-card-thumbnail {
-  margin: -10px -12px 8px;
-  height: 120px;
-  overflow: hidden;
-  border-radius: var(--radius-s) var(--radius-s) 0 0;
-  border-bottom: 1px solid var(--background-modifier-border);
-  background-color: var(--background-secondary);
-}
-
-.base-board-card-thumbnail-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Only animate cards on initial board mount */
-.base-board-board--animate .base-board-card {
-  animation: base-board-card-enter 0.25s ease both;
-}
-
-.base-board-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-color: var(--interactive-accent);
-}
-
-.base-board-card:active {
-  cursor: grabbing;
-}
-
-.base-board-card--dragging {
-  display: none;
-}
-
-/* Multi-select highlight */
-.base-board-card--selected {
-  border-color: var(--interactive-accent);
-  box-shadow:
-    0 0 0 2px var(--interactive-accent),
-    0 2px 8px rgba(0, 0, 0, 0.08);
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 6%,
-    var(--background-primary)
-  );
-}
-
-/* Other selected cards dimmed during a multi-drag */
-.base-board-card--drag-ghost {
-  opacity: 0.35;
-  transform: scale(0.97);
-  pointer-events: none;
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-/* ---- Card title ---- */
-
-.base-board-card-title {
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-medium);
-  line-height: 1.35;
-  margin-bottom: 4px;
-  padding-right: 24px; /* leave room for the edit button */
-}
-
-/* ---- Card edit button ---- */
-
-.base-board-card-edit-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-s);
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity 0.15s ease,
-    background-color 0.15s ease;
-  color: var(--text-muted);
-}
-
-.base-board-card-edit-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.base-board-card:hover .base-board-card-edit-btn {
-  opacity: 1;
-}
-
-.base-board-card-edit-btn:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-/* ---- Card rename input ---- */
-
-.base-board-card-rename-input {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-medium);
-  line-height: 1.35;
-  padding: 1px 2px;
-  background-color: var(--background-primary);
-  color: var(--text-normal);
-  border: 1px solid var(--interactive-accent);
-  border-radius: var(--radius-s);
-  outline: none;
-}
-
-/* ---- Card property chips ---- */
-
-.base-board-card-props {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.base-board-card-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
-  background-color: var(--background-secondary);
-  border-radius: var(--radius-s);
-  padding: 2px 6px;
-  max-width: 180px;
-  overflow: hidden;
-}
-
-.base-board-chip-label {
-  opacity: 0.6;
-  white-space: nowrap;
-}
-
-.base-board-chip-value {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Overflow chips — hidden until expanded */
-.base-board-card-chips-overflow {
-  display: none;
-}
-
-.base-board-card-chips-overflow--expanded {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-/* "Show more" toggle button */
-.base-board-card-chip-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-accent);
-  border-radius: var(--radius-s);
-  padding: 2px 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.base-board-card-chip-more:hover {
-  color: var(--text-normal);
-}
-
-/* ---- Card drop placeholder ---- */
-
-@keyframes base-board-placeholder-pulse {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.base-board-card-placeholder {
-  border: 2px dashed var(--interactive-accent);
-  border-radius: var(--radius-s);
-  box-sizing: border-box;
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 8%,
-    transparent
-  );
-  transition: height 0.15s ease;
-  flex-shrink: 0;
-  animation: base-board-placeholder-pulse 1.5s ease-in-out infinite;
-}
-
 /* ---- Add column button ---- */
 
 .base-board-add-column-btn {
@@ -606,58 +1222,14 @@
   border-color: var(--interactive-accent);
 }
 
-/* ---- Add card button ---- */
 
-.base-board-add-card-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  margin: 4px 8px 8px;
-  border-radius: var(--radius-s);
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
-}
+/* ============================================================
+   filter-bar.css
+   ============================================================ */
 
-.base-board-add-card-btn:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.base-board-add-card-icon {
-  display: flex;
-  align-items: center;
-}
-
-.base-board-add-card-icon svg {
-  width: 14px;
-  height: 14px;
-}
-
-.base-board-add-card-input-wrapper {
-  padding: 4px 8px 8px;
-}
-
-.base-board-add-card-input {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: var(--font-ui-small);
-  padding: 8px 10px;
-  background-color: var(--background-primary);
-  color: var(--text-normal);
-  border: 1px solid var(--interactive-accent);
-  border-radius: var(--radius-s);
-  outline: none;
-}
-
-.base-board-add-card-input::placeholder {
-  color: var(--text-faint);
-}
+/* ============================================================
+   Base Board — Filter Bar / Toolbar
+   ============================================================ */
 
 /* ---- Filter Bar ---- */
 
@@ -810,6 +1382,113 @@
   text-shadow: none;
 }
 
+
+/* ============================================================
+   icon-picker.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Icon Picker Modal
+   ============================================================ */
+
+.modal.base-board-icon-picker-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+}
+
+.icon-picker-search {
+  width: 100%;
+  padding: 6px 10px;
+  margin: 4px 0 12px 0;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.icon-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: center;
+}
+
+.icon-picker-tile:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.icon-picker-tile.is-selected {
+  background-color: var(--background-modifier-active-hover);
+  border-color: var(--interactive-accent);
+}
+
+.icon-picker-tile-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-normal);
+}
+
+.icon-picker-tile-glyph svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-picker-tile-glyph.icon-picker-none {
+  width: 16px;
+  height: 16px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+}
+
+.icon-picker-tile-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-transform: capitalize;
+}
+
+.icon-picker-empty {
+  grid-column: 1 / -1;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+
+/* ============================================================
+   modals.css
+   ============================================================ */
+
+/* ============================================================
+   Base Board — Modals (Card Detail, Tag Edit)
+   ============================================================ */
+
 /* Card Detail Modal */
 .modal.base-board-card-modal {
   width: 800px;
@@ -929,608 +1608,13 @@
   margin-top: 16px;
 }
 
-/* ---- Chip Properties (custom frontmatter value chips) ---- */
-
-.base-board-chip-property-container {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.base-board-chip-property {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: var(--chip-color, var(--background-modifier-hover));
-  color: var(--text-normal);
-  font-weight: var(--font-medium);
-  cursor: default;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-}
-
-.base-board-chip-property:hover {
-  opacity: 0.85;
-}
-
-.base-board-chip-property-light {
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.base-board-chip-property-dark {
-  color: #1c212b;
-  text-shadow: none;
-}
-
-.base-board-chip-property .base-board-chip-property-label {
-  opacity: 0.75;
-  margin-right: 3px;
-  font-weight: var(--font-normal);
-}
-
-.base-board-chip-property-icon-only {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  background: transparent;
-  color: var(--chip-color, var(--interactive-accent));
-  line-height: 1;
-}
-
-.base-board-chip-property-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: inherit;
-  line-height: 1;
-}
-
-.base-board-chip-property-icon svg {
-  width: 24px;
-  height: 24px;
-  color: inherit;
-}
-
-/* Chip config modal — show label toggle */
-.chip-show-label-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  background-color: var(--background-secondary);
-  cursor: pointer;
-  user-select: none;
-}
-
-.chip-show-label-wrapper:hover {
-  border-color: var(--background-modifier-border-hover);
-}
-
-.chip-show-label-checkbox {
-  margin: 0;
-  cursor: pointer;
-}
-
-.chip-icon-picker-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 112px;
-  max-width: 220px;
-  padding: 4px 10px 4px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background-color: var(--background-primary);
-  color: var(--text-normal);
-  cursor: pointer;
-  text-align: left;
-}
-
-.chip-icon-picker-btn:hover {
-  border-color: var(--background-modifier-border-hover);
-  background-color: var(--background-modifier-hover);
-}
-
-.chip-icon-picker-preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  color: var(--text-normal);
-}
-
-.chip-icon-picker-preview.is-empty {
-  width: 14px;
-  height: 14px;
-  border: 1px dashed var(--text-faint);
-  border-radius: 3px;
-  margin: 3px;
-}
-
-.chip-icon-picker-preview svg {
-  width: 16px;
-  height: 16px;
-}
-
-.chip-icon-picker-label {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: capitalize;
-}
-
-.chip-icon-help {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
-}
-
-.chip-show-label-text {
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
-  cursor: pointer;
-  line-height: 1.4;
-}
-
-/* ---- Card border via CSS variable (applied after base card border) ---- */
-
-.base-board-card {
-  border-left: 3px solid var(--card-border-color, transparent);
-}
-
-.base-board-card-thumbnail-img,
-.base-board-card img {
-  -webkit-user-drag: none;
-  user-drag: none;
-}
 
 /* ============================================================
-   Chip Config Modal — Two Column Layout (NEW)
+   settings.css
    ============================================================ */
 
-.modal.base-board-chip-config-modal {
-  width: min(1200px, calc(100vw - 32px));
-  max-width: 100%;
-  max-height: min(92vh, 1100px);
-}
-
-.chip-config-layout {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1.6fr);
-  min-width: 0;
-  min-height: min(70vh, 720px);
-  max-height: 100%;
-  margin-bottom: 8px;
-}
-
-/* Ensure left panel fills available space */
-.chip-config-left {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Header spans both columns */
-.chip-config-header {
-  grid-column: 1 / -1;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  background-color: var(--background-primary);
-}
-
-.chip-config-header h2 {
-  font-size: 18px;
-  font-weight: var(--font-semibold);
-  margin: 0 0 4px 0;
-}
-
-.chip-config-header p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
-}
-
-/* LEFT: navigation panel */
-.chip-config-left {
-  border-right: 1px solid var(--background-modifier-border);
-  padding: 12px;
-  overflow-y: auto;
-  background-color: var(--background-secondary);
-}
-
-/* RIGHT: editor panel */
-.chip-config-right {
-  padding: 20px 24px;
-  overflow-y: auto;
-  background-color: var(--background-primary);
-  min-width: 0;
-}
-
-/* Section blocks (shared) */
-.chip-config-left .chip-config-section,
-.chip-config-right .chip-config-section {
-  margin-bottom: 16px;
-}
-
 /* ============================================================
-   Left panel — property navigation
-   ============================================================ */
-
-.chip-property-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-  max-height: min(420px, calc(70vh - 220px));
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-/* Each property becomes a selectable row */
-.base-board-chip-property-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.12s ease, transform 0.08s ease;
-}
-
-/* Hover = UI affordance */
-.base-board-chip-property-row:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-/* Active selection = modern sidebar highlight */
-.base-board-chip-property-row.is-active {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 12%,
-    var(--background-secondary)
-  );
-  border-left: 2px solid var(--interactive-accent);
-  padding-left: 6px;
-}
-
-/* Checkbox alignment cleanup */
-.base-board-chip-property-row input[type="checkbox"] {
-  margin: 0;
-  transform: translateY(1px);
-}
-
-/* Reorder buttons */
-.base-board-chip-move-btn {
-  font-size: 10px;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
-  transition: background-color 0.12s ease;
-  user-select: none;
-}
-
-.base-board-chip-move-btn:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-/* ============================================================
-   Right panel — editor
-   ============================================================ */
-
-.chip-property-editor {
-  max-width: none;
-  width: 100%;
-}
-
-/* Title feels like a section header, not a modal header */
-.chip-property-editor h3 {
-  font-size: 16px;
-  font-weight: var(--font-semibold);
-  margin-bottom: 12px;
-}
-
-/* Empty state now centered + calm */
-.chip-empty-state {
-  color: var(--text-muted);
-  text-align: center;
-  padding: 24px;
-  border: 1px dashed var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  background-color: var(--background-secondary);
-}
-
-/* ============================================================
-   Color mapping editor — modern inspector style
-   ============================================================ */
-
-.base-board-chip-mapping-section {
-  padding: 12px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  background-color: var(--background-secondary);
-  margin-bottom: 12px;
-}
-
-.base-board-chip-mapping-section h4 {
-  margin: 0 0 10px 0;
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-semibold);
-  opacity: 0.9;
-}
-
-/* Each row becomes a mini "property editor row" */
-.base-board-chip-mapping-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) auto auto minmax(120px, 220px) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-}
-
-/* Value label */
-.base-board-chip-mapping-value {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.4;
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-medium);
-  color: var(--text-normal);
-}
-
-.base-board-chip-mapping-edit {
-  flex: 0 0 auto;
-  padding: 4px 8px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  background-color: var(--background-primary);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--font-ui-smaller);
-}
-
-.base-board-chip-mapping-edit:hover {
-  color: var(--text-normal);
-  background-color: var(--background-modifier-hover);
-}
-
-/* Color picker becomes cleaner */
-.base-board-chip-color-swatch {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 0;
-  background: transparent;
-  flex: 0 0 auto;
-}
-
-/* Delete button becomes subtle until hover */
-.base-board-chip-mapping-delete {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  opacity: 0.4;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.base-board-chip-mapping-delete:hover {
-  opacity: 1;
-}
-
-/* ============================================================
-   Mode selector (radio group)
-   ============================================================ */
-
-.chip-mode-section {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 10px 12px;
-  background-color: var(--background-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--background-modifier-border);
-}
-
-.chip-radio-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
-  user-select: none;
-}
-
-.chip-radio-label input[type="radio"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-/* Fixed color section (single picker) */
-.chip-fixed-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background-color: var(--background-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--background-modifier-border);
-}
-
-.chip-fixed-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
-}
-
-/* Per-value section */
-.chip-per-value-section {
-  margin-top: 8px;
-}
-
-/* Utility class to hide elements */
-.is-hidden {
-  display: none !important;
-}
-
-/* ============================================================
-   Improved button style (less "settings plugin energy")
-   ============================================================ */
-
-.base-board-chip-add-mapping-btn {
-  margin-top: 10px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px dashed var(--background-modifier-border);
-  background-color: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-
-.base-board-chip-add-mapping-btn:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-/* ============================================================
-   Small but important UX fixes
-   ============================================================ */
-
-/* Better section spacing rhythm */
-.base-board-chip-config-section {
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.base-board-chip-config-section:last-child {
-  border-bottom: none;
-}
-
-/* Make border selector feel less "form field" */
-.base-board-chip-border-select {
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background-color: var(--background-primary);
-}
-
-/* ============================================================
-   Icon Picker Modal — searchable grid of all Obsidian icons
-   ============================================================ */
-
-.modal.base-board-icon-picker-modal {
-  width: min(560px, calc(100vw - 32px));
-  max-height: min(80vh, 640px);
-  display: flex;
-  flex-direction: column;
-}
-
-.icon-picker-search {
-  width: 100%;
-  padding: 6px 10px;
-  margin: 4px 0 12px 0;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background-color: var(--background-primary);
-  color: var(--text-normal);
-}
-
-.icon-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 6px;
-  overflow-y: auto;
-  padding-right: 4px;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.icon-picker-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 10px 4px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  text-align: center;
-}
-
-.icon-picker-tile:hover {
-  background-color: var(--background-modifier-hover);
-  border-color: var(--background-modifier-border-hover);
-}
-
-.icon-picker-tile.is-selected {
-  background-color: var(--background-modifier-active-hover);
-  border-color: var(--interactive-accent);
-}
-
-.icon-picker-tile-glyph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--text-normal);
-}
-
-.icon-picker-tile-glyph svg {
-  width: 20px;
-  height: 20px;
-}
-
-.icon-picker-tile-glyph.icon-picker-none {
-  width: 16px;
-  height: 16px;
-  border: 1px dashed var(--text-faint);
-  border-radius: 3px;
-}
-
-.icon-picker-tile-label {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-  text-transform: capitalize;
-}
-
-.icon-picker-empty {
-  grid-column: 1 / -1;
-  padding: 24px 8px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
-}
-
-/* ============================================================
-   Board Settings Modal
+   Base Board — Board Settings Modal
    ============================================================ */
 
 .base-board-settings-modal {
@@ -1579,6 +1663,7 @@
 
 .base-board-settings-content {
   padding: 24px;
+  min-height: 400px;
   max-height: 60vh;
   overflow-y: auto;
 }

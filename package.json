@@ -18,5 +18,8 @@
   },
   "devDependencies": {
     "prettier": "3.8.4"
+  },
+  "dependencies": {
+    "ripgrep": "^0.3.1"
   }
 }

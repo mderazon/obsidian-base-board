@@ -1,0 +1,301 @@
+/* ============================================================
+   Base Board — Cards
+   ============================================================ */
+
+/* ---- Card ---- */
+
+@keyframes base-board-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.base-board-card {
+  position: relative;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    border-color 0.15s ease;
+  user-select: none;
+}
+
+.base-board-card-thumbnail {
+  margin: -10px -12px 8px;
+  height: 120px;
+  overflow: hidden;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-card-thumbnail-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Only animate cards on initial board mount */
+.base-board-board--animate .base-board-card {
+  animation: base-board-card-enter 0.25s ease both;
+}
+
+.base-board-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: var(--interactive-accent);
+}
+
+.base-board-card:active {
+  cursor: grabbing;
+}
+
+.base-board-card--dragging {
+  display: none;
+}
+
+/* Multi-select highlight */
+.base-board-card--selected {
+  border-color: var(--interactive-accent);
+  box-shadow:
+    0 0 0 2px var(--interactive-accent),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 6%,
+    var(--background-primary)
+  );
+}
+
+/* Other selected cards dimmed during a multi-drag */
+.base-board-card--drag-ghost {
+  opacity: 0.35;
+  transform: scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+/* ---- Card title ---- */
+
+.base-board-card-title {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  padding-right: 24px; /* leave room for the edit button */
+}
+
+/* ---- Card edit button ---- */
+
+.base-board-card-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+  color: var(--text-muted);
+}
+
+.base-board-card-edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-card:hover .base-board-card-edit-btn {
+  opacity: 1;
+}
+
+.base-board-card-edit-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ---- Card rename input ---- */
+
+.base-board-card-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  padding: 1px 2px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  outline: none;
+}
+
+/* ---- Card property chips ---- */
+
+.base-board-card-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.base-board-card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.base-board-chip-label {
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.base-board-chip-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Overflow chips — hidden until expanded */
+.base-board-card-chips-overflow {
+  display: none;
+}
+
+.base-board-card-chips-overflow--expanded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* "Show more" toggle button */
+.base-board-card-chip-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-accent);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.base-board-card-chip-more:hover {
+  color: var(--text-normal);
+}
+
+/* ---- Card drop placeholder ---- */
+
+@keyframes base-board-placeholder-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.base-board-card-placeholder {
+  border: 2px dashed var(--interactive-accent);
+  border-radius: var(--radius-s);
+  box-sizing: border-box;
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 8%,
+    transparent
+  );
+  transition: height 0.15s ease;
+  flex-shrink: 0;
+  animation: base-board-placeholder-pulse 1.5s ease-in-out infinite;
+}
+
+/* ---- Add card button ---- */
+
+.base-board-add-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 4px 8px 8px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.base-board-add-card-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.base-board-add-card-icon {
+  display: flex;
+  align-items: center;
+}
+
+.base-board-add-card-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-add-card-input-wrapper {
+  padding: 4px 8px 8px;
+}
+
+.base-board-add-card-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  padding: 8px 10px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  outline: none;
+}
+
+.base-board-add-card-input::placeholder {
+  color: var(--text-faint);
+}
+
+/* ---- Card border via CSS variable (applied after base card border) ---- */
+
+.base-board-card {
+  border-left: 3px solid var(--card-border-color, transparent);
+}
+
+.base-board-card-thumbnail-img,
+.base-board-card img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}

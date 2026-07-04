@@ -1,8 +1,6 @@
-import { App, Modal, Setting, setIcon } from "obsidian";
+import { App, Modal, Setting } from "obsidian";
 import { ChipPropertiesManager, AvailableProperty } from "./chip-properties";
-import { ChipConfigSnapshot } from "./chip-config-modal";
 import { InputModal } from "./modals";
-import { IconPickerModal } from "./icon-picker-modal";
 
 type TabId = "cover" | "chips" | "behavior";
 
@@ -10,6 +8,15 @@ export interface BoardSettingsState {
   coverProperty: string;
   useFirstEmbed: boolean;
   openBehavior: "active" | "modal" | "split" | "tab";
+}
+
+/** Snapshot of chip configuration state, returned when the user saves. */
+export interface ChipConfigSnapshot {
+  properties: string[];
+  borderProperty: string;
+  colors: Record<string, Record<string, string>>;
+  fixedColors: Record<string, string>;
+  icons: Record<string, Record<string, string>>;
 }
 
 export interface BoardSettingsCallbacks {
@@ -212,14 +219,16 @@ export class BoardSettingsModal extends Modal {
 }
 
 // ---------------------------------------------------------------------------
-//  Chip Config Panel (reusable two-panel layout, extracted from ChipConfigModal)
+//  Chip Config Panel (card-based layout with drag-and-drop reordering)
 // ---------------------------------------------------------------------------
 
 /**
- * Reusable two-panel chip configuration UI.
+ * Card-based chip configuration UI.
  *
- * Left panel: property list with checkboxes + border select.
- * Right panel: color/icon editor for the selected property.
+ * Each property is an expandable card with:
+ * - Drag handle for reordering
+ * - Checkbox to enable/disable
+ * - Expandable section for color/icon configuration
  *
  * Renders into any container element; does not manage its own modal lifecycle.
  */
@@ -239,10 +248,12 @@ export class ChipConfigPanel {
   private chipIcons: Record<string, Record<string, string>> = {};
   private useFixedColor: boolean = false;
 
-  // Layout refs (set by build methods, used by render methods)
+  // Layout refs
   private propsContainerEl!: HTMLDivElement;
   private borderSelectEl!: HTMLSelectElement;
-  private editorContainerEl!: HTMLDivElement;
+
+  // Drag state
+  private draggedPropertyIndex: number | null = null;
 
   constructor(
     app: App,
@@ -263,30 +274,14 @@ export class ChipConfigPanel {
   renderInto(container: HTMLElement): void {
     container.empty();
 
-    const layout = container.createDiv({ cls: "chip-config-layout" });
-
-    const header = layout.createDiv({ cls: "chip-config-header" });
+    const header = container.createDiv({ cls: "chip-config-header" });
     header.createEl("h2", { text: "Chip configuration" });
     header.createEl("p", {
       text: "Manage chip fields, colors, and display behavior.",
       cls: "setting-item-description",
     });
 
-    const left = layout.createDiv({ cls: "chip-config-left" });
-    this.buildLeftPanel(left);
-
-    const right = layout.createDiv({ cls: "chip-config-right" });
-    this.buildRightPanel(right);
-
-    void this.refreshAndRender();
-  }
-
-  // ----------------------------
-  // LEFT PANEL
-  // ----------------------------
-  private buildLeftPanel(parent: HTMLElement): void {
-    const propSection = parent.createDiv({ cls: "chip-config-section" });
-
+    const propSection = container.createDiv({ cls: "chip-config-section" });
     propSection.createEl("h3", { text: "Properties" });
 
     const refreshBtn = propSection.createEl("button", {
@@ -299,25 +294,12 @@ export class ChipConfigPanel {
       cls: "chip-property-list",
     });
 
-    const borderSection = parent.createDiv({ cls: "chip-config-section" });
+    const borderSection = container.createDiv({ cls: "chip-config-section" });
     borderSection.createEl("h3", { text: "Card border" });
 
     this.borderSelectEl = borderSection.createEl("select");
-  }
 
-  private buildRightPanel(parent: HTMLElement): void {
-    this.editorContainerEl = parent.createDiv({
-      cls: "chip-editor-container",
-    });
-    this.renderEmptyEditor();
-  }
-
-  private renderEmptyEditor(): void {
-    this.editorContainerEl.empty();
-    this.editorContainerEl.createEl("div", {
-      text: "Select a property to edit its values.",
-      cls: "chip-empty-state",
-    });
+    void this.refreshAndRender();
   }
 
   // ----------------------------
@@ -327,10 +309,9 @@ export class ChipConfigPanel {
     this.availableProps = this.chipManager.discoverAvailableProperties();
     this.renderPropertyList();
     this.renderBorderSelect();
-    this.renderEditor();
   }
 
-  // -- Left: property list ---------------------------------------------------
+  // -- Property list (card-based) --------------------------------------------
   private renderPropertyList(): void {
     if (!this.propsContainerEl) return;
     this.propsContainerEl.empty();
@@ -352,90 +333,112 @@ export class ChipConfigPanel {
       ),
     ].filter(Boolean) as AvailableProperty[];
 
-    for (const prop of orderedProps) {
-      const row = this.propsContainerEl.createDiv({
-        cls: "base-board-chip-property-row",
-      });
-
-      const checkbox = row.createEl("input", { type: "checkbox" });
-      checkbox.checked = this.selectedProperties.includes(prop.name);
-
-      checkbox.onchange = () => {
-        if (checkbox.checked) {
-          if (!this.selectedProperties.includes(prop.name)) {
-            this.selectedProperties.push(prop.name);
-          }
-          this.activeProperty = prop.name;
-        } else {
-          this.selectedProperties = this.selectedProperties.filter(
-            (p) => p !== prop.name,
-          );
-          if (this.activeProperty === prop.name) {
-            this.activeProperty = null;
-          }
-        }
-        this.renderPropertyList();
-        this.renderEditor();
-      };
-
-      const label = row.createEl("span", {
-        text: prop.displayName,
-        cls: "base-board-chip-property-label",
-      });
-      label.title = prop.name;
-
-      if (this.selectedProperties.includes(prop.name)) {
-        const idx = this.selectedProperties.indexOf(prop.name);
-        const moveUpBtn = row.createEl("span", {
-          text: "▲",
-          cls: "base-board-chip-move-btn",
-        });
-        moveUpBtn.title = "Move up";
-        moveUpBtn.onclick = (e) => {
-          e.stopPropagation();
-          if (idx > 0) {
-            [this.selectedProperties[idx - 1], this.selectedProperties[idx]] = [
-              this.selectedProperties[idx],
-              this.selectedProperties[idx - 1],
-            ];
-            this.renderPropertyList();
-            this.renderEditor();
-          }
-        };
-
-        const moveDownBtn = row.createEl("span", {
-          text: "▼",
-          cls: "base-board-chip-move-btn",
-        });
-        moveDownBtn.title = "Move down";
-        moveDownBtn.onclick = (e) => {
-          e.stopPropagation();
-          if (idx < this.selectedProperties.length - 1) {
-            [this.selectedProperties[idx], this.selectedProperties[idx + 1]] = [
-              this.selectedProperties[idx + 1],
-              this.selectedProperties[idx],
-            ];
-            this.renderPropertyList();
-            this.renderEditor();
-          }
-        };
-
-        row.appendChild(moveUpBtn);
-        row.appendChild(moveDownBtn);
-      }
-
-      row.classList.toggle("is-active", this.activeProperty === prop.name);
-
-      row.onclick = (evt) => {
-        if (evt.target === checkbox) return;
-        this.activeProperty = prop.name;
-        this.renderPropertyList();
-        this.renderEditor();
-      };
+    for (let i = 0; i < orderedProps.length; i++) {
+      const prop = orderedProps[i];
+      if (!prop) continue;
+      const card = this.renderPropertyCard(prop, i);
+      this.propsContainerEl.appendChild(card);
     }
   }
 
-  // -- Left: border select ---------------------------------------------------
+  private renderPropertyCard(
+    prop: AvailableProperty,
+    index: number,
+  ): HTMLDivElement {
+    const card = this.propsContainerEl.createDiv({
+      cls: "chip-property-card",
+    });
+    card.draggable = true;
+
+    // Drag handle
+    const dragHandle = card.createDiv({ cls: "chip-drag-handle" });
+    dragHandle.textContent = "⠿";
+    dragHandle.title = "Drag to reorder";
+
+    // Checkbox
+    const checkbox = card.createEl("input", { type: "checkbox" });
+    checkbox.checked = this.selectedProperties.includes(prop.name);
+    checkbox.onchange = () => {
+      if (checkbox.checked) {
+        if (!this.selectedProperties.includes(prop.name)) {
+          this.selectedProperties.push(prop.name);
+        }
+        this.activeProperty = prop.name;
+      } else {
+        this.selectedProperties = this.selectedProperties.filter(
+          (p) => p !== prop.name,
+        );
+        if (this.activeProperty === prop.name) {
+          this.activeProperty = null;
+        }
+      }
+      this.renderPropertyList();
+    };
+
+    // Label
+    const label = card.createEl("span", {
+      text: prop.displayName,
+      cls: "chip-card-label",
+    });
+    label.title = prop.name;
+
+    // Expand toggle
+    const expandBtn = card.createEl("button", {
+      text: this.activeProperty === prop.name ? "▾" : "▸",
+      cls: "chip-expand-btn",
+    });
+    expandBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (this.activeProperty === prop.name) {
+        this.activeProperty = null;
+      } else {
+        this.activeProperty = prop.name;
+      }
+      this.renderPropertyList();
+    };
+
+    // Body (expanded content)
+    const body = card.createDiv({ cls: "chip-property-card-body" });
+    if (this.activeProperty === prop.name) {
+      this.renderPropertyEditor(body, prop);
+    }
+
+    // Drag handlers
+    card.ondragstart = (e) => {
+      this.draggedPropertyIndex = index;
+      e.dataTransfer?.setData("text/plain", prop.name);
+      card.classList.add("is-dragging");
+    };
+    card.ondragend = () => {
+      this.draggedPropertyIndex = null;
+      card.classList.remove("is-dragging");
+    };
+    card.ondragover = (e) => {
+      e.preventDefault();
+      card.classList.add("chip-drop-target");
+    };
+    card.ondragleave = () => {
+      card.classList.remove("chip-drop-target");
+    };
+    card.ondrop = (e) => {
+      e.preventDefault();
+      card.classList.remove("chip-drop-target");
+      if (this.draggedPropertyIndex === null) return;
+
+      const fromIndex = this.draggedPropertyIndex;
+      const toIndex = index;
+
+      if (fromIndex !== toIndex) {
+        const [moved] = this.selectedProperties.splice(fromIndex, 1);
+        this.selectedProperties.splice(toIndex, 0, moved);
+        this.renderPropertyList();
+      }
+    };
+
+    return card;
+  }
+
+  // -- Border select ---------------------------------------------------------
   private renderBorderSelect(): void {
     if (!this.borderSelectEl) return;
     this.borderSelectEl.empty();
@@ -459,30 +462,12 @@ export class ChipConfigPanel {
     };
   }
 
-  // -- Right: editor ---------------------------------------------------------
-  private renderEditor(): void {
-    if (!this.editorContainerEl) return;
-    this.editorContainerEl.empty();
-
-    if (!this.activeProperty) {
-      this.renderEmptyEditor();
-      return;
-    }
-
-    const prop = this.availableProps.find(
-      (p) => p.name === this.activeProperty,
-    );
-    if (!prop) return;
-
-    this.renderPropertyEditor(prop);
-  }
-
-  private renderPropertyEditor(prop: AvailableProperty): void {
-    const wrapper = this.editorContainerEl.createDiv({
-      cls: "chip-property-editor",
-    });
-
-    wrapper.createEl("h3", { text: prop.displayName });
+  // -- Property editor (expanded card body) ----------------------------------
+  private renderPropertyEditor(
+    container: HTMLElement,
+    prop: AvailableProperty,
+  ): void {
+    const wrapper = container.createDiv({ cls: "chip-property-editor" });
 
     // Show label toggle
     const showLabelWrapper = wrapper.createDiv({
@@ -553,8 +538,8 @@ export class ChipConfigPanel {
     perValueRadio.onchange = () => {
       if (perValueRadio.checked) {
         this.useFixedColor = false;
-        fixedSection.classList.add("is-hidden");
         perValueSection.classList.remove("is-hidden");
+        fixedSection.classList.add("is-hidden");
       }
     };
 
@@ -599,6 +584,7 @@ export class ChipConfigPanel {
     return radio;
   }
 
+  // -- Per-value rows (simplified) -------------------------------------------
   private renderPerValueRows(
     container: HTMLElement,
     prop: AvailableProperty,
@@ -611,7 +597,7 @@ export class ChipConfigPanel {
     ]);
 
     for (const value of values) {
-      this.createMappingRow(
+      this.createSimplifiedMappingRow(
         container,
         prop.name,
         value,
@@ -628,175 +614,56 @@ export class ChipConfigPanel {
     addBtn.onclick = () => {
       new InputModal(this.app, "New value", "Enter value", (v) => {
         if (!v?.trim()) return;
-        this.createMappingRowBefore(
-          container,
-          addBtn,
-          prop.name,
-          v.trim(),
-          "",
-          "",
-        );
+        this.createSimplifiedMappingRow(container, prop.name, v.trim(), "", "");
       }).open();
     };
   }
 
-  // ----------------------------
-  // MAPPING ROWS
-  // ----------------------------
-  private createMappingRow(
+  private createSimplifiedMappingRow(
     container: HTMLElement,
     propName: string,
     value: string,
     currentColor: string,
     currentIcon: string,
-  ): HTMLDivElement {
-    return this.createMappingRowInternal(
-      container,
-      propName,
-      value,
-      currentColor,
-      currentIcon,
-      null,
-    );
-  }
-
-  private createMappingRowBefore(
-    container: HTMLElement,
-    anchor: HTMLElement,
-    propName: string,
-    value: string,
-    currentColor: string,
-    currentIcon: string,
-  ): HTMLDivElement {
-    return this.createMappingRowInternal(
-      container,
-      propName,
-      value,
-      currentColor,
-      currentIcon,
-      anchor,
-    );
-  }
-
-  private createMappingRowInternal(
-    container: HTMLElement,
-    propName: string,
-    value: string,
-    currentColor: string,
-    currentIcon: string,
-    anchor: HTMLElement | null,
   ): HTMLDivElement {
     const row = container.createDiv({
-      cls: "base-board-chip-mapping-row",
+      cls: "chip-mapping-row-simple",
     });
 
     let currentValue = String(value);
 
+    // Value display
     const valueEl = row.createEl("span", {
       text: currentValue,
-      cls: "base-board-chip-mapping-value",
+      cls: "chip-mapping-value",
     });
     valueEl.title = currentValue;
 
-    const editBtn = row.createEl("button", {
-      text: "Edit",
-      cls: "base-board-chip-mapping-edit",
-    });
-
-    editBtn.onclick = () => {
-      new InputModal(
-        this.app,
-        "Edit value",
-        "Enter value",
-        (nextValue) => {
-          const trimmed = nextValue?.trim();
-          if (!trimmed || trimmed === currentValue) return;
-
-          const colors = this.colorState[propName] || {};
-          const currentColorForValue = colors[currentValue] || "";
-          const currentIconForValue =
-            this.chipIcons[propName]?.[currentValue] || "";
-
-          this.updateMapping(propName, currentValue, "");
-          this.updateMapping(propName, trimmed, currentColorForValue);
-
-          this.updateIconMapping(propName, currentValue, "");
-          this.updateIconMapping(propName, trimmed, currentIconForValue);
-
-          currentValue = trimmed;
-          valueEl.textContent = currentValue;
-          valueEl.title = currentValue;
-        },
-        currentValue,
-      ).open();
-    };
-
+    // Color swatch
     const color = row.createEl("input", {
       type: "color",
       cls: "base-board-chip-color-swatch",
     });
     color.value = currentColor || "#808080";
-
     color.oninput = () => {
       this.updateMapping(propName, currentValue, color.value);
     };
 
-    let currentIconValue = currentIcon;
-
-    const iconPickerBtn = row.createEl("button", {
-      cls: "chip-icon-picker-btn",
-      attr: { type: "button" },
-    });
-    const iconPreviewEl = iconPickerBtn.createDiv({
-      cls: "chip-icon-picker-preview",
-    });
-    const iconLabelEl = iconPickerBtn.createEl("span", {
-      cls: "chip-icon-picker-label",
-    });
-
-    const refreshIconPreview = () => {
-      iconPreviewEl.empty();
-      if (currentIconValue) {
-        setIcon(iconPreviewEl, currentIconValue);
-        iconPreviewEl.classList.remove("is-empty");
-      } else {
-        iconPreviewEl.classList.add("is-empty");
-      }
-      iconLabelEl.textContent = currentIconValue
-        ? currentIconValue
-            .replace(/^lucide-/, "")
-            .split("-")
-            .join(" ")
-        : "No icon";
-    };
-    refreshIconPreview();
-
-    iconPickerBtn.onclick = () => {
-      new IconPickerModal(this.app, currentIconValue, (iconId) => {
-        currentIconValue = iconId;
-        this.updateIconMapping(propName, currentValue, currentIconValue);
-        refreshIconPreview();
-      }).open();
-    };
-
+    // Delete button
     const del = row.createEl("button", {
       text: "×",
       cls: "base-board-chip-mapping-delete",
     });
-
     del.onclick = () => {
       this.updateMapping(propName, currentValue, "");
       this.updateIconMapping(propName, currentValue, "");
       row.remove();
     };
 
-    if (anchor) {
-      anchor.before(row);
-    }
-
     return row;
   }
 
+  // -- State updates ---------------------------------------------------------
   private updateMapping(propName: string, value: string, color: string): void {
     const colors = this.colorState;
     const key = String(value);

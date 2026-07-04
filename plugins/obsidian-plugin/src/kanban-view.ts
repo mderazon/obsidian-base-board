@@ -18,8 +18,11 @@ import { ColumnManager } from "./column";
 import { CardManager } from "./card";
 import { Tags } from "./tags";
 import { ChipPropertiesManager } from "./chip-properties";
-import { ChipConfigSnapshot } from "./chip-config-modal";
-import { BoardSettingsModal, BoardSettingsState } from "./board-settings-modal";
+import {
+  BoardSettingsModal,
+  BoardSettingsState,
+  ChipConfigSnapshot,
+} from "./board-settings-modal";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,

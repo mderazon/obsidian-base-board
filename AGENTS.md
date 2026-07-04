@@ -160,7 +160,6 @@ All managers accept `CardData` (not `BasesEntry`) and access Obsidian-specific o
 ### Modals
 
 - **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid over every icon Obsidian knows about. Each tile rendered with `setIcon()` for pixel-accurate previews. Used when configuring chip icon overrides.
-- **`ChipConfigModal`** (`src/chip-config-modal.ts`) — Legacy standalone chip config modal (kept for backward compat, no longer used). Replaced by `BoardSettingsModal`.
 - **`TagEditModal`** (`src/tag-edit-modal.ts`) — Modal for editing tags on a single file. Opens via right-click on tag pills in the filter bar.
 - **`InputModal` / `WipLimitModal`** (`src/modals.ts`) — Generic input modals for column names, WIP limits, etc.
 
@@ -218,8 +217,7 @@ Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 
 - **`ChipPropertiesManager`** (`src/chip-properties.ts`) — manages chip property configuration, color mappings, icon overrides, and property discovery
 - **`BoardSettingsModal`** (`src/board-settings-modal.ts`) — multi-page settings modal with tabs: Cover images, Chips & borders, Behavior. Replaces standalone `ChipConfigModal`.
-- **`ChipConfigPanel`** (`src/board-settings-modal.ts`) — reusable two-panel chip configuration UI extracted from `ChipConfigModal`. Renders inside the Settings modal's Chips tab.
-- **`ChipConfigModal`** (`src/chip-config-modal.ts`) — legacy standalone chip config modal (kept for backward compat, no longer used).
+- **`ChipConfigPanel`** (`src/board-settings-modal.ts`) — card-based chip configuration UI with drag-and-drop reordering. Renders inside the Settings modal's Chips tab. Each property is an expandable card with drag handle, checkbox, and editor section.
 - **`IconPickerModal`** (`src/icon-picker-modal.ts`) — Searchable grid of all Obsidian icons. Used when configuring icon overrides for chip properties. Each tile uses `setIcon()` for pixel-accurate previews.
 - **Toolbar Button**: Boards render a persistent `Settings` button (gear icon) in the filter bar to open the multi-page settings modal directly from the board UI
 - **Storage**: All settings persisted in `.base` file via `BasesViewConfig`: `boardCoverProperty`, `boardUseFirstEmbed`, `boardOpenBehavior`, `chipProperties`, `chipColors`, `chipFixedColors`, `chipShowLabels`, `chipIcons`, `borderProperty`
@@ -229,21 +227,33 @@ Custom frontmatter fields can be rendered as colored chips (like tags) on cards:
 
 ### Chip Config Panel Layout
 
-The chip config panel (used inside BoardSettingsModal) uses a CSS Grid layout:
+The chip config panel (used inside BoardSettingsModal) uses a card-based layout:
 ```
-chip-config-layout (grid: auto 1fr / 260px 1fr)
-├── chip-config-header (spans both columns)
-├── chip-config-left (navigation panel, 260px)
-└── chip-config-right (editor panel, 1fr)
+chip-config-header (title + description)
+├── chip-config-section (Properties)
+│   ├── Refresh button
+│   └── chip-property-list (vertical stack of cards)
+│       ├── chip-property-card (draggable)
+│       │   ├── chip-drag-handle (⠿)
+│       │   ├── checkbox (enable/disable)
+│       │   ├── chip-card-label (property name)
+│       │   ├── chip-expand-btn (▸/▾)
+│       │   └── chip-property-card-body (expanded editor)
+│       │       ├── show label toggle
+│       │       ├── mode radio group (fixed/per-value)
+│       │       ├── fixed color picker (if fixed mode)
+│       │       └── per-value mapping rows (if per-value mode)
+└── chip-config-section (Card border)
+    └── select dropdown
 ```
 
-The header is a grid child (not a sibling), ensuring it appears at the top. The ChipConfigPanel renders into any container element and does not manage its own modal lifecycle.
+Each property card is draggable for reordering. The card body expands/collapses to show/hide the editor. The ChipConfigPanel renders into any container element and does not manage its own modal lifecycle.
 
 ### Board Settings Modal
 
 Multi-page modal with three tabs:
 1. **Cover images** — cover property name input, first-embed toggle
-2. **Chips & borders** — ChipConfigPanel (two-panel master-detail)
+2. **Chips & borders** — ChipConfigPanel (card-based with drag-and-drop)
 3. **Behavior** — open behavior dropdown (active/modal/split/tab)
 
 Settings persist immediately via callbacks to `KanbanView.config.set()`. No separate "Save" action needed — changes are written as the user types.
@@ -263,7 +273,30 @@ esbuild bundles `main.ts` (Node/CJS) and `renderer/main.ts` (browser/iife) into 
 
 ## CSS
 
-Plugin styles live in `plugins/obsidian-plugin/styles.css` (~35KB). Classes follow the `base-board-*` naming convention. Dark mode is handled via Obsidian's built-in theme variables — no explicit dark-mode media queries. Electron app has its own minimal styles in `apps/electron-app/renderer/styles.css`.
+Source CSS is split into logical modules in `plugins/obsidian-plugin/src/styles/` (9 files, ~35KB total). The build process concatenates them into a single `styles.css` that lives next to `main.js` in the output directory. Obsidian auto-loads `styles.css` from the plugin root. Classes follow the `base-board-*` naming convention. Dark mode is handled via Obsidian's built-in theme variables — no explicit dark-mode media queries.
+
+### Source files (`src/styles/`)
+
+| File | Contents |
+|------|----------|
+| `board.css` | Container, board layout, placeholder |
+| `column.css` | Column styles, drag handle, header, cards container, add column button |
+| `card.css` | Card styles, thumbnail, chips, rename, overflow, border, add card button |
+| `filter-bar.css` | Toolbar, filter bar, pills, tags, light/dark variants |
+| `modals.css` | Card detail modal, tag edit modal, modal actions |
+| `chip-properties.css` | On-card chip rendering, show label toggle, icon picker button |
+| `chip-config.css` | Chip config panel (card-based layout), mapping editor, mode selector |
+| `icon-picker.css` | Icon picker modal grid |
+| `settings.css` | Board settings modal (header, tabs, content) |
+
+### Build output
+
+The esbuild config includes a `concat-styles` plugin that reads all `.css` files from `src/styles/`, concatenates them with section headers, and writes the result to `styles.css` in the output directory (next to `main.js`). This means:
+
+- **Dev mode**: `npm run dev:plugin` produces `main.js` + `styles.css` in the current directory (set `PLUGIN_DEV_DIR` to your vault's plugin folder for auto-deploy).
+- **Production**: `npm run build` produces `main.js` + `styles.css` in the plugin root.
+
+Electron app has its own minimal styles in `apps/electron-app/renderer/styles.css`.
 
 ## Adding a New Package
 

@@ -1,0 +1,157 @@
+/* ============================================================
+   Base Board — Chip Properties (on-card rendering)
+   ============================================================ */
+
+/* ---- Chip Properties (custom frontmatter value chips) ---- */
+
+.base-board-chip-property-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.base-board-chip-property {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--chip-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  cursor: default;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.base-board-chip-property:hover {
+  opacity: 0.85;
+}
+
+.base-board-chip-property-light {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-chip-property-dark {
+  color: #1c212b;
+  text-shadow: none;
+}
+
+.base-board-chip-property .base-board-chip-property-label {
+  opacity: 0.75;
+  margin-right: 3px;
+  font-weight: var(--font-normal);
+}
+
+.base-board-chip-property-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--chip-color, var(--interactive-accent));
+  line-height: 1;
+}
+
+.base-board-chip-property-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  line-height: 1;
+}
+
+.base-board-chip-property-icon svg {
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+
+/* Chip config modal — show label toggle */
+.chip-show-label-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip-show-label-wrapper:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.chip-show-label-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.chip-icon-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 112px;
+  max-width: 220px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chip-icon-picker-btn:hover {
+  border-color: var(--background-modifier-border-hover);
+  background-color: var(--background-modifier-hover);
+}
+
+.chip-icon-picker-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-normal);
+}
+
+.chip-icon-picker-preview.is-empty {
+  width: 14px;
+  height: 14px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+  margin: 3px;
+}
+
+.chip-icon-picker-preview svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chip-icon-picker-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.chip-icon-help {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.chip-show-label-text {
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  cursor: pointer;
+  line-height: 1.4;
+}

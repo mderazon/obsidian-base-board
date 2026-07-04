@@ -20,35 +20,33 @@ Obsidian's API changes frequently and is not fully up to date in training data.
 Always verify API signatures against https://docs.obsidian.md/ (via researcher subagent
 or direct webfetch) before writing code that depends on them.
 
-## Code Intelligence (tree-sitter-analyzer)
+## Code Intelligence (LSP)
 
-TSA is the primary tool for understanding and modifying code in this repo.
+The native `lsp` integration is the primary tool for understanding and modifying code in this repo.
 Use it proactively — don't wait for structural questions to arise.
 
 ### Before editing any file
 
-1. **`tsa_edit action=safe`** — is this file safe to modify right now? Returns SAFE/UNSAFE verdict + risk factors.
-2. **`tsa_edit action=impact`** — what breaks if I touch this symbol/file? Shows affected files and must-run tests.
+1. **`goToDefinition`** — jump to symbol definitions to understand what you're touching.
+2. **`diagnostics`** — check for live type/lint errors before and after edits.
 
 ### When refactoring or adding features
 
-3. **`tsa_nav action=caller_tree`** / **`action=callee_tree`** — full blast radius in one call. Don't loop through grep + read.
-4. **`tsa_search action=symbol`** — "where is X defined?" (fast BM25 lookup).
-5. **`tsa_structure action=signatures`** — method directory of a file without reading the body.
+3. **`findReferences`** — full blast radius in one call. Don't loop through grep + read.
+4. **`hover`** — quick type/signature info without opening the file.
+5. **Call hierarchy** (caller/callee) — full fan-in/fan-out for any function or method.
 
 ### After editing
 
-6. **`tsa_edit action=impact`** — verify nothing unexpected broke.
-7. Run `npm run build` and `npm run lint` to catch type errors.
+6. Run `npm run build` and `npm run lint` to catch type errors.
+7. Re-check `diagnostics` on edited files to confirm no regressions.
 
 ### Anti-patterns (DO NOT)
 
-- Don't grep for imports then manually trace callers — use `tsa_nav action=callers`.
-- Don't read a 900-line file to find one function — use `tsa_structure action=signatures` first.
+- Don't grep for imports then manually trace callers — use `findReferences`.
+- Don't read a 900-line file to find one function — use `goToDefinition` and call hierarchy first.
 - Don't edit without checking blast radius — even small changes can have hidden coupling.
-- Don't skip TSA for "obvious" changes — you'll miss co-change risks that git-history reveals.
-
-TSA skill files in `.claude/skills/` have detailed workflows for each capability. The 2-call chain (`action=context` → `action=callee_tree`) answers most "how does X work" questions.
+- Don't skip LSP lookups for "obvious" changes — you'll miss co-change risks that git-history reveals.
 
 ## Commands
 

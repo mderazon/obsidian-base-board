@@ -10,8 +10,6 @@ import {
   setIcon,
   TFile,
   WorkspaceLeaf,
-  parseYaml,
-  stringifyYaml,
 } from "obsidian";
 import type { CardData, Column } from "@base-board/board-core/types";
 import type BaseBoardPlugin from "./main";
@@ -118,6 +116,8 @@ export class KanbanView extends BasesView implements HoverParent {
         this.chipProperties,
         state,
         (chipConfig: ChipConfigSnapshot | null) => {
+          // DEBUG VALUE IF NEEDED
+          // console.log("[chip-debug] onSubmit received", chipConfig);
           if (chipConfig) {
             this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, chipConfig.properties);
             this.config?.set(
@@ -131,10 +131,6 @@ export class KanbanView extends BasesView implements HoverParent {
             );
             this.config?.set(CONFIG_KEY_CHIP_ICONS, chipConfig.icons);
             this.config?.set(CONFIG_KEY_CHIP_STYLERULES, chipConfig.styleRules);
-
-            // Sync order array and chipProperties to .base file
-            // Pass chipConfig directly to avoid reading stale config state
-            void this.syncOrderToBaseFile(chipConfig.properties);
           }
           this.scheduleRender();
         },
@@ -179,66 +175,6 @@ export class KanbanView extends BasesView implements HoverParent {
 
   public focus(): void {
     this.containerEl.focus({ preventScroll: true });
-  }
-
-  /**
-   * Sync the order array in the .base file with chip properties.
-   * Directly modifies the YAML file since config.set() doesn't persist
-   * the native 'order' field to disk.
-   */
-  private async syncOrderToBaseFile(chipProps: string[]): Promise<void> {
-    if (!Array.isArray(chipProps)) {
-      return;
-    }
-
-    // Get the active .base file from the workspace
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile || activeFile.extension !== "base") {
-      return;
-    }
-
-    try {
-      // Convert chip properties to Bases format: "status" → "note.status"
-      const chipOrder = chipProps.map((prop) => `note.${prop}`);
-
-      // Always prepend file.name as the first sort field
-      const order = ["file.name", ...chipOrder];
-
-      // Read and parse the .base file
-      const rawContent = await this.app.vault.read(activeFile);
-      const baseConfig = parseYaml(rawContent) as {
-        views?: Array<{
-          name?: string;
-          type?: string;
-          order?: string[];
-          chipProperties?: string[];
-        }>;
-      };
-
-      // Find the current view in the views array
-      const viewName = this.config?.name;
-      if (!viewName || !baseConfig.views || !Array.isArray(baseConfig.views)) {
-        return;
-      }
-
-      const currentView = baseConfig.views.find(
-        (v) => v.name === viewName && v.type === "kanban",
-      );
-
-      if (!currentView) {
-        return;
-      }
-
-      // Update both the order array and chipProperties
-      currentView.order = order;
-      currentView.chipProperties = chipProps;
-
-      // Stringify and write back
-      const updatedYaml = stringifyYaml(baseConfig);
-      await this.app.vault.modify(activeFile, updatedYaml);
-    } catch {
-      // Silently fail - don't block the settings save
-    }
   }
 
   public onDataUpdated(): void {

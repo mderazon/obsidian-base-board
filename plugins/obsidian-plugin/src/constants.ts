@@ -58,6 +58,12 @@ export const CONFIG_KEY_CHIP_PROPERTY_MODES = "chipPropertyModes";
 /** Default color used for chip icons when no explicit color is mapped. */
 export const DEFAULT_CHIP_COLOR = "#808080";
 
+/** Sentinel value in the chip property order array to insert a line break on the card. */
+export const CHIP_NEWLINE_SENTINEL = "__newline__";
+
+/** Key used by BasesViewConfig.set/get to persist newline positions in chip property order. */
+export const CONFIG_KEY_CHIP_NEWLINE_POSITIONS = "chipNewlinePositions";
+
 /**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.

@@ -6,6 +6,7 @@ import {
 } from "./chip-properties";
 import { InputModal } from "./modals";
 import { IconPickerModal } from "./icon-picker-modal";
+import { CHIP_NEWLINE_SENTINEL } from "./constants";
 
 type TabId = "cover" | "chips" | "behavior";
 
@@ -320,8 +321,16 @@ export class ChipConfigPanel {
         this.propertyModes[key] = value;
       }
     }
-    // Initialize property order from selected properties
+    // Initialize property order from selected properties, inserting newlines
+    // at their persisted positions.
+    const newlinePositions = chipManager.getNewlinePositions();
     this.propertyOrder = [...this.selectedProperties];
+    // Insert sentinels in reverse so earlier indices stay valid.
+    for (const pos of newlinePositions.sort((a, b) => b - a)) {
+      if (pos >= 0 && pos <= this.propertyOrder.length) {
+        this.propertyOrder.splice(pos, 0, CHIP_NEWLINE_SENTINEL);
+      }
+    }
   }
 
   renderInto(container: HTMLElement): void {
@@ -337,7 +346,7 @@ export class ChipConfigPanel {
     const propSection = container.createDiv({ cls: "chip-config-section" });
     propSection.createEl("h3", { text: "Properties" });
     propSection.createEl("p", {
-      text: "Select which frontmatter fields appear as colored chips on cards. Drag to reorder the chips on the card.",
+      text: "Select which frontmatter fields appear as colored chips on cards. Drag to reorder. Add line breaks to group chips visually.",
       cls: "setting-item-description",
     });
 
@@ -360,9 +369,31 @@ export class ChipConfigPanel {
   /** Collect current config state for persistence. */
   getSnapshot(): ChipConfigSnapshot {
     // Preserve order from propertyOrder, filtered to only selected properties
-    const properties = this.propertyOrder.filter((name) =>
-      this.selectedProperties.includes(name),
+    // (newlines are structural markers and must not be persisted as properties)
+    const properties = this.propertyOrder.filter(
+      (name) =>
+        name !== CHIP_NEWLINE_SENTINEL &&
+        this.selectedProperties.includes(name),
     );
+
+    // Compute newline positions: indices into the filtered property list where
+    // newlines should appear. We count newlines that come before each property.
+    const newlinePositions: number[] = [];
+    let newlineCount = 0;
+    for (let i = 0; i < this.propertyOrder.length; i++) {
+      if (this.propertyOrder[i] === CHIP_NEWLINE_SENTINEL) {
+        newlinePositions.push(newlineCount);
+      } else if (
+        !this.propertyOrder[i].startsWith(CHIP_NEWLINE_SENTINEL) &&
+        this.selectedProperties.includes(this.propertyOrder[i])
+      ) {
+        newlineCount++;
+      }
+    }
+
+    // Persist newline positions via the chip manager.
+    this.chipManager.setNewlinePositions(newlinePositions);
+
     return {
       properties,
       borderProperty: this.borderProperty,
@@ -390,14 +421,6 @@ export class ChipConfigPanel {
     if (!this.propsContainerEl) return;
     this.propsContainerEl.empty();
 
-    if (this.availableProps.length === 0) {
-      this.propsContainerEl.createEl("div", {
-        text: "No properties found yet.",
-        cls: "chip-empty-state",
-      });
-      return;
-    }
-
     // Build ordered list from propertyOrder, adding any new available props at the end
     const orderedNames = [...this.propertyOrder];
     for (const prop of this.availableProps) {
@@ -406,16 +429,38 @@ export class ChipConfigPanel {
       }
     }
 
-    const orderedProps = orderedNames
-      .map((name) => this.availableProps.find((p) => p.name === name))
-      .filter(Boolean) as AvailableProperty[];
-
-    for (let i = 0; i < orderedProps.length; i++) {
-      const prop = orderedProps[i];
-      if (!prop) continue;
-      const card = this.renderPropertyCard(prop, i);
-      this.propsContainerEl.appendChild(card);
+    // If nothing at all (no properties, no newlines), show empty state
+    if (
+      orderedNames.length === 0 ||
+      (orderedNames.length === 1 &&
+        !this.availableProps.find((p) => p.name === orderedNames[0]))
+    ) {
+      this.propsContainerEl.createEl("div", {
+        text: "No properties found yet.",
+        cls: "chip-empty-state",
+      });
+      return;
     }
+
+    for (const name of orderedNames) {
+      if (name === CHIP_NEWLINE_SENTINEL) {
+        const card = this.renderNewlineCard();
+        this.propsContainerEl.appendChild(card);
+      } else {
+        const prop = this.availableProps.find((p) => p.name === name);
+        if (!prop) continue;
+        const index = orderedNames.indexOf(name);
+        const card = this.renderPropertyCard(prop, index);
+        this.propsContainerEl.appendChild(card);
+      }
+    }
+
+    // Add "add line break" button at the bottom
+    const addNewlineBtn = this.propsContainerEl.createEl("button", {
+      text: "+ add line break",
+      cls: "chip-add-newline-btn",
+    });
+    addNewlineBtn.onclick = () => this.addNewline();
   }
 
   private renderPropertyCard(
@@ -566,6 +611,124 @@ export class ChipConfigPanel {
 
       const fromIndex = this.propertyOrder.indexOf(this.draggedPropertyName);
       const toIndex = this.propertyOrder.indexOf(prop.name);
+
+      if (fromIndex !== -1 && fromIndex !== toIndex) {
+        const [moved] = this.propertyOrder.splice(fromIndex, 1);
+        this.propertyOrder.splice(toIndex, 0, moved);
+        this.renderPropertyList();
+      }
+    };
+
+    return card;
+  }
+
+  // -- Newline (line break) card ---------------------------------------------
+  private addNewline(): void {
+    this.propertyOrder.push(CHIP_NEWLINE_SENTINEL);
+    this.renderPropertyList();
+  }
+
+  private removeNewline(): void {
+    this.propertyOrder = this.propertyOrder.filter(
+      (name) => name !== CHIP_NEWLINE_SENTINEL,
+    );
+    this.renderPropertyList();
+  }
+
+  private renderNewlineCard(): HTMLDivElement {
+    const card = this.propsContainerEl.createDiv({
+      cls: "chip-newline-card",
+    });
+
+    // Header row (drag handle, icon, label, remove button)
+    const header = card.createDiv({ cls: "chip-card-header" });
+
+    // Drag handle — always enabled for newlines
+    const dragHandle = header.createDiv({ cls: "chip-drag-handle" });
+    dragHandle.textContent = "⠿";
+    dragHandle.title = "Drag to reorder";
+    dragHandle.draggable = true;
+    dragHandle.onclick = (e) => e.stopPropagation();
+
+    // Line break icon
+    header.createEl("span", {
+      text: "↲",
+      cls: "chip-newline-icon",
+    });
+
+    // Label
+    const label = header.createEl("span", {
+      text: "Line break",
+      cls: "chip-card-label chip-newline-label",
+    });
+    label.title = "Inserts a line break between chip rows on the card";
+
+    // Remove button
+    const removeBtn = header.createEl("button", {
+      text: "×",
+      cls: "chip-newline-remove-btn",
+    });
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.removeNewline();
+    };
+
+    // Drag handlers — newlines are draggable to reorder
+    dragHandle.ondragstart = (e) => {
+      this.draggedPropertyName = CHIP_NEWLINE_SENTINEL;
+      e.dataTransfer!.setData("text/plain", CHIP_NEWLINE_SENTINEL);
+      card.classList.add("is-dragging");
+
+      // Custom floating ghost card
+      const rect = card.getBoundingClientRect();
+      const wrapper = activeDocument.createElement("div");
+      wrapper.style.cssText = `
+        position: fixed;
+        top: ${e.clientY - 12}px;
+        left: ${e.clientX - 12}px;
+        transform: rotate(3deg);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        opacity: 0.85;
+        border-radius: var(--radius-m, 6px);
+        pointer-events: none;
+        z-index: 9999;
+      `;
+
+      const ghost = card.cloneNode(true) as HTMLElement;
+      ghost.style.cssText = `
+        width: ${rect.width}px;
+        border-radius: var(--radius-m, 6px);
+        background-color: var(--background-primary);
+        border: 1px solid var(--background-modifier-border);
+      `;
+      wrapper.appendChild(ghost);
+      activeDocument.body.appendChild(wrapper);
+
+      e.dataTransfer!.setDragImage(wrapper, 12, 12);
+      e.dataTransfer!.effectAllowed = "move";
+
+      window.requestAnimationFrame(() => wrapper.remove());
+    };
+    dragHandle.ondragend = () => {
+      this.draggedPropertyName = null;
+      card.classList.remove("is-dragging");
+    };
+
+    // Drop target handlers on card
+    card.ondragover = (e) => {
+      e.preventDefault();
+      card.classList.add("chip-drop-target", "is-newline-drop");
+    };
+    card.ondragleave = () => {
+      card.classList.remove("chip-drop-target", "is-newline-drop");
+    };
+    card.ondrop = (e) => {
+      e.preventDefault();
+      card.classList.remove("chip-drop-target", "is-newline-drop");
+      if (!this.draggedPropertyName) return;
+
+      const fromIndex = this.propertyOrder.indexOf(this.draggedPropertyName);
+      const toIndex = this.propertyOrder.indexOf(CHIP_NEWLINE_SENTINEL);
 
       if (fromIndex !== -1 && fromIndex !== toIndex) {
         const [moved] = this.propertyOrder.splice(fromIndex, 1);

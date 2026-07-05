@@ -156,6 +156,83 @@
   outline-offset: -2px;
 }
 
+/* ============================================================
+   Newline (line break) card — structural marker in the drag list
+   ============================================================ */
+
+.chip-newline-card {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.chip-newline-card:hover {
+  border-color: var(--background-modifier-border-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Distinct icon for newline cards */
+.chip-newline-icon {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-faint);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* Label styling for newline cards */
+.chip-newline-label {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Remove button on newline card */
+.chip-newline-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.chip-newline-remove-btn:hover {
+  background-color: color-mix(in srgb, var(--destructive-accent, var(--text-error)) 15%, transparent);
+  color: var(--text-error, var(--destructive-accent));
+}
+
+/* Drop target highlight for newline cards during drag */
+.chip-newline-card.chip-drop-target.is-newline-drop {
+  border-color: var(--interactive-accent) !important;
+  border-style: solid;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent) !important;
+}
+
+/* "Add line break" button */
+.chip-add-newline-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 4px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-add-newline-btn:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  background-color: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+}
+
 /* Empty state */
 .chip-empty-state {
   color: var(--text-muted);

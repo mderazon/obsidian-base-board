@@ -427,7 +427,18 @@ export class CardManager {
       cls: "base-board-chip-property-container",
     });
 
-    for (const propName of chipProps) {
+    // Load persisted newline positions (indices into the chip property list).
+    const newlinePositions = new Set(
+      this.view.chipProperties.getNewlinePositions(),
+    );
+
+    for (let i = 0; i < chipProps.length; i++) {
+      // Insert a separator before this property if its position matches.
+      if (newlinePositions.has(i)) {
+        container.createEl("div", { cls: "base-board-chip-newline" });
+      }
+
+      const propName = chipProps[i];
       const propId = propName.startsWith("note.")
         ? propName
         : `note.${propName}`;

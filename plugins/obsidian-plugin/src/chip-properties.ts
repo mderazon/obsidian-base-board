@@ -1,14 +1,15 @@
 import { KanbanView } from "./kanban-view";
 import {
-  CONFIG_KEY_CHIP_PROPERTIES,
+  CONFIG_KEY_BORDER_PROPERTY,
   CONFIG_KEY_CHIP_COLORS,
   CONFIG_KEY_CHIP_FIXED_COLORS,
-  CONFIG_KEY_CHIP_SHOW_LABELS,
   CONFIG_KEY_CHIP_ICON_SHOW_LABELS,
   CONFIG_KEY_CHIP_ICONS,
-  CONFIG_KEY_CHIP_STYLERULES,
-  CONFIG_KEY_BORDER_PROPERTY,
+  CONFIG_KEY_CHIP_NEWLINE_POSITIONS,
+  CONFIG_KEY_CHIP_PROPERTIES,
   CONFIG_KEY_CHIP_PROPERTY_MODES,
+  CONFIG_KEY_CHIP_SHOW_LABELS,
+  CONFIG_KEY_CHIP_STYLERULES,
   ORDER_PROPERTY,
 } from "./constants";
 
@@ -91,6 +92,16 @@ export class ChipPropertiesManager {
   public setBorderProperty(name: string): void {
     this.view.config?.set(CONFIG_KEY_BORDER_PROPERTY, name || "");
     this.view.scheduleRender();
+  }
+
+  /** Positions (indices into the chip property list) where line breaks should appear. */
+  public getNewlinePositions(): number[] {
+    const raw = this.view.config?.get(CONFIG_KEY_CHIP_NEWLINE_POSITIONS);
+    return Array.isArray(raw) ? (raw as number[]) : [];
+  }
+
+  public setNewlinePositions(positions: number[]): void {
+    this.view.config?.set(CONFIG_KEY_CHIP_NEWLINE_POSITIONS, positions);
   }
 
   public getChipColors(): ChipColorMap {

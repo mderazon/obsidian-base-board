@@ -35,6 +35,7 @@ export class DragDropManager {
   private autoScrollSpeed = 0; // horizontal (boardEl)
   private autoScrollVerticalSpeed = 0; // vertical (active cards container)
   private autoScrollVerticalEl: HTMLElement | null = null;
+  private lastDragOverColumn: HTMLElement | null = null;
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -321,14 +322,15 @@ export class DragDropManager {
     ) as HTMLElement | null;
 
     if (this.boardEl) {
-      const allColumns = this.boardEl.querySelectorAll(".base-board-column");
-      allColumns.forEach((col) => {
-        if (col === hoveredColumn) {
-          col.classList.add("base-board-column--drag-over");
-        } else {
-          col.classList.remove("base-board-column--drag-over");
-        }
-      });
+      const nextColumn =
+        hoveredColumn instanceof HTMLElement ? hoveredColumn : null;
+      if (nextColumn !== this.lastDragOverColumn) {
+        this.lastDragOverColumn?.classList.remove(
+          "base-board-column--drag-over",
+        );
+        nextColumn?.classList.add("base-board-column--drag-over");
+        this.lastDragOverColumn = nextColumn;
+      }
     }
 
     if (!cardsContainer) {
@@ -507,6 +509,7 @@ export class DragDropManager {
         .querySelectorAll(".base-board-column--drag-over")
         .forEach((col) => col.classList.remove("base-board-column--drag-over"));
     }
+    this.lastDragOverColumn = null;
     this.dragType = null;
   }
 

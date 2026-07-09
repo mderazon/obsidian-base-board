@@ -348,6 +348,16 @@ export class DragDropManager {
       e.clientY,
       "vertical",
     );
+
+    const desiredParent = cardsContainer;
+    const desiredNext = afterElement;
+    if (
+      this.placeholderEl.parentElement === desiredParent &&
+      this.placeholderEl.nextElementSibling === desiredNext
+    ) {
+      return;
+    }
+
     if (afterElement) {
       cardsContainer.insertBefore(this.placeholderEl, afterElement);
     } else {

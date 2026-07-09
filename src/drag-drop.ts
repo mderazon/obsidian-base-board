@@ -122,6 +122,7 @@ export class DragDropManager {
         this.placeholderEl.className = "base-board-column-placeholder";
         columnEl.parentElement?.insertBefore(this.placeholderEl, columnEl);
         columnEl.addClass("base-board-column--dragging");
+        this.boardEl?.addClass("base-board-board--is-dragging");
       });
       return;
     }
@@ -263,6 +264,7 @@ export class DragDropManager {
       this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
       cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
       cardEl.addClass("base-board-card--dragging");
+      this.boardEl?.addClass("base-board-board--is-dragging");
 
       // Dim all other selected cards during multi-drag
       if (isMultiDrag && this.boardEl) {
@@ -477,6 +479,8 @@ export class DragDropManager {
   }
 
   private onDragEnd(): void {
+    this.boardEl?.removeClass("base-board-board--is-dragging");
+
     // Stop any in-progress auto-scroll
     if (this.autoScrollRAF !== null) {
       cancelAnimationFrame(this.autoScrollRAF);

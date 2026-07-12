@@ -17,6 +17,13 @@ import { ColumnManager } from "./column";
 import { CardManager } from "./card";
 import { Tags } from "./tags";
 import {
+  compareOrderValues,
+  generateOrderKeys,
+  isOrderKey,
+  OrderValue,
+  readOrderValue,
+} from "./order";
+import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
@@ -24,6 +31,7 @@ import {
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
+  CONFIG_KEY_ADD_TO_TOP,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -45,12 +53,15 @@ export class KanbanView extends BasesView implements HoverParent {
 
   /** Prevent re-renders while we batch-update frontmatter. */
   private isUpdating = false;
-  /** Track if Bases fired onDataUpdated while we were updating. */
-  private pendingRender = false;
+  /** Track if Bases delivered fresh query data while we were updating. */
+  private pendingDataRender = false;
   /** True until the first successful render completes. */
   private isFirstRender = true;
   /** Debounce timer for render calls. */
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Local drop intent retained until Bases publishes the matching groups. */
+  private optimisticMoves = new Map<string, string>();
+  private optimisticColumnOrders = new Map<string, string[]>();
   /** Label Manager for tags and filters */
   public tags: Tags;
   /** Currently selected card file paths (for batch operations) */
@@ -96,9 +107,10 @@ export class KanbanView extends BasesView implements HoverParent {
 
   public onDataUpdated(): void {
     if (this.isUpdating) {
-      this.pendingRender = true;
+      this.pendingDataRender = true;
       return;
     }
+    this.acknowledgeOptimisticMoves();
     this.scheduleRender();
   }
 
@@ -110,7 +122,7 @@ export class KanbanView extends BasesView implements HoverParent {
     updateFn: () => Promise<void> | void,
   ): Promise<void> {
     this.isUpdating = true;
-    this.pendingRender = false;
+    this.pendingDataRender = false;
 
     try {
       await updateFn();
@@ -119,8 +131,8 @@ export class KanbanView extends BasesView implements HoverParent {
     }
 
     // If Bases fired onDataUpdated during our batch, schedule a debounced render.
-    if (this.pendingRender) {
-      this.pendingRender = false;
+    if (this.pendingDataRender) {
+      this.pendingDataRender = false;
       this.scheduleRender();
     }
   }
@@ -150,9 +162,19 @@ export class KanbanView extends BasesView implements HoverParent {
             default: "cover",
             placeholder: "E.g. cover",
           },
+          {
+            key: CONFIG_KEY_ADD_TO_TOP,
+            type: "toggle" as const,
+            displayName: "Add new cards to top",
+            default: false,
+          },
         ],
       },
     ];
+  }
+
+  public isAddNewCardsToTop(): boolean {
+    return !!this.config?.get(CONFIG_KEY_ADD_TO_TOP);
   }
 
   // ---------------------------------------------------------------------------
@@ -321,13 +343,70 @@ export class KanbanView extends BasesView implements HoverParent {
    * Read kanban_order from metadataCache (more reliable than entry.values
    * since the Bases engine may not expose all properties).
    */
-  public getFileOrder(filePath: string): number {
+  public getFileOrder(filePath: string): OrderValue {
     const file = this.app.vault.getAbstractFileByPath(filePath);
-    if (!file || !(file instanceof TFile)) return Infinity;
+    if (!file || !(file instanceof TFile)) return null;
     const cache = this.app.metadataCache.getFileCache(file);
-    const order: unknown = cache?.frontmatter?.[ORDER_PROPERTY];
-    if (typeof order === "number") return order;
-    return Infinity;
+    return readOrderValue(cache?.frontmatter?.[ORDER_PROPERTY]);
+  }
+
+  public compareFileOrder(pathA: string, pathB: string): number {
+    return compareOrderValues(
+      this.getFileOrder(pathA),
+      this.getFileOrder(pathB),
+    );
+  }
+
+  public compareCardOrder(
+    columnName: string,
+    pathA: string,
+    pathB: string,
+  ): number {
+    const optimisticOrder = this.optimisticColumnOrders.get(columnName);
+    if (optimisticOrder) {
+      const indexA = optimisticOrder.indexOf(pathA);
+      const indexB = optimisticOrder.indexOf(pathB);
+      if (indexA !== -1 || indexB !== -1) {
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      }
+    }
+    return this.compareFileOrder(pathA, pathB);
+  }
+
+  public getEntriesForColumn(
+    columnName: string,
+    group: BasesEntryGroup | null,
+  ): BasesEntry[] {
+    const entries = [...(group?.entries ?? [])].filter((entry) => {
+      const path = entry.file?.path;
+      const optimisticColumn = path ? this.optimisticMoves.get(path) : null;
+      return !optimisticColumn || optimisticColumn === columnName;
+    });
+    const present = new Set(entries.map((entry) => entry.file?.path));
+
+    for (const entry of this.data?.data ?? []) {
+      const path = entry.file?.path;
+      if (
+        path &&
+        this.optimisticMoves.get(path) === columnName &&
+        !present.has(path)
+      ) {
+        entries.push(entry);
+      }
+    }
+    return entries;
+  }
+
+  public getOrderedPathsForColumn(columnName: string): string[] {
+    const group = this.currentGroups.find(
+      (candidate) => this.getColumnName(candidate.key) === columnName,
+    );
+    const paths = (group?.entries ?? [])
+      .map((entry) => entry.file?.path)
+      .filter((path): path is string => typeof path === "string");
+    return paths.sort((a, b) => this.compareFileOrder(a, b));
   }
 
   // ---------------------------------------------------------------------------
@@ -394,8 +473,33 @@ export class KanbanView extends BasesView implements HoverParent {
   //  Rendering
   // ---------------------------------------------------------------------------
 
+  public cardElCache = new Map<string, HTMLElement>();
+  public columnElCache = new Map<string, HTMLElement>();
+
   public render(): void {
     this.selectedCards.clear();
+
+    // Index stable DOM nodes before rebuilding the lightweight board shell.
+    // Columns are detached as complete subtrees, preserving their card lists,
+    // card descendants, scroll state, image elements, and event listeners.
+    this.cardElCache.clear();
+    this.containerEl.querySelectorAll(".base-board-card").forEach((el) => {
+      const path = (el as HTMLElement).dataset.filePath;
+      if (path) {
+        this.cardElCache.set(path, el as HTMLElement);
+      }
+    });
+
+    this.columnElCache.clear();
+    this.containerEl
+      .querySelectorAll<HTMLElement>(".base-board-column")
+      .forEach((el) => {
+        const name = el.dataset.columnName;
+        if (name) {
+          this.columnElCache.set(name, el);
+          el.remove();
+        }
+      });
 
     // Save scroll positions before destroying the DOM so we can restore
     // them after rebuild.  Without this the board jumps back to 0 on every
@@ -464,7 +568,13 @@ export class KanbanView extends BasesView implements HoverParent {
 
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);
-      this.columnManager.renderColumn(boardEl, columnName, group, idx);
+      this.columnManager.renderColumn(
+        boardEl,
+        columnName,
+        group,
+        idx,
+        this.columnElCache.get(columnName),
+      );
     });
 
     this.columnManager.renderAddColumnButton(boardEl);
@@ -526,7 +636,9 @@ export class KanbanView extends BasesView implements HoverParent {
     orderedPaths: string[],
   ): Promise<void> {
     const groupByProp = this.getGroupByProperty();
-    if (!groupByProp) return;
+    if (!groupByProp) {
+      throw new Error("Cannot move a card without a group by property");
+    }
 
     // Snapshot the selection NOW, before any async work or re-render can clear it
     const selectedSnapshot = new Set(this.selectedCards);
@@ -550,47 +662,116 @@ export class KanbanView extends BasesView implements HoverParent {
       fullOrderedPaths.splice(insertAt, 0, ...otherSelected);
     }
 
-    await this.applyBatchUpdate(async () => {
-      // 1. Move all cards to the target column (dragged card + any co-selected)
-      const pathsToMove = isMultiDrag
-        ? [filePath, ...otherSelected]
-        : [filePath];
+    const pathsToMove = isMultiDrag ? [filePath, ...otherSelected] : [filePath];
+    for (const path of pathsToMove) {
+      this.optimisticMoves.set(path, targetColumnName);
+    }
+    this.optimisticColumnOrders.set(targetColumnName, fullOrderedPaths);
 
-      const movePromises = pathsToMove.map((fp) => {
-        const file = this.app.vault.getAbstractFileByPath(fp);
-        if (!file || !(file instanceof TFile)) return Promise.resolve();
-        const sourceColumn = this.getCardSourceColumn(fp);
-        if (sourceColumn === targetColumnName) return Promise.resolve();
-        return this.app.fileManager.processFrontMatter(
-          file,
-          (fm: Record<string, unknown>) => {
-            if (targetColumnName === NO_VALUE_COLUMN) {
-              delete fm[groupByProp];
-            } else {
-              fm[groupByProp] = targetColumnName;
-            }
-          },
-        );
+    try {
+      await this.applyBatchUpdate(async () => {
+        // 1. Move all cards to the target column (dragged card + any co-selected)
+        const movePromises = pathsToMove.map((fp) => {
+          const file = this.app.vault.getAbstractFileByPath(fp);
+          if (!file || !(file instanceof TFile)) return Promise.resolve();
+          const sourceColumn = this.getCardSourceColumn(fp);
+          if (sourceColumn === targetColumnName) return Promise.resolve();
+          return this.app.fileManager.processFrontMatter(
+            file,
+            (fm: Record<string, unknown>) => {
+              if (targetColumnName === NO_VALUE_COLUMN) {
+                delete fm[groupByProp];
+              } else {
+                fm[groupByProp] = targetColumnName;
+              }
+            },
+          );
+        });
+        await Promise.all(movePromises);
+
+        // 2. Update only the moved cards when the column already uses string
+        // fractional keys. Numeric legacy columns are migrated once, in DOM order.
+        await this.writeCardOrder(fullOrderedPaths, pathsToMove);
       });
-      await Promise.all(movePromises);
+    } catch (error) {
+      this.clearOptimisticMoves(pathsToMove, targetColumnName);
+      this.scheduleRender();
+      throw error;
+    }
 
-      // 2. Update kanban_order for all cards in the target column
-      const orderPromises = fullOrderedPaths.map((cardPath, i) => {
+    // The optimistic DOM move remains visible until Bases acknowledges the
+    // write through onDataUpdated(), which is the only fresh-data render path.
+  }
+
+  private acknowledgeOptimisticMoves(): void {
+    const confirmedPaths: string[] = [];
+    for (const [path, expectedColumn] of this.optimisticMoves) {
+      if (
+        this.findCardColumn(this.data?.groupedData ?? [], path) ===
+        expectedColumn
+      ) {
+        confirmedPaths.push(path);
+      }
+    }
+    for (const path of confirmedPaths) this.optimisticMoves.delete(path);
+
+    for (const [columnName, orderedPaths] of this.optimisticColumnOrders) {
+      if (orderedPaths.every((path) => !this.optimisticMoves.has(path))) {
+        this.optimisticColumnOrders.delete(columnName);
+      }
+    }
+  }
+
+  private clearOptimisticMoves(paths: string[], columnName: string): void {
+    for (const path of paths) this.optimisticMoves.delete(path);
+    this.optimisticColumnOrders.delete(columnName);
+  }
+
+  /** Persist a contiguous block within an ordered column. */
+  public async writeCardOrder(
+    orderedPaths: string[],
+    pathsToAssign: string[],
+  ): Promise<void> {
+    if (pathsToAssign.length === 0) return;
+
+    const startIdx = orderedPaths.indexOf(pathsToAssign[0]);
+    const prevPath = startIdx > 0 ? orderedPaths[startIdx - 1] : null;
+    const nextPath =
+      startIdx + pathsToAssign.length < orderedPaths.length
+        ? orderedPaths[startIdx + pathsToAssign.length]
+        : null;
+    const existingPaths = orderedPaths.filter(
+      (path) => !pathsToAssign.includes(path),
+    );
+    const hasLegacyOrder = existingPaths.some(
+      (path) => !isOrderKey(this.getFileOrder(path)),
+    );
+    const pathsToWrite = hasLegacyOrder ? orderedPaths : pathsToAssign;
+    const previousOrder = prevPath ? this.getFileOrder(prevPath) : null;
+    const followingOrder = nextPath ? this.getFileOrder(nextPath) : null;
+    const newOrders = hasLegacyOrder
+      ? generateOrderKeys(null, null, orderedPaths.length)
+      : generateOrderKeys(
+          isOrderKey(previousOrder) ? previousOrder : null,
+          isOrderKey(followingOrder) ? followingOrder : null,
+          pathsToAssign.length,
+        );
+
+    await Promise.all(
+      pathsToWrite.map((cardPath, index) => {
         const file = this.app.vault.getAbstractFileByPath(cardPath);
         if (!file || !(file instanceof TFile)) return Promise.resolve();
+        const orderVal = hasLegacyOrder
+          ? newOrders[index]
+          : newOrders[pathsToAssign.indexOf(cardPath)];
         return this.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
-            fm[ORDER_PROPERTY] = i;
+            fm[ORDER_PROPERTY] = orderVal;
           },
         );
-      });
-      await Promise.all(orderPromises);
-    });
-
-    // Always ensure a re-render, even if Bases hasn't fired onDataUpdated yet.
-    // The scheduleRender is debounced, so if Bases fires later it just coalesces.
-    this.scheduleRender();
+      }),
+    );
   }
 
   /** Debounced render — coalesces multiple calls into one. */
@@ -603,7 +784,14 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   private getCardSourceColumn(filePath: string): string | null {
-    for (const group of this.currentGroups) {
+    return this.findCardColumn(this.currentGroups, filePath);
+  }
+
+  private findCardColumn(
+    groups: BasesEntryGroup[],
+    filePath: string,
+  ): string | null {
+    for (const group of groups) {
       for (const entry of group.entries) {
         if (entry.file?.path === filePath) {
           return this.getColumnName(group.key);

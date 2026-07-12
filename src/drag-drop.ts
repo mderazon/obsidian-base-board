@@ -1,4 +1,4 @@
-import { App, Platform } from "obsidian";
+import { App, Notice } from "obsidian";
 
 // We use dataTransfer types to distinguish card vs column drags
 const CARD_MIME = "application/x-kanban-card";
@@ -24,8 +24,6 @@ export class DragDropManager {
   private draggedEl: HTMLElement | null = null;
   private placeholderEl: HTMLElement | null = null;
   private dragType: "card" | "column" | null = null;
-  /** True after a successful card drop — prevents visual cleanup before re-render */
-  private cardDropped = false;
   /** Height of the dragged card, used to size the placeholder */
   private draggedCardHeight = 0;
   /** Other selected card elements dimmed during multi-drag */
@@ -36,6 +34,12 @@ export class DragDropManager {
   private autoScrollVerticalSpeed = 0; // vertical (active cards container)
   private autoScrollVerticalEl: HTMLElement | null = null;
   private lastDragOverColumn: HTMLElement | null = null;
+  private dropHighlightEl: HTMLElement | null = null;
+  private dropHighlightBoardEl: HTMLElement | null = null;
+  private dropHighlightRAF: number | null = null;
+  private readonly clearDropHighlightOnPointerMove = (): void => {
+    this.clearDropHighlight();
+  };
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -61,6 +65,10 @@ export class DragDropManager {
   initBoard(boardEl: HTMLElement): void {
     this.teardownBoard();
     this.boardEl = boardEl;
+    if (this.dropHighlightEl) {
+      boardEl.addClass("base-board-board--drop-settling");
+      this.dropHighlightBoardEl = boardEl;
+    }
     boardEl.addEventListener("dragstart", this.boundHandlers.dragStart);
     boardEl.addEventListener("dragover", this.boundHandlers.dragOver);
     boardEl.addEventListener("dragend", this.boundHandlers.dragEnd);
@@ -68,6 +76,7 @@ export class DragDropManager {
   }
 
   destroy(): void {
+    this.clearDropHighlight();
     this.teardownBoard();
   }
 
@@ -77,6 +86,10 @@ export class DragDropManager {
     this.boardEl.removeEventListener("dragover", this.boundHandlers.dragOver);
     this.boardEl.removeEventListener("dragend", this.boundHandlers.dragEnd);
     this.boardEl.removeEventListener("drop", this.boundHandlers.drop);
+    this.boardEl.removeClass("base-board-board--drop-settling");
+    if (this.dropHighlightBoardEl === this.boardEl) {
+      this.dropHighlightBoardEl = null;
+    }
     this.removePlaceholder();
     this.boardEl = null;
   }
@@ -87,6 +100,7 @@ export class DragDropManager {
 
   private onDragStart(e: DragEvent): void {
     if (!e.dataTransfer) return;
+    this.clearDropHighlight();
 
     // Check if dragging a column header
     const headerEl = (e.target as HTMLElement).closest(
@@ -496,16 +510,11 @@ export class DragDropManager {
     }
     this.multiDragEls = [];
 
-    if (this.cardDropped) {
-      // Successful card drop — don't restore the card or remove the placeholder.
-      // The re-render will replace the entire DOM with the correct order.
-      this.cardDropped = false;
-    } else if (this.draggedEl) {
-      // Cancelled drag (e.g. dropped outside) — restore original state
+    if (this.draggedEl) {
       this.draggedEl.removeClass("base-board-card--dragging");
       this.draggedEl.removeClass("base-board-column--dragging");
-      this.removePlaceholder();
     }
+    this.removePlaceholder();
     this.draggedEl = null;
     // Remove all column drag-over highlights
     if (this.boardEl) {
@@ -528,14 +537,7 @@ export class DragDropManager {
       this.handleColumnDrop(e);
       this.onDragEnd();
     } else if (this.dragType === "card") {
-      const success = await this.handleCardDrop(e);
-      this.cardDropped = success;
-      // Don't call onDragEnd here on desktop — the browser fires dragend automatically,
-      // and our flag ensures we skip visual cleanup on success.
-      // On mobile, the dragend event is often not fired, so we must call it manually.
-      if (Platform.isMobile) {
-        this.onDragEnd();
-      }
+      await this.handleCardDrop(e);
     }
   }
 
@@ -567,15 +569,15 @@ export class DragDropManager {
     this.callbacks.onColumnReorder(orderedNames);
   }
 
-  private async handleCardDrop(e: DragEvent): Promise<boolean> {
+  private async handleCardDrop(e: DragEvent): Promise<void> {
     const filePath = this.draggedEl?.dataset.filePath;
-    if (!filePath) return false;
+    if (!filePath) return;
 
     const columnEl = (e.target as HTMLElement).closest(".base-board-column");
-    if (!(columnEl instanceof HTMLElement)) return false;
+    if (!(columnEl instanceof HTMLElement)) return;
 
     const targetColumnName = columnEl.dataset.columnName;
-    if (!targetColumnName) return false;
+    if (!targetColumnName) return;
 
     const cardsContainer = columnEl.querySelector(".base-board-cards");
 
@@ -600,8 +602,62 @@ export class DragDropManager {
       }
     }
 
-    await this.callbacks.onCardDrop(filePath, targetColumnName, orderedPaths);
-    return true;
+    const droppedEl = this.draggedEl;
+    const placeholderEl = this.placeholderEl;
+    const additionalDroppedEls = Array.from(this.callbacks.getSelectedCards())
+      .filter((path) => path !== filePath && !orderedPaths.includes(path))
+      .map((path) =>
+        Array.from(
+          this.boardEl?.querySelectorAll<HTMLElement>(".base-board-card") ?? [],
+        ).find((el) => el.dataset.filePath === path),
+      )
+      .filter((el): el is HTMLElement => el instanceof HTMLElement);
+    const movedElements = droppedEl
+      ? [droppedEl, ...additionalDroppedEls]
+      : additionalDroppedEls;
+    const originalPositions = movedElements.map((el) => ({
+      element: el,
+      parent: el.parentElement,
+      nextSibling: el.nextElementSibling,
+      columnName: el.dataset.columnName,
+    }));
+
+    // Commit the user's visual intent before the first asynchronous write.
+    // replaceChild moves the existing node, preserving its identity and subtree.
+    if (droppedEl && placeholderEl?.parentElement) {
+      placeholderEl.parentElement.replaceChild(droppedEl, placeholderEl);
+      this.placeholderEl = null;
+      droppedEl.dataset.columnName = targetColumnName;
+      droppedEl.removeClass("base-board-card--dragging");
+      this.showDropHighlight(droppedEl);
+
+      const insertionPoint = droppedEl.nextSibling;
+      for (const additionalEl of additionalDroppedEls) {
+        droppedEl.parentElement?.insertBefore(additionalEl, insertionPoint);
+        additionalEl.dataset.columnName = targetColumnName;
+        additionalEl.removeClass("base-board-card--drag-ghost");
+      }
+    }
+    this.onDragEnd();
+
+    try {
+      await this.callbacks.onCardDrop(filePath, targetColumnName, orderedPaths);
+    } catch (error) {
+      this.clearDropHighlight();
+      for (const position of originalPositions.reverse()) {
+        if (position.parent) {
+          const nextSibling =
+            position.nextSibling?.parentElement === position.parent
+              ? position.nextSibling
+              : null;
+          position.parent.insertBefore(position.element, nextSibling);
+          if (position.columnName) {
+            position.element.dataset.columnName = position.columnName;
+          }
+        }
+      }
+      new Notice(`Could not move card: ${String(error)}`);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -643,5 +699,41 @@ export class DragDropManager {
       this.placeholderEl.remove();
       this.placeholderEl = null;
     }
+  }
+
+  private showDropHighlight(cardEl: HTMLElement): void {
+    this.clearDropHighlight();
+    this.dropHighlightEl = cardEl;
+    this.dropHighlightBoardEl = this.boardEl;
+    cardEl.addClass("base-board-card--just-dropped");
+    this.boardEl?.addClass("base-board-board--drop-settling");
+
+    // Attach on the next frame so a terminal event from the native drag does
+    // not immediately clear the state. The first real pointer move hands the
+    // highlight back to the browser's normal :hover calculation.
+    this.dropHighlightRAF = window.requestAnimationFrame(() => {
+      this.dropHighlightRAF = null;
+      activeDocument.addEventListener(
+        "pointermove",
+        this.clearDropHighlightOnPointerMove,
+        { once: true, capture: true },
+      );
+    });
+  }
+
+  private clearDropHighlight(): void {
+    if (this.dropHighlightRAF !== null) {
+      window.cancelAnimationFrame(this.dropHighlightRAF);
+      this.dropHighlightRAF = null;
+    }
+    activeDocument.removeEventListener(
+      "pointermove",
+      this.clearDropHighlightOnPointerMove,
+      true,
+    );
+    this.dropHighlightEl?.removeClass("base-board-card--just-dropped");
+    this.dropHighlightBoardEl?.removeClass("base-board-board--drop-settling");
+    this.dropHighlightEl = null;
+    this.dropHighlightBoardEl = null;
   }
 }

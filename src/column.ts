@@ -12,6 +12,7 @@ import { InputModal } from "./modals";
 import { NO_VALUE_COLUMN } from "./constants";
 import { ColorPickerModal } from "./tags";
 import { WipLimitModal } from "./modals";
+import { generateOrderKey, isOrderKey, OrderValue } from "./order";
 
 export class ColumnManager {
   private view: KanbanView;
@@ -25,15 +26,25 @@ export class ColumnManager {
     columnName: string,
     group: BasesEntryGroup | null,
     columnIndex: number,
+    existingColumnEl?: HTMLElement,
   ): void {
     const isNoValue = columnName === NO_VALUE_COLUMN;
-    const entries = group ? group.entries : [];
+    const entries = this.view.getEntriesForColumn(columnName, group);
 
-    // Sort entries up-front so the header add-card button can reference sorted.length
+    // Sort entries up-front using a stable fallback
     const sorted = [...entries].sort((a: BasesEntry, b: BasesEntry) => {
       const pathA = a.file?.path ?? "";
       const pathB = b.file?.path ?? "";
-      return this.view.getFileOrder(pathA) - this.view.getFileOrder(pathB);
+      const orderComparison = this.view.compareCardOrder(
+        columnName,
+        pathA,
+        pathB,
+      );
+      if (orderComparison !== 0) return orderComparison;
+      const timeA = a.file?.stat.ctime ?? 0;
+      const timeB = b.file?.stat.ctime ?? 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return pathA.localeCompare(pathB);
     });
 
     const activeFilters = this.view.tags.activeFilters;
@@ -49,7 +60,15 @@ export class ColumnManager {
           })
         : sorted;
 
-    const columnEl = boardEl.createDiv({ cls: "base-board-column" });
+    const columnEl =
+      existingColumnEl ?? boardEl.createDiv({ cls: "base-board-column" });
+    const existingCardsEl =
+      columnEl.querySelector<HTMLElement>(".base-board-cards");
+    existingCardsEl?.remove();
+    columnEl.empty();
+    columnEl.className = "base-board-column";
+    columnEl.style.removeProperty("--column-color");
+    boardEl.appendChild(columnEl);
     columnEl.dataset.columnName = columnName;
     columnEl.dataset.columnIndex = String(columnIndex);
 
@@ -107,10 +126,29 @@ export class ColumnManager {
       setIcon(addCardHeaderBtn, "plus");
       addCardHeaderBtn.addEventListener("click", (e: MouseEvent) => {
         e.stopPropagation();
+        const addToTop = this.view.isAddNewCardsToTop();
+        let targetOrder: OrderValue = generateOrderKey(null, null);
+        if (sorted.length > 0) {
+          const orders = sorted.map((entry) =>
+            entry.file?.path ? this.view.getFileOrder(entry.file.path) : null,
+          );
+          if (orders.every(isOrderKey)) {
+            targetOrder = addToTop
+              ? generateOrderKey(null, orders[0])
+              : generateOrderKey(orders[orders.length - 1], null);
+          } else {
+            const numericOrders = orders.filter(
+              (order): order is number => typeof order === "number",
+            );
+            targetOrder = addToTop
+              ? Math.min(...numericOrders, 0) - 1000
+              : Math.max(...numericOrders, -1000) + 1000;
+          }
+        }
         this.view.cardManager.startInlineCardCreation(
           addCardHeaderBtn!,
           columnName,
-          sorted.length,
+          targetOrder,
         );
       });
     }
@@ -152,10 +190,27 @@ export class ColumnManager {
     });
 
     // ---- Cards container ----
-    const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
+    const cardsEl =
+      existingCardsEl ?? columnEl.createDiv({ cls: "base-board-cards" });
+    columnEl.appendChild(cardsEl);
+
+    const visiblePaths = new Set(
+      visibleCards.map((entry) => entry.file?.path ?? ""),
+    );
 
     visibleCards.forEach((entry) => {
-      this.view.cardManager.renderCard(cardsEl, entry, columnName);
+      const filePath = entry.file?.path ?? "";
+      const cachedCardEl = this.view.cardElCache.get(filePath);
+      this.view.cardManager.renderCard(
+        cardsEl,
+        entry,
+        columnName,
+        cachedCardEl,
+      );
+    });
+
+    cardsEl.querySelectorAll<HTMLElement>(".base-board-card").forEach((el) => {
+      if (!visiblePaths.has(el.dataset.filePath ?? "")) el.remove();
     });
   }
 

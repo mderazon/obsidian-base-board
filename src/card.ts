@@ -16,6 +16,7 @@ import {
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
+import type { OrderValue } from "./order";
 import { CardDetailModal } from "./card-detail-modal";
 
 const IMAGE_EXTENSIONS = new Set([
@@ -96,12 +97,27 @@ export class CardManager {
     cardsEl: HTMLElement,
     entry: BasesEntry,
     columnName: string,
+    existingCardEl?: HTMLElement | null,
   ): void {
     const filePath = entry.file?.path ?? "";
-    const cardEl = cardsEl.createDiv({ cls: "base-board-card" });
-    cardEl.setAttr("draggable", "true");
-    cardEl.dataset.filePath = filePath;
-    cardEl.dataset.columnName = columnName;
+    const cardEl =
+      existingCardEl ?? cardsEl.createDiv({ cls: "base-board-card" });
+    const renderVersion = this.getRenderVersion(entry);
+
+    if (existingCardEl) {
+      cardsEl.appendChild(cardEl);
+      cardEl.dataset.columnName = columnName;
+      cardEl.removeClass("base-board-card--dragging");
+      cardEl.removeClass("base-board-card--drag-ghost");
+      cardEl.removeClass("base-board-card--selected");
+      if (cardEl.dataset.renderVersion === renderVersion) return;
+      cardEl.innerHTML = "";
+    } else {
+      cardEl.setAttr("draggable", "true");
+      cardEl.dataset.filePath = filePath;
+      cardEl.dataset.columnName = columnName;
+    }
+    cardEl.dataset.renderVersion = renderVersion;
 
     const file = this.view.app.vault.getAbstractFileByPath(filePath);
     const coverProp = this.view.getCardCoverProperty();
@@ -112,122 +128,128 @@ export class CardManager {
       }
     }
 
-    // Open the note on click; guard against accidental clicks after a drag
-    let dragEndTime = 0;
-    cardEl.addEventListener("dragend", () => {
-      dragEndTime = Date.now();
-    });
-
-    cardEl.addEventListener("click", (e: MouseEvent) => {
-      if (Date.now() - dragEndTime < 100) return;
-
-      const isAlt = e.altKey;
-      const isShift = e.shiftKey;
-      const isMod = e.ctrlKey || e.metaKey;
-
-      if ((isAlt || isShift) && !isMod) {
-        e.preventDefault();
-        this.handleCardSelect(filePath, columnName, isShift);
-        return;
-      }
-
-      // If there are selected cards, clear them on a plain click instead of opening
-      if (this.view.selectedCards.size > 0) {
-        this.clearSelection();
-        return;
-      }
-
-      const file = this.view.app.vault.getAbstractFileByPath(filePath);
-      if (!(file instanceof TFile)) return;
-
-      // Handle standard Obsidian modifiers using Keymap.isModEvent(e)
-      const mod = Keymap.isModEvent(e);
-      if (mod) {
-        e.preventDefault();
-        void this.view.app.workspace.getLeaf(mod).openFile(file);
-        return;
-      }
-
-      const openBehavior = this.view.getCardOpenBehavior();
-      if (openBehavior === "split") {
-        if (
-          this.view.detailLeaf &&
-          this.view.isLeafAttached(this.view.detailLeaf)
-        ) {
-          void this.view.detailLeaf.openFile(file);
-        } else {
-          this.view.detailLeaf = this.view.app.workspace.getLeaf(
-            "split",
-            "vertical",
-          );
-          void this.view.detailLeaf.openFile(file);
-        }
-      } else if (openBehavior === "tab") {
-        void this.view.app.workspace.getLeaf("tab").openFile(file);
-      } else if (openBehavior === "active") {
-        void this.view.app.workspace.getLeaf(false).openFile(file);
-      } else {
-        new CardDetailModal(this.view.app, file, this.view).open();
-      }
-    });
-
-    // Middle-click → always open in new tab
-    cardEl.addEventListener("auxclick", (e: MouseEvent) => {
-      if (e.button !== 1) return;
-      const file = this.view.app.vault.getAbstractFileByPath(filePath);
-      if (!(file instanceof TFile)) return;
-      void this.view.app.workspace.getLeaf("tab").openFile(file);
-    });
-
-    // Keyboard: Escape clears multi-selection when a card is focused
-    cardEl.setAttribute("tabindex", "-1");
-    cardEl.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === "Escape" && this.view.selectedCards.size > 0) {
-        e.preventDefault();
-        this.clearSelection();
-      }
-    });
-
-    // Hover → native Obsidian page-preview popover (same as hovering a [[wikilink]])
-    // Use mouseenter (not mouseover) — mouseover bubbles from every child element
-    // and would re-trigger the preview on each chip/tag/title crossing.
-    cardEl.addEventListener("mouseenter", (evt: MouseEvent) => {
-      if (!filePath) return;
-      this.view.app.workspace.trigger("hover-link", {
-        event: evt,
-        source: "base-board",
-        hoverParent: this.view,
-        targetEl: cardEl,
-        linktext: filePath,
+    if (!existingCardEl) {
+      // Open the note on click; guard against accidental clicks after a drag
+      let dragEndTime = 0;
+      cardEl.addEventListener("dragend", () => {
+        dragEndTime = Date.now();
       });
-    });
 
-    // Right-click → batch move menu when cards are selected, otherwise standard file menu
-    cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
-      e.preventDefault();
-      if (Platform.isMobile) return;
-      const file = this.view.app.vault.getAbstractFileByPath(filePath);
-      if (!(file instanceof TFile)) return;
+      cardEl.addEventListener("click", (e: MouseEvent) => {
+        if (Date.now() - dragEndTime < 100) return;
 
-      // If this card is part of a multi-selection, show the batch move menu
-      if (
-        this.view.selectedCards.size > 1 &&
-        this.view.selectedCards.has(filePath)
-      ) {
-        this.showBatchMoveMenu(e);
-        return;
-      }
+        const isAlt = e.altKey;
+        const isShift = e.shiftKey;
+        const isMod = e.ctrlKey || e.metaKey;
 
-      const menu = new Menu();
-      this.view.app.workspace.trigger(
-        "file-menu",
-        menu,
-        file,
-        "base-board-card",
-        this.view.app.workspace.getMostRecentLeaf(),
-      );
-      menu.showAtMouseEvent(e);
-    });
+        if ((isAlt || isShift) && !isMod) {
+          e.preventDefault();
+          this.handleCardSelect(
+            filePath,
+            cardEl.dataset.columnName ?? columnName,
+            isShift,
+          );
+          return;
+        }
+
+        // If there are selected cards, clear them on a plain click instead of opening
+        if (this.view.selectedCards.size > 0) {
+          this.clearSelection();
+          return;
+        }
+
+        const file = this.view.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return;
+
+        // Handle standard Obsidian modifiers using Keymap.isModEvent(e)
+        const mod = Keymap.isModEvent(e);
+        if (mod) {
+          e.preventDefault();
+          void this.view.app.workspace.getLeaf(mod).openFile(file);
+          return;
+        }
+
+        const openBehavior = this.view.getCardOpenBehavior();
+        if (openBehavior === "split") {
+          if (
+            this.view.detailLeaf &&
+            this.view.isLeafAttached(this.view.detailLeaf)
+          ) {
+            void this.view.detailLeaf.openFile(file);
+          } else {
+            this.view.detailLeaf = this.view.app.workspace.getLeaf(
+              "split",
+              "vertical",
+            );
+            void this.view.detailLeaf.openFile(file);
+          }
+        } else if (openBehavior === "tab") {
+          void this.view.app.workspace.getLeaf("tab").openFile(file);
+        } else if (openBehavior === "active") {
+          void this.view.app.workspace.getLeaf(false).openFile(file);
+        } else {
+          new CardDetailModal(this.view.app, file, this.view).open();
+        }
+      });
+
+      // Middle-click → always open in new tab
+      cardEl.addEventListener("auxclick", (e: MouseEvent) => {
+        if (e.button !== 1) return;
+        const file = this.view.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return;
+        void this.view.app.workspace.getLeaf("tab").openFile(file);
+      });
+
+      // Keyboard: Escape clears multi-selection when a card is focused
+      cardEl.setAttribute("tabindex", "-1");
+      cardEl.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Escape" && this.view.selectedCards.size > 0) {
+          e.preventDefault();
+          this.clearSelection();
+        }
+      });
+
+      // Hover → native Obsidian page-preview popover (same as hovering a [[wikilink]])
+      // Use mouseenter (not mouseover) — mouseover bubbles from every child element
+      // and would re-trigger the preview on each chip/tag/title crossing.
+      cardEl.addEventListener("mouseenter", (evt: MouseEvent) => {
+        if (!filePath) return;
+        this.view.app.workspace.trigger("hover-link", {
+          event: evt,
+          source: "base-board",
+          hoverParent: this.view,
+          targetEl: cardEl,
+          linktext: filePath,
+        });
+      });
+
+      // Right-click → batch move menu when cards are selected, otherwise standard file menu
+      cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
+        e.preventDefault();
+        if (Platform.isMobile) return;
+        const file = this.view.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return;
+
+        // If this card is part of a multi-selection, show the batch move menu
+        if (
+          this.view.selectedCards.size > 1 &&
+          this.view.selectedCards.has(filePath)
+        ) {
+          this.showBatchMoveMenu(e);
+          return;
+        }
+
+        const menu = new Menu();
+        this.view.app.workspace.trigger(
+          "file-menu",
+          menu,
+          file,
+          "base-board-card",
+          this.view.app.workspace.getMostRecentLeaf(),
+        );
+        menu.showAtMouseEvent(e);
+      });
+    }
 
     const tagContainerEl = cardEl.createDiv({
       cls: "base-board-tag-container",
@@ -348,6 +370,63 @@ export class CardManager {
         toggleBtn.setText(expanded ? "show less" : `+${overflowCount} more`);
       });
     }
+  }
+
+  private getRenderVersion(entry: BasesEntry): string {
+    const file = entry.file;
+    const groupByProp = this.view.getGroupByProperty();
+    const visibleProperties = this.view.config
+      .getOrder()
+      .filter((propId) => {
+        const propName = propId.startsWith("note.") ? propId.slice(5) : propId;
+        return propName !== groupByProp && propName !== ORDER_PROPERTY;
+      })
+      .map((propId) => {
+        const value = entry.getValue(propId);
+        return [
+          propId,
+          this.view.config.getDisplayName(propId),
+          value && !(value instanceof NullValue) && value.isTruthy()
+            ? formatValueForChip(value)
+            : "",
+        ];
+      });
+    const resolvedFile = file
+      ? this.view.app.vault.getAbstractFileByPath(file.path)
+      : null;
+    const tags =
+      resolvedFile instanceof TFile
+        ? this.view.tags.extractTagsFromFile(resolvedFile)
+        : [];
+    const coverProperty = this.view.getCardCoverProperty();
+    const cover =
+      resolvedFile instanceof TFile && coverProperty
+        ? this.getCardCoverSrc(resolvedFile, coverProperty)
+        : null;
+    const titleProperty = this.view.config.get("cardTitleProperty");
+    const titleValue =
+      typeof titleProperty === "string"
+        ? entry.getValue(
+            (titleProperty.startsWith("note.")
+              ? titleProperty
+              : `note.${titleProperty}`) as BasesPropertyId,
+          )
+        : null;
+
+    return JSON.stringify({
+      path: file?.path ?? "",
+      basename: file?.basename ?? "",
+      cover,
+      title:
+        titleValue &&
+        !(titleValue instanceof NullValue) &&
+        titleValue.isTruthy()
+          ? formatValueForChip(titleValue)
+          : (file?.basename ?? "Untitled"),
+      visibleProperties,
+      tags,
+      tagColors: this.view.tags.getColors(),
+    });
   }
 
   /** Create a single chip span with label + value inside the given parent. */
@@ -497,7 +576,7 @@ export class CardManager {
   public startInlineCardCreation(
     btnEl: HTMLElement,
     columnName: string,
-    existingCount: number,
+    targetOrder: OrderValue,
   ): void {
     // Find the cards list for this column.
     // The trigger button may be in the header OR in the footer, so we walk
@@ -526,7 +605,7 @@ export class CardManager {
       inputWrapper.remove();
       btnEl.classList.remove("base-board-hidden");
       if (name) {
-        await this.createNewCard(name, columnName, existingCount);
+        await this.createNewCard(name, columnName, targetOrder);
       }
     };
 
@@ -549,7 +628,7 @@ export class CardManager {
   private async createNewCard(
     title: string,
     columnName: string,
-    orderIndex: number,
+    targetOrder: OrderValue,
   ): Promise<void> {
     const groupByProp = this.view.getGroupByProperty();
     if (!groupByProp) {
@@ -559,7 +638,7 @@ export class CardManager {
 
     const overrides = (fm: Record<string, unknown>) => {
       fm[groupByProp] = columnName;
-      fm[ORDER_PROPERTY] = orderIndex;
+      fm[ORDER_PROPERTY] = targetOrder;
     };
 
     try {
@@ -677,20 +756,25 @@ export class CardManager {
     targetColumn: string,
     groupByProp: string,
   ): Promise<void> {
+    const selected = new Set(filePaths);
+    const orderedPaths = this.view
+      .getOrderedPathsForColumn(targetColumn)
+      .filter((path) => !selected.has(path));
+    orderedPaths.push(...filePaths);
+
     await this.view.applyBatchUpdate(async () => {
-      const updates = filePaths.map((fp, i) => {
+      const updates = filePaths.map((fp) => {
         const file = this.view.app.vault.getAbstractFileByPath(fp);
         if (!file || !(file instanceof TFile)) return Promise.resolve();
         return this.view.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
             fm[groupByProp] = targetColumn;
-            // Preserve relative order by assigning sequential indices
-            fm[ORDER_PROPERTY] = i;
           },
         );
       });
       await Promise.all(updates);
+      await this.view.writeCardOrder(orderedPaths, filePaths);
     });
     this.clearSelection();
     new Notice(

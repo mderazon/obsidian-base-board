@@ -78,7 +78,8 @@
   );
 }
 
-.base-board-column.base-board-column--wip-overflow[style*="--column-color"] .base-board-column-count,
+.base-board-column.base-board-column--wip-overflow[style*="--column-color"]
+  .base-board-column-count,
 .base-board-column.base-board-column--wip-overflow .base-board-column-count {
   background-color: color-mix(
     in srgb,
@@ -383,6 +384,22 @@
     var(--interactive-accent) 6%,
     var(--background-primary)
   );
+}
+
+/* Native drag-and-drop can leave :hover latched to the card that shifted into
+   the source slot. During the handoff, highlight the dropped card explicitly
+   and suppress only the stale, non-selected hover target. */
+.base-board-board--drop-settling
+  .base-board-card:hover:not(.base-board-card--selected):not(
+    .base-board-card--just-dropped
+  ) {
+  border-color: var(--background-modifier-border);
+  box-shadow: none;
+}
+
+.base-board-card--just-dropped {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 /* Other selected cards dimmed during a multi-drag */

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run --dir tests",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "lint": "tsc -noEmit -skipLibCheck && eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\""
@@ -33,6 +34,10 @@
     "obsidian": "1.13.1",
     "prettier": "3.8.4",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.61.0"
+    "typescript-eslint": "8.61.0",
+    "vitest": "3.2.7"
+  },
+  "dependencies": {
+    "fractional-indexing": "4.0.0"
   }
 }

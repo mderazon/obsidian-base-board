@@ -34,13 +34,17 @@ Open the **Command palette** (`Ctrl/Cmd + P`) and run **"Base Board: Create new 
 
 By default, card interaction respects native Obsidian conventions:
 
-* **Click:** Open the card's note in the active tab / pane.
-* **Ctrl/Cmd + Click:** Open the note in a new tab.
-* **Ctrl/Cmd + Alt + Click** (or **Cmd + Option + Click** on macOS): Open the note to the side in a split pane.
-* **Alt / Option + Click:** Toggle selection of a card (for bulk actions or dragging).
-* **Shift + Click:** Select a range of cards.
+- **Click:** Open the card's note in the active tab / pane.
+- **Ctrl/Cmd + Click:** Open the note in a new tab.
+- **Ctrl/Cmd + Alt + Click** (or **Cmd + Option + Click** on macOS): Open the note to the side in a split pane.
+- **Alt / Option + Click:** Toggle selection of a card (for bulk actions or dragging).
+- **Shift + Click:** Select a range of cards.
 
 You can customize the default click behavior (e.g. to always open in a floating modal, split pane, or new tab) via the board toolbar under the view options menu.
+
+### Card Ordering
+
+Base Board uses manual drag order so cards remain exactly where you place them. This order is stored in each note's `kanban_order` property and overrides the native Bases **Sort by** setting.
 
 ## Installation
 

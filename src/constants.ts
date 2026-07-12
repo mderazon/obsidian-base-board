@@ -22,6 +22,9 @@ export const CONFIG_KEY_WIP_LIMITS = "wipLimits";
 /** Key used by BasesViewConfig.set/get to persist card cover property key in the .base file. */
 export const CONFIG_KEY_COVER_PROPERTY = "cardCoverProperty";
 
+/** Key used by BasesViewConfig.set/get to persist if new cards should be added to the top in the .base file. */
+export const CONFIG_KEY_ADD_TO_TOP = "newCardsToTop";
+
 /**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.

@@ -35,6 +35,7 @@ export class DragDropManager {
   private autoScrollSpeed = 0; // horizontal (boardEl)
   private autoScrollVerticalSpeed = 0; // vertical (active cards container)
   private autoScrollVerticalEl: HTMLElement | null = null;
+  private lastDragOverColumn: HTMLElement | null = null;
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -121,6 +122,7 @@ export class DragDropManager {
         this.placeholderEl.className = "base-board-column-placeholder";
         columnEl.parentElement?.insertBefore(this.placeholderEl, columnEl);
         columnEl.addClass("base-board-column--dragging");
+        this.boardEl?.addClass("base-board-board--is-dragging");
       });
       return;
     }
@@ -262,6 +264,7 @@ export class DragDropManager {
       this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
       cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
       cardEl.addClass("base-board-card--dragging");
+      this.boardEl?.addClass("base-board-board--is-dragging");
 
       // Dim all other selected cards during multi-drag
       if (isMultiDrag && this.boardEl) {
@@ -321,14 +324,15 @@ export class DragDropManager {
     ) as HTMLElement | null;
 
     if (this.boardEl) {
-      const allColumns = this.boardEl.querySelectorAll(".base-board-column");
-      allColumns.forEach((col) => {
-        if (col === hoveredColumn) {
-          col.classList.add("base-board-column--drag-over");
-        } else {
-          col.classList.remove("base-board-column--drag-over");
-        }
-      });
+      const nextColumn =
+        hoveredColumn instanceof HTMLElement ? hoveredColumn : null;
+      if (nextColumn !== this.lastDragOverColumn) {
+        this.lastDragOverColumn?.classList.remove(
+          "base-board-column--drag-over",
+        );
+        nextColumn?.classList.add("base-board-column--drag-over");
+        this.lastDragOverColumn = nextColumn;
+      }
     }
 
     if (!cardsContainer) {
@@ -348,6 +352,16 @@ export class DragDropManager {
       e.clientY,
       "vertical",
     );
+
+    const desiredParent = cardsContainer;
+    const desiredNext = afterElement;
+    if (
+      this.placeholderEl.parentElement === desiredParent &&
+      this.placeholderEl.nextElementSibling === desiredNext
+    ) {
+      return;
+    }
+
     if (afterElement) {
       cardsContainer.insertBefore(this.placeholderEl, afterElement);
     } else {
@@ -465,6 +479,8 @@ export class DragDropManager {
   }
 
   private onDragEnd(): void {
+    this.boardEl?.removeClass("base-board-board--is-dragging");
+
     // Stop any in-progress auto-scroll
     if (this.autoScrollRAF !== null) {
       cancelAnimationFrame(this.autoScrollRAF);
@@ -497,6 +513,7 @@ export class DragDropManager {
         .querySelectorAll(".base-board-column--drag-over")
         .forEach((col) => col.classList.remove("base-board-column--drag-over"));
     }
+    this.lastDragOverColumn = null;
     this.dragType = null;
   }
 

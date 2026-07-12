@@ -543,6 +543,16 @@
   animation: base-board-placeholder-pulse 1.5s ease-in-out infinite;
 }
 
+/* Disable transitions during drag to avoid layout/paint backlog */
+.base-board-board--is-dragging .base-board-cards,
+.base-board-board--is-dragging .base-board-cards:empty,
+.base-board-board--is-dragging .base-board-card-placeholder,
+.base-board-board--is-dragging .base-board-card--drag-ghost,
+.base-board-board--is-dragging .base-board-column-placeholder {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* ---- Add column button ---- */
 
 .base-board-add-column-btn {

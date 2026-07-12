@@ -310,6 +310,7 @@ export class CardManager {
       propId: string;
       displayName: string;
       display: string;
+      val: Value;
     }
 
     const chips: ChipDescriptor[] = [];
@@ -331,6 +332,7 @@ export class CardManager {
         propId,
         displayName: this.view.config.getDisplayName(propId),
         display,
+        val,
       });
     }
 
@@ -338,8 +340,8 @@ export class CardManager {
 
     // Render visible chips.
     for (let i = 0; i < chips.length && i < CHIP_VISIBLE; i++) {
-      const { displayName, display, propId } = chips[i];
-      this.renderChip(propsEl, displayName, display, propId);
+      const { displayName, display, propId, val } = chips[i];
+      this.renderChip(propsEl, displayName, display, propId, val);
     }
 
     // Overflow chips (if any) go into a collapsible container.
@@ -350,8 +352,8 @@ export class CardManager {
           cls: "base-board-card-chips-overflow",
         });
       }
-      const { displayName, display, propId } = chips[i];
-      this.renderChip(overflowEl, displayName, display, propId);
+      const { displayName, display, propId, val } = chips[i];
+      this.renderChip(overflowEl, displayName, display, propId, val);
     }
 
     // ---- Expand toggle when chips exceed visible threshold ----
@@ -434,11 +436,22 @@ export class CardManager {
     label: string,
     value: string,
     propId?: string,
+    val?: Value,
   ): HTMLElement {
     const chip = parent.createSpan({ cls: "base-board-card-chip" });
     if (propId) chip.setAttr("data-property-id", propId);
     chip.createSpan({ text: label, cls: "base-board-chip-label" });
-    chip.createSpan({ text: value, cls: "base-board-chip-value" });
+    const valueEl = chip.createSpan({ cls: "base-board-chip-value" });
+    // Formula properties (e.g. one using html()) resolve to a value whose
+    // toString() is raw markup. Render formula output through the Bases
+    // renderer so HTML is shown as rich content instead of being escaped to
+    // literal text by setText().
+    if (val && propId?.startsWith("formula.")) {
+      valueEl.addClass("base-board-chip-value--formula");
+      val.renderTo(valueEl, this.view.app.renderContext);
+    } else {
+      valueEl.setText(value);
+    }
     return chip;
   }
 

@@ -505,6 +505,22 @@
   text-overflow: ellipsis;
 }
 
+/* Rendered formula output (e.g. a formula using html()) renders inline. Keep
+   any block-level markup the formula emits flowing on the chip's single line. */
+.base-board-chip-value--formula,
+.base-board-chip-value--formula * {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}
+
+.base-board-chip-value--formula img,
+.base-board-chip-value--formula svg {
+  display: inline-block;
+  max-height: 1.1em;
+  vertical-align: text-bottom;
+}
+
 /* Overflow chips — hidden until expanded */
 .base-board-card-chips-overflow {
   display: none;

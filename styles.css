@@ -5,11 +5,47 @@
 /* ---- Container / Board ---- */
 
 .base-board-container {
-  width: 100%;
-  height: 100%;
+  /* Anchor to the nearest positioned ancestor instead of relying on
+     height:100% propagation. In some Obsidian Bases contexts the
+     scrollEl's own height resolves to "auto" once content grows,
+     which makes height:100% here collapse to fit content instead of
+     filling the real available space — leaving a gap at the bottom
+     and a vertical scrollbar that stops short of the window edge.
+     position:absolute + inset:0 sidesteps that entirely. */
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* If the view's immediate wrapper is statically positioned, add this
+   helper class to make it a positioning context for absolutely-
+   positioned children like `.base-board-container`. Adding a class
+   avoids inline style mutations and keeps theming consistent. */
+.base-board-positioned-root {
+  position: relative;
+}
+
+/* Chip Config Modal header */
+.chip-config-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+.chip-config-header h2 {
+  font-size: 18px;
+  font-weight: var(--font-semibold);
+  margin: 0 0 4px 0;
+}
+
+.chip-config-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
 }
 
 /* Inline embed: .bases-embed wraps the view with no defined height,
@@ -635,6 +671,37 @@
 
 /* ---- Filter Bar ---- */
 
+.base-board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.base-board-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 0.35em 0.9em;
+  background-color: var(--background-modifier-surface);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.base-board-toolbar-button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.base-board-toolbar-button-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+}
+
 .base-board-filter-bar {
   display: flex;
   align-items: center;
@@ -681,6 +748,25 @@
     0 0 0 2px var(--background-secondary),
     0 0 0 4px var(--interactive-accent);
   font-weight: var(--font-bold);
+}
+
+.base-board-chip-config-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 0.35em;
+  background-color: var(--background-modifier-surface);
+  color: var(--text-normal);
+  cursor: pointer;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+}
+
+.base-board-chip-config-btn:hover {
+  background-color: var(--background-modifier-hover);
 }
 
 .base-board-filter-clear {
@@ -851,4 +937,604 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* ---- Chip Properties (custom frontmatter value chips) ---- */
+
+.base-board-chip-property-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.base-board-chip-property {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--chip-color, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  cursor: default;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.base-board-chip-property:hover {
+  opacity: 0.85;
+}
+
+.base-board-chip-property-light {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.base-board-chip-property-dark {
+  color: #1c212b;
+  text-shadow: none;
+}
+
+.base-board-chip-property .base-board-chip-property-label {
+  opacity: 0.75;
+  margin-right: 3px;
+  font-weight: var(--font-normal);
+}
+
+.base-board-chip-property-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--chip-color, var(--interactive-accent));
+  line-height: 1;
+}
+
+.base-board-chip-property-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  line-height: 1;
+}
+
+.base-board-chip-property-icon svg {
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+
+/* Chip config modal — show label toggle */
+.chip-show-label-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip-show-label-wrapper:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.chip-show-label-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.chip-icon-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 112px;
+  max-width: 220px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chip-icon-picker-btn:hover {
+  border-color: var(--background-modifier-border-hover);
+  background-color: var(--background-modifier-hover);
+}
+
+.chip-icon-picker-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-normal);
+}
+
+.chip-icon-picker-preview.is-empty {
+  width: 14px;
+  height: 14px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+  margin: 3px;
+}
+
+.chip-icon-picker-preview svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chip-icon-picker-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.chip-icon-help {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.chip-show-label-text {
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+/* ---- Card border via CSS variable (applied after base card border) ---- */
+
+.base-board-card {
+  border-left: 3px solid var(--card-border-color, transparent);
+}
+
+.base-board-card-thumbnail-img,
+.base-board-card img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* ============================================================
+   Chip Config Modal — Two Column Layout (NEW)
+   ============================================================ */
+
+.modal.base-board-chip-config-modal {
+  width: min(1200px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: min(92vh, 1100px);
+}
+
+.chip-config-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1.6fr);
+  min-width: 0;
+  min-height: min(70vh, 720px);
+  max-height: 100%;
+  margin-bottom: 8px;
+}
+
+/* Ensure left panel fills available space */
+.chip-config-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Header spans both columns */
+.chip-config-header {
+  grid-column: 1 / -1;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+.chip-config-header h2 {
+  font-size: 18px;
+  font-weight: var(--font-semibold);
+  margin: 0 0 4px 0;
+}
+
+.chip-config-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* LEFT: navigation panel */
+.chip-config-left {
+  border-right: 1px solid var(--background-modifier-border);
+  padding: 12px;
+  overflow-y: auto;
+  background-color: var(--background-secondary);
+}
+
+/* RIGHT: editor panel */
+.chip-config-right {
+  padding: 20px 24px;
+  overflow-y: auto;
+  background-color: var(--background-primary);
+  min-width: 0;
+}
+
+/* Section blocks (shared) */
+.chip-config-left .chip-config-section,
+.chip-config-right .chip-config-section {
+  margin-bottom: 16px;
+}
+
+/* ============================================================
+   Left panel — property navigation
+   ============================================================ */
+
+.chip-property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  max-height: min(420px, calc(70vh - 220px));
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Each property becomes a selectable row */
+.base-board-chip-property-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.08s ease;
+}
+
+/* Hover = UI affordance */
+.base-board-chip-property-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Active selection = modern sidebar highlight */
+.base-board-chip-property-row.is-active {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 12%,
+    var(--background-secondary)
+  );
+  border-left: 2px solid var(--interactive-accent);
+  padding-left: 6px;
+}
+
+/* Checkbox alignment cleanup */
+.base-board-chip-property-row input[type="checkbox"] {
+  margin: 0;
+  transform: translateY(1px);
+}
+
+/* Reorder buttons */
+.base-board-chip-move-btn {
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background-color 0.12s ease;
+  user-select: none;
+}
+
+.base-board-chip-move-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+   Right panel — editor
+   ============================================================ */
+
+.chip-property-editor {
+  max-width: none;
+  width: 100%;
+}
+
+/* Title feels like a section header, not a modal header */
+.chip-property-editor h3 {
+  font-size: 16px;
+  font-weight: var(--font-semibold);
+  margin-bottom: 12px;
+}
+
+/* Empty state now centered + calm */
+.chip-empty-state {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+}
+
+/* ============================================================
+   Color mapping editor — modern inspector style
+   ============================================================ */
+
+.base-board-chip-mapping-section {
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background-color: var(--background-secondary);
+  margin-bottom: 12px;
+}
+
+.base-board-chip-mapping-section h4 {
+  margin: 0 0 10px 0;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  opacity: 0.9;
+}
+
+/* Each row becomes a mini "property editor row" */
+.base-board-chip-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto auto minmax(120px, 220px) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+/* Value label */
+.base-board-chip-mapping-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+}
+
+.base-board-chip-mapping-edit {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+}
+
+.base-board-chip-mapping-edit:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+/* Color picker becomes cleaner */
+.base-board-chip-color-swatch {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+/* Delete button becomes subtle until hover */
+.base-board-chip-mapping-delete {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  opacity: 0.4;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.base-board-chip-mapping-delete:hover {
+  opacity: 1;
+}
+
+/* ============================================================
+   Mode selector (radio group)
+   ============================================================ */
+
+.chip-mode-section {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chip-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.chip-radio-label input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Fixed color section (single picker) */
+.chip-fixed-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chip-fixed-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+/* Per-value section */
+.chip-per-value-section {
+  margin-top: 8px;
+}
+
+/* Utility class to hide elements */
+.is-hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   Improved button style (less "settings plugin energy")
+   ============================================================ */
+
+.base-board-chip-add-mapping-btn {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--background-modifier-border);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.base-board-chip-add-mapping-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ============================================================
+   Small but important UX fixes
+   ============================================================ */
+
+/* Better section spacing rhythm */
+.base-board-chip-config-section {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.base-board-chip-config-section:last-child {
+  border-bottom: none;
+}
+
+/* Make border selector feel less "form field" */
+.base-board-chip-border-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+/* ============================================================
+   Icon Picker Modal — searchable grid of all Obsidian icons
+   ============================================================ */
+
+.modal.base-board-icon-picker-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+}
+
+.icon-picker-search {
+  width: 100%;
+  padding: 6px 10px;
+  margin: 4px 0 12px 0;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.icon-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: center;
+}
+
+.icon-picker-tile:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.icon-picker-tile.is-selected {
+  background-color: var(--background-modifier-active-hover);
+  border-color: var(--interactive-accent);
+}
+
+.icon-picker-tile-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-normal);
+}
+
+.icon-picker-tile-glyph svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-picker-tile-glyph.icon-picker-none {
+  width: 16px;
+  height: 16px;
+  border: 1px dashed var(--text-faint);
+  border-radius: 3px;
+}
+
+.icon-picker-tile-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-transform: capitalize;
+}
+
+.icon-picker-empty {
+  grid-column: 1 / -1;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
 }

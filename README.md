@@ -18,6 +18,7 @@
 - **Inline Power**: Rename cards or column titles directly on the board.
 - **Native Editing Modal**: Open any card into a fully-functional Obsidian editor floating directly over your workspace.
 - **Rich Cards**: View key metadata fields as chips on each card for a quick overview.
+- **Chip Properties**: Use the board toolbar to map frontmatter fields into colored chip badges, optionally set one property as a card border color, and even render a configured icon instead of the text value.
 - **Configurable Card Title**: Set `cardTitleProperty: note.title` in your `.base` file to use a frontmatter property (e.g. `title`) as the card heading instead of the filename.
 - **Tags**: Color-coded tag chips on cards with a clickable filter bar to narrow the board by tag.
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).
@@ -41,6 +42,8 @@ By default, card interaction respects native Obsidian conventions:
 * **Shift + Click:** Select a range of cards.
 
 You can customize the default click behavior (e.g. to always open in a floating modal, split pane, or new tab) via the board toolbar under the view options menu.
+
+To configure chip properties, open any board and use the toolbar button labeled "Configure chip properties" to select frontmatter fields, assign colors, choose a border-color property, and optionally define an icon override for a chip.
 
 ## Installation
 

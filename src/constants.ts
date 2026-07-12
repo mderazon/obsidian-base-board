@@ -22,6 +22,24 @@ export const CONFIG_KEY_WIP_LIMITS = "wipLimits";
 /** Key used by BasesViewConfig.set/get to persist card cover property key in the .base file. */
 export const CONFIG_KEY_COVER_PROPERTY = "cardCoverProperty";
 
+/** Key used by BasesViewConfig.set/get to persist selected chip property names. */
+export const CONFIG_KEY_CHIP_PROPERTIES = "chipProperties";
+
+/** Key used by BasesViewConfig.set/get to persist per-property value→color mappings. */
+export const CONFIG_KEY_CHIP_COLORS = "chipColors";
+
+/** Key used by BasesViewConfig.set/get to persist one fixed color per chip property. */
+export const CONFIG_KEY_CHIP_FIXED_COLORS = "chipFixedColors";
+
+/** Key used by BasesViewConfig.set/get to persist per-property "show label" toggles. */
+export const CONFIG_KEY_CHIP_SHOW_LABELS = "chipShowLabels";
+
+/** Key used by BasesViewConfig.set/get to persist per-property value→icon mappings. */
+export const CONFIG_KEY_CHIP_ICONS = "chipIcons";
+
+/** Key used by BasesViewConfig.set/get to persist which property controls card border color. */
+export const CONFIG_KEY_BORDER_PROPERTY = "borderProperty";
+
 /**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.

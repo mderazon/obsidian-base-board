@@ -1,6 +1,7 @@
 import {
   BasesEntry,
   BasesPropertyId,
+  BooleanValue,
   DateValue,
   LinkValue,
   ListValue,
@@ -13,6 +14,7 @@ import {
   Keymap,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
+import { InputModal } from "./modals";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
 import { CardDetailModal } from "./card-detail-modal";
@@ -31,6 +33,15 @@ const IMAGE_EXTENSIONS = new Set([
   "svg",
   "webp",
 ]);
+
+/** Check if a value is present and should be displayed. */
+function isValuePresent(val: Value | null | undefined): val is Value {
+  if (!val) return false;
+  if (val instanceof NullValue) return false;
+  // BooleanValue(false) is an explicit false, not "no value"
+  if (val instanceof BooleanValue) return true;
+  return val.isTruthy();
+}
 
 // Format a Value for chip display:
 //   - DateValue    → relative ("3 days ago")
@@ -59,7 +70,7 @@ function formatValueForChip(val: Value): string {
     const len = val.length();
     for (let i = 0; i < len; i++) {
       const item = val.get(i);
-      if (!item || item instanceof NullValue || !item.isTruthy()) continue;
+      if (!isValuePresent(item)) continue;
       parts.push(formatValueForChip(item));
     }
     return parts.join(", ");
@@ -105,7 +116,7 @@ export class CardManager {
     const file = this.view.app.vault.getAbstractFileByPath(filePath);
     const coverProp = this.view.getCardCoverProperty();
     if (file instanceof TFile && coverProp) {
-      const src = this.getCardCoverSrc(file, coverProp);
+      const src = this.getCardCoverSrc(file, entry, coverProp);
       if (src) {
         this.renderCardThumbnail(cardEl, src);
       }
@@ -254,6 +265,30 @@ export class CardManager {
       }
     }
 
+    // ---- Chip properties (custom frontmatter value chips) ----
+    this.renderChipProperties(cardEl, entry);
+
+    // ---- Card border color from configured border property ----
+    const borderProp = this.view.chipProperties.getBorderProperty();
+    if (borderProp) {
+      const borderPropId = borderProp.startsWith("note.")
+        ? borderProp
+        : `note.${borderProp}`;
+      const borderVal = entry.getValue(borderPropId as BasesPropertyId);
+      if (isValuePresent(borderVal)) {
+        const display = formatValueForChip(borderVal);
+        if (display) {
+          const borderColor = this.view.chipProperties.getColorForValue(
+            borderProp,
+            display,
+          );
+          if (borderColor) {
+            cardEl.style.setProperty("--card-border-color", borderColor);
+          }
+        }
+      }
+    }
+
     const titleEl = cardEl.createDiv({ cls: "base-board-card-title" });
 
     // Respect cardTitleProperty if configured — use a frontmatter property
@@ -267,7 +302,7 @@ export class CardManager {
         ? titleProp
         : `note.${titleProp}`;
       const tv = entry.getValue(propId as BasesPropertyId);
-      if (tv && !(tv instanceof NullValue) && tv.isTruthy()) {
+      if (isValuePresent(tv)) {
         cardTitle = formatValueForChip(tv);
       }
     }
@@ -295,17 +330,22 @@ export class CardManager {
     }
 
     const chips: ChipDescriptor[] = [];
+    const chipPropNames = new Set(this.view.chipProperties.getChipProperties());
+    const borderPropName = this.view.chipProperties.getBorderProperty();
     for (const propId of visibleProps) {
       if (chips.length >= 6) break;
+      if (chips.length >= 10) break;
       if (propId.startsWith("file.")) {
         if (FILE_PROPS_TO_SKIP.has(propId.slice(5))) continue;
       }
       const propName = propId.startsWith("note.") ? propId.slice(5) : propId;
       if (groupByProp && propName === groupByProp) continue;
       if (propName === ORDER_PROPERTY) continue;
+      if (chipPropNames.has(propName)) continue;
+      if (borderPropName && propName === borderPropName) continue;
 
       const val = entry.getValue(propId);
-      if (!val || val instanceof NullValue || !val.isTruthy()) continue;
+      if (!isValuePresent(val)) continue;
       const display = formatValueForChip(val);
       if (!display) continue;
 
@@ -365,6 +405,109 @@ export class CardManager {
     chip.createSpan({ text: label, cls: "base-board-chip-label" });
     chip.createSpan({ text: value, cls: "base-board-chip-value" });
     return chip;
+  }
+
+  /** Render custom frontmatter fields as colored value-only chips. */
+  private renderChipProperties(parent: HTMLElement, entry: BasesEntry): void {
+    const chipProps = this.view.chipProperties.getChipProperties();
+    if (chipProps.length === 0) return;
+
+    const container = parent.createDiv({
+      cls: "base-board-chip-property-container",
+    });
+
+    for (const propName of chipProps) {
+      const propId = propName.startsWith("note.")
+        ? propName
+        : `note.${propName}`;
+      const val = entry.getValue(propId as BasesPropertyId);
+      if (!isValuePresent(val)) continue;
+
+      const display = formatValueForChip(val);
+      if (!display) continue;
+
+      this.renderChipProperty(container, propName, display);
+    }
+  }
+
+  /** Render a single chip property pill. */
+  private renderChipProperty(
+    parent: HTMLElement,
+    propName: string,
+    value: string,
+  ): void {
+    const chip = parent.createSpan({ cls: "base-board-chip-property" });
+    chip.setAttr("data-property-name", propName);
+
+    // Resolve color from manager (mapped or deterministic fallback)
+    const color = this.view.chipProperties.getColorForValue(propName, value);
+    if (color) {
+      chip.style.setProperty("--chip-color", color);
+      if (relativeLuminance(color) === "dark") {
+        chip.addClass("base-board-chip-property-light");
+      } else {
+        chip.addClass("base-board-chip-property-dark");
+      }
+    }
+
+    const chipIconName = this.view.chipProperties.getChipIcon(propName, value);
+    const showLabels = this.view.chipProperties.getShowLabels();
+    if (showLabels[propName] && !chipIconName) {
+      const propId = propName.startsWith("note.")
+        ? (propName as BasesPropertyId)
+        : (`note.${propName}` as BasesPropertyId);
+      const displayName = this.view.config.getDisplayName(propId);
+      chip.createSpan({
+        text: `${displayName}: `,
+        cls: "base-board-chip-property-label",
+      });
+    }
+
+    if (chipIconName) {
+      chip.removeClass("base-board-chip-property");
+      chip.addClass("base-board-chip-property-icon-only");
+      const iconEl = chip.createSpan({
+        cls: "base-board-chip-property-icon",
+      });
+      setIcon(iconEl, chipIconName);
+    } else if (!showLabels[propName]) {
+      chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+    } else {
+      chip.createSpan({ text: value, cls: "base-board-chip-property-value" });
+    }
+
+    // Right-click → context menu for color editing
+    chip.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+      this.showChipContextMenu(e, propName, value);
+    });
+  }
+
+  /** Show context menu on a chip property (right-click). */
+  private showChipContextMenu(
+    e: MouseEvent,
+    propName: string,
+    value: string,
+  ): void {
+    const currentColor = this.view.chipProperties.getColorForValue(
+      propName,
+      value,
+    );
+    new InputModal(
+      this.view.app,
+      `Color for "${value}"`,
+      "Enter hex color (e.g. #ff0000)",
+      (newColor) => {
+        if (newColor && newColor.trim()) {
+          this.view.chipProperties.setCustomColor(
+            propName,
+            value,
+            newColor.trim(),
+          );
+        }
+      },
+      currentColor || "",
+    ).open();
   }
 
   private showCardActionMenu(
@@ -701,21 +844,41 @@ export class CardManager {
     );
   }
 
-  private getCardCoverSrc(file: TFile, coverPropName: string): string | null {
-    if (coverPropName === "__proto__" || coverPropName === "constructor") {
+  private getCardCoverSrc(
+    file: TFile,
+    entry: BasesEntry,
+    coverPropName: string,
+  ): string | null {
+    if (coverPropName === "__proto__" || coverPropName === "constructor")
       return null;
-    }
+
+    // 1. Try frontmatter first (plain property like "cover")
     const cache = this.view.app.metadataCache.getFileCache(file);
     const rawValue: unknown = cache?.frontmatter?.[coverPropName];
-    if (!rawValue) return null;
-    if (typeof rawValue !== "string" && typeof rawValue !== "number")
-      return null;
-
-    if (typeof rawValue === "string" && /^https?:\/\//i.test(rawValue)) {
-      return rawValue;
+    if (
+      rawValue &&
+      (typeof rawValue === "string" || typeof rawValue === "number")
+    ) {
+      const src = this.resolveCoverString(String(rawValue), file);
+      if (src) return src;
     }
 
-    const cleanPath = String(rawValue)
+    // 2. Try entry.getValue() for Bases property IDs like "formula.cover"
+    const propId = coverPropName.includes(".")
+      ? coverPropName
+      : `note.${coverPropName}`;
+    const val = entry.getValue(propId as BasesPropertyId);
+    if (!val || val instanceof NullValue || !val.isTruthy()) return null;
+
+    return this.resolveCoverString(val.toString().trim(), file);
+  }
+
+  private resolveCoverString(rawValue: string, file: TFile): string | null {
+    if (!rawValue) return null;
+
+    if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+    const cleanPath = rawValue
       .replace(/^!?\[\[(.*?)\]\]$/, "$1")
       .split("|")[0]
       .split("#")[0]
@@ -741,15 +904,14 @@ export class CardManager {
   private renderCardThumbnail(cardEl: HTMLElement, src: string): void {
     const thumbEl = activeDocument.createElement("div");
     thumbEl.className = "base-board-card-thumbnail";
-    thumbEl
-      .createEl("img", {
-        cls: "base-board-card-thumbnail-img",
-        attr: { src, loading: "lazy" },
-      })
-      .addEventListener("error", () => {
-        thumbEl.remove();
-        cardEl.removeClass("base-board-card--has-thumbnail");
-      });
+    const thumbImg = thumbEl.createEl("img", {
+      cls: "base-board-card-thumbnail-img",
+      attr: { src, loading: "lazy", draggable: "false" },
+    });
+    thumbImg.addEventListener("error", () => {
+      thumbEl.remove();
+      cardEl.removeClass("base-board-card--has-thumbnail");
+    });
     cardEl.prepend(thumbEl);
     cardEl.addClass("base-board-card--has-thumbnail");
   }

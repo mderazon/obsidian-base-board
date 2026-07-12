@@ -16,6 +16,8 @@ import { DragDropManager } from "./drag-drop";
 import { ColumnManager } from "./column";
 import { CardManager } from "./card";
 import { Tags } from "./tags";
+import { ChipPropertiesManager } from "./chip-properties";
+import { ChipConfigModal, ChipConfigSnapshot } from "./chip-config-modal";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
@@ -24,6 +26,11 @@ import {
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
+  CONFIG_KEY_BORDER_PROPERTY,
+  CONFIG_KEY_CHIP_PROPERTIES,
+  CONFIG_KEY_CHIP_COLORS,
+  CONFIG_KEY_CHIP_FIXED_COLORS,
+  CONFIG_KEY_CHIP_ICONS,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -42,6 +49,7 @@ export class KanbanView extends BasesView implements HoverParent {
   private columnManager: ColumnManager;
   public currentGroups: BasesEntryGroup[] = [];
   public cardManager: CardManager;
+  public chipProperties: ChipPropertiesManager;
 
   /** Prevent re-renders while we batch-update frontmatter. */
   private isUpdating = false;
@@ -65,11 +73,37 @@ export class KanbanView extends BasesView implements HoverParent {
     super(controller);
     this.scrollEl = scrollEl;
     this.plugin = plugin;
+
+    // .base-board-container is anchored with position:absolute + inset:0
+    // (see styles.css) so it reliably fills the available space even if
+    // scrollEl's own height resolves to "auto". That requires scrollEl to
+    // be a positioning context — set it defensively rather than relying on
+    // Obsidian's default wrapper styling, which can vary by context
+    // (full view vs. inline embed) and silently break the anchor.
+    if (getComputedStyle(scrollEl).position === "static") {
+      scrollEl.classList.add("base-board-positioned-root");
+    }
+
     this.containerEl = scrollEl.createDiv({ cls: "base-board-container" });
 
     this.tags = new Tags(this);
+    this.tags.setChipConfigCallback(() => {
+      new ChipConfigModal(
+        this.app,
+        this.chipProperties,
+        (config: ChipConfigSnapshot) => {
+          this.config?.set(CONFIG_KEY_CHIP_PROPERTIES, config.properties);
+          this.config?.set(CONFIG_KEY_BORDER_PROPERTY, config.borderProperty);
+          this.config?.set(CONFIG_KEY_CHIP_COLORS, config.colors);
+          this.config?.set(CONFIG_KEY_CHIP_FIXED_COLORS, config.fixedColors);
+          this.config?.set(CONFIG_KEY_CHIP_ICONS, config.icons);
+          this.scheduleRender();
+        },
+      ).open();
+    });
     this.cardManager = new CardManager(this);
     this.columnManager = new ColumnManager(this);
+    this.chipProperties = new ChipPropertiesManager(this);
 
     this.dragDropManager = new DragDropManager(this.app, {
       onCardDrop: (

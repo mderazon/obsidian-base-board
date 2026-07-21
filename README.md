@@ -20,6 +20,7 @@
 - **Rich Cards**: View key metadata fields as chips on each card for a quick overview.
 - **Configurable Card Title**: Set `cardTitleProperty: note.title` in your `.base` file to use a frontmatter property (e.g. `title`) as the card heading instead of the filename.
 - **Tags**: Color-coded tag chips on cards with a clickable filter bar to narrow the board by tag.
+- **Derived tags**: Optionally surface the values of other frontmatter properties (e.g. `assignee`, `priority`) as tags — they join the filter bar and card chips automatically, with no manual tagging, and are never written back to the note's `tags` frontmatter. Configure via the "Derive tags from properties" view option.
 - **Hover Preview**: Native note previews on hover (uses the **Page preview** core plugin).
 - **One-Click Creation**: Add new notes directly to a specific column without leaving the board view.
 - **WIP Limits**: Set per-column work-in-progress limits via the column header context menu. Columns that exceed their limit are highlighted in red.

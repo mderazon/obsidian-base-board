@@ -38,3 +38,16 @@ export const UNSAFE_FILENAME_CHARS = /[\\/:*?"<>|]/g;
 export function sanitizeFilename(name: string): string {
   return name.replace(UNSAFE_FILENAME_CHARS, "");
 }
+
+/**
+ * Sanitize a user-supplied string for use as a single folder name nested
+ * directly under another folder: strips characters invalid in file/folder
+ * names (via sanitizeFilename) and rejects "." / "..". Those contain no
+ * invalid characters on their own, but the latter would resolve outside the
+ * folder it's nested under and the former would represent the folder itself.
+ * Neither is permitted in the design.
+ */
+export function sanitizeFolderSegment(name: string): string {
+  const clean = sanitizeFilename(name);
+  return clean === "." || clean === ".." ? "" : clean;
+}

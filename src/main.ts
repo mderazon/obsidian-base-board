@@ -7,7 +7,7 @@ import {
   TAbstractFile,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
-import { sanitizeFilename } from "./constants";
+import { sanitizeFilename, sanitizeFolderSegment } from "./constants";
 import { CreateBoardModal, BoardConfig } from "./modals";
 import { updateBaseFolderReferences } from "./folder-rename";
 
@@ -140,12 +140,14 @@ export default class BaseBoardPlugin extends Plugin {
   // -- Board scaffolding ------------------------------------------------------
 
   private async createBoard(config: BoardConfig): Promise<void> {
-    const { name, folder, groupBy } = config;
+    const { name, folder, groupBy, tasksFolder: tasksFolderName } = config;
     const vault = this.app.vault;
 
     // Sanitize folder path
     const safeFolder = folder.replace(/[\\:*?"<>|]/g, "");
-    const tasksFolder = `${safeFolder}/Tasks`;
+    const safeTasksFolderName =
+      sanitizeFolderSegment(tasksFolderName || "Tasks") || "Tasks";
+    const tasksFolder = `${safeFolder}/${safeTasksFolderName}`;
 
     // 1. Create folder structure
     if (!vault.getAbstractFileByPath(safeFolder)) {

@@ -161,6 +161,7 @@ export interface BoardConfig {
   name: string;
   folder: string;
   groupBy: string;
+  tasksFolder: string;
 }
 
 export class CreateBoardModal extends Modal {
@@ -168,6 +169,7 @@ export class CreateBoardModal extends Modal {
     name: "",
     folder: "",
     groupBy: "status",
+    tasksFolder: "Tasks",
   };
   private onSubmit: (config: BoardConfig) => void;
 
@@ -209,6 +211,16 @@ export class CreateBoardModal extends Modal {
         });
       });
 
+    // --- Tasks folder ---
+    new Setting(contentEl)
+      .setName("Tasks folder name")
+      .setDesc("Subfolder (inside the board folder) where task files live")
+      .addText((text) => {
+        text.setValue("Tasks");
+        text.setPlaceholder("Tasks");
+        text.onChange((v) => (this.config.tasksFolder = v || "Tasks"));
+      });
+
     // --- GroupBy property ---
     new Setting(contentEl)
       .setName("Group by property")
@@ -245,6 +257,7 @@ export class CreateBoardModal extends Modal {
     this.config.name = name;
     this.config.folder = this.config.folder.trim() || name;
     this.config.groupBy = this.config.groupBy.trim() || "status";
+    this.config.tasksFolder = this.config.tasksFolder.trim() || "Tasks";
     this.close();
     this.onSubmit(this.config);
   }

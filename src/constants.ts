@@ -26,6 +26,12 @@ export const CONFIG_KEY_COVER_PROPERTY = "cardCoverProperty";
 export const CONFIG_KEY_ADD_TO_TOP = "newCardsToTop";
 
 /**
+ * Key used by BasesViewConfig.set/get to persist the list of frontmatter
+ * properties whose values are surfaced as derived (virtual) tags.
+ */
+export const CONFIG_KEY_TAG_PROPERTIES = "tagProperties";
+
+/**
  * Regex matching characters that are invalid in file/folder names.
  * Used when sanitizing user input before creating vault items.
  */

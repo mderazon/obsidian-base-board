@@ -32,6 +32,7 @@ import {
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
   CONFIG_KEY_ADD_TO_TOP,
+  CONFIG_KEY_TAG_PROPERTIES,
 } from "./constants";
 
 interface BoardScrollState {
@@ -173,6 +174,13 @@ export class KanbanView extends BasesView implements HoverParent {
             type: "toggle" as const,
             displayName: "Add new cards to top",
             default: false,
+          },
+          {
+            key: CONFIG_KEY_TAG_PROPERTIES,
+            type: "text" as const,
+            displayName: "Derive tags from properties",
+            default: "",
+            placeholder: "E.g. assignee, priority",
           },
         ],
       },

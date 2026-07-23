@@ -12,7 +12,6 @@ import { InputModal } from "./modals";
 import { NO_VALUE_COLUMN } from "./constants";
 import { ColorPickerModal } from "./tags";
 import { WipLimitModal } from "./modals";
-import { generateOrderKey, isOrderKey, OrderValue } from "./order";
 
 export class ColumnManager {
   private view: KanbanView;
@@ -126,25 +125,7 @@ export class ColumnManager {
       setIcon(addCardHeaderBtn, "plus");
       addCardHeaderBtn.addEventListener("click", (e: MouseEvent) => {
         e.stopPropagation();
-        const addToTop = this.view.isAddNewCardsToTop();
-        let targetOrder: OrderValue = generateOrderKey(null, null);
-        if (sorted.length > 0) {
-          const orders = sorted.map((entry) =>
-            entry.file?.path ? this.view.getFileOrder(entry.file.path) : null,
-          );
-          if (orders.every(isOrderKey)) {
-            targetOrder = addToTop
-              ? generateOrderKey(null, orders[0])
-              : generateOrderKey(orders[orders.length - 1], null);
-          } else {
-            const numericOrders = orders.filter(
-              (order): order is number => typeof order === "number",
-            );
-            targetOrder = addToTop
-              ? Math.min(...numericOrders, 0) - 1000
-              : Math.max(...numericOrders, -1000) + 1000;
-          }
-        }
+        const targetOrder = this.view.generateNewCardOrders(columnName, 1)[0];
         this.view.cardManager.startInlineCardCreation(
           addCardHeaderBtn!,
           columnName,
@@ -329,6 +310,7 @@ export class ColumnManager {
   public handleDeleteColumn(columnName: string): void {
     const columns = this.view.getColumns().filter((c) => c !== columnName);
     this.view.saveColumns(columns);
+    this.view.removeColumnPreferences(columnName);
     this.view.render();
   }
 
@@ -407,6 +389,7 @@ export class ColumnManager {
       // 1. Update column config
       const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
       this.view.saveColumns(updatedColumns);
+      this.view.updateColumnPreferences(oldName, newName);
 
       // 2. Update frontmatter for all cards in this column
       if (groupByProp) {

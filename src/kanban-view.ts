@@ -7,6 +7,7 @@ import {
   HoverPopover,
   QueryController,
   NullValue,
+  Notice,
   setIcon,
   TFile,
   WorkspaceLeaf,
@@ -27,6 +28,7 @@ import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
+  CONFIG_KEY_DEFAULT_COLUMN,
   CONFIG_KEY_OPEN_BEHAVIOR,
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
@@ -56,6 +58,9 @@ export class KanbanView extends BasesView implements HoverParent {
   private columnManager: ColumnManager;
   public currentGroups: BasesEntryGroup[] = [];
   public cardManager: CardManager;
+
+  /** Entry paths from the previous snapshot, to detect newly-created notes. */
+  private seenEntryPaths: Set<string> | null = null;
 
   /** Prevent re-renders while we batch-update frontmatter. */
   private isUpdating = false;
@@ -117,7 +122,83 @@ export class KanbanView extends BasesView implements HoverParent {
       return;
     }
     this.acknowledgeOptimisticMoves();
+    this.assignDefaultColumnToNewEntries();
     this.scheduleRender();
+  }
+
+  /**
+   * Move newly-created no-value notes into the default column. The native Bases
+   * "New" button bypasses `createFileForView`, so we detect new entries here by
+   * diffing snapshots and write the default column into their frontmatter.
+   */
+  private assignDefaultColumnToNewEntries(): void {
+    const currentPaths = new Set<string>();
+    for (const entry of this.data?.data ?? []) {
+      const path = entry.file?.path;
+      if (path) currentPaths.add(path);
+    }
+
+    // First snapshot only establishes the baseline; never reassign existing notes.
+    if (this.seenEntryPaths === null) {
+      this.seenEntryPaths = currentPaths;
+      return;
+    }
+
+    const previousPaths = this.seenEntryPaths;
+    this.seenEntryPaths = currentPaths;
+
+    const groupByProp = this.getGroupByProperty();
+    const defaultColumn = this.getDefaultColumn();
+    if (!groupByProp || !defaultColumn || defaultColumn === NO_VALUE_COLUMN) {
+      return;
+    }
+
+    const newFiles: TFile[] = [];
+    for (const group of this.data?.groupedData ?? []) {
+      if (this.getColumnName(group.key) !== NO_VALUE_COLUMN) continue;
+      for (const entry of group.entries) {
+        const path = entry.file?.path;
+        if (!path || previousPaths.has(path)) continue;
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) newFiles.push(file);
+      }
+    }
+
+    if (newFiles.length === 0) return;
+
+    // Order must be computed before the optimistic move, or the new cards would
+    // count themselves as existing column members.
+    const movedPaths = newFiles.map((file) => file.path);
+    const orders = this.generateNewCardOrders(defaultColumn, movedPaths.length);
+    const existingPaths = this.getOrderedPathsForColumn(defaultColumn);
+    const orderedPaths = this.isAddNewCardsToTop()
+      ? [...movedPaths, ...existingPaths]
+      : [...existingPaths, ...movedPaths];
+
+    // Optimistic placement avoids a flash before the async write lands.
+    for (const path of movedPaths) {
+      this.optimisticMoves.set(path, defaultColumn);
+    }
+    this.optimisticColumnOrders.set(defaultColumn, orderedPaths);
+
+    void this.applyBatchUpdate(async () => {
+      await Promise.all(
+        newFiles.map((file, i) =>
+          this.app.fileManager.processFrontMatter(
+            file,
+            (fm: Record<string, unknown>) => {
+              fm[groupByProp] = defaultColumn;
+              fm[ORDER_PROPERTY] = orders[i];
+            },
+          ),
+        ),
+      );
+    }).catch((err) => {
+      for (const path of movedPaths) this.optimisticMoves.delete(path);
+      this.optimisticColumnOrders.delete(defaultColumn);
+      new Notice(`Failed to move new card to default column: ${String(err)}`);
+      this.scheduleRender();
+    });
   }
 
   /**
@@ -173,6 +254,13 @@ export class KanbanView extends BasesView implements HoverParent {
             type: "toggle" as const,
             displayName: "Add new cards to top",
             default: false,
+          },
+          {
+            key: CONFIG_KEY_DEFAULT_COLUMN,
+            type: "text" as const,
+            displayName: "Default column for new cards",
+            default: "",
+            placeholder: "E.g. To Do",
           },
         ],
       },
@@ -415,6 +503,45 @@ export class KanbanView extends BasesView implements HoverParent {
     return paths.sort((a, b) => this.compareFileOrder(a, b));
   }
 
+  /**
+   * `count` distinct `kanban_order` values for new cards in `columnName`,
+   * honoring the "Add new cards to top" setting.
+   */
+  public generateNewCardOrders(
+    columnName: string,
+    count: number,
+  ): OrderValue[] {
+    if (count <= 0) return [];
+
+    const group = this.getGroupForColumn(columnName);
+    const orders = this.getEntriesForColumn(columnName, group).map((entry) =>
+      entry.file?.path ? this.getFileOrder(entry.file.path) : null,
+    );
+    const addToTop = this.isAddNewCardsToTop();
+
+    const keys = orders.filter(isOrderKey);
+    if (keys.length === orders.length && keys.length > 0) {
+      keys.sort((a, b) => compareOrderValues(a, b));
+      return addToTop
+        ? generateOrderKeys(null, keys[0], count)
+        : generateOrderKeys(keys[keys.length - 1], null, count);
+    }
+
+    if (orders.length === 0) {
+      return generateOrderKeys(null, null, count);
+    }
+
+    // Legacy numeric columns: fall back to numeric spacing.
+    const numericOrders = orders.filter(
+      (order): order is number => typeof order === "number",
+    );
+    const min = Math.min(...numericOrders, 0);
+    const max = Math.max(...numericOrders, -1000);
+    return Array.from({ length: count }, (_, i) =>
+      addToTop ? min - 1000 * (count - i) : max + 1000 * (i + 1),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   //  Column config  (dual-layer: .base file via config API + plugin data.json)
   // ---------------------------------------------------------------------------
@@ -463,6 +590,17 @@ export class KanbanView extends BasesView implements HoverParent {
     }
 
     return dataColumns;
+  }
+
+  public getDefaultColumn(): string | null {
+    const value = this.config?.get(CONFIG_KEY_DEFAULT_COLUMN);
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  public setDefaultColumn(columnName: string | null): void {
+    this.config?.set(CONFIG_KEY_DEFAULT_COLUMN, columnName?.trim() ?? "");
   }
 
   private getGroupForColumn(columnName: string): BasesEntryGroup | null {
@@ -635,6 +773,18 @@ export class KanbanView extends BasesView implements HoverParent {
 
     // Legacy fallback: also write to plugin data.json
     void this.plugin.saveColumnConfig(this.getBaseId(), { columns });
+  }
+
+  public updateColumnPreferences(oldName: string, newName: string): void {
+    if (this.getDefaultColumn() === oldName) {
+      this.setDefaultColumn(newName);
+    }
+  }
+
+  public removeColumnPreferences(columnName: string): void {
+    if (this.getDefaultColumn() === columnName) {
+      this.setDefaultColumn(null);
+    }
   }
 
   // ---------------------------------------------------------------------------

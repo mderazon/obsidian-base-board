@@ -27,6 +27,7 @@ import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
+  CONFIG_KEY_COLLAPSED_COLUMNS,
   CONFIG_KEY_OPEN_BEHAVIOR,
   CONFIG_KEY_COLUMN_COLORS,
   CONFIG_KEY_WIP_LIMITS,
@@ -465,6 +466,32 @@ export class KanbanView extends BasesView implements HoverParent {
     return dataColumns;
   }
 
+  public getCollapsedColumns(): Record<string, boolean> {
+    const raw = this.config?.get(CONFIG_KEY_COLLAPSED_COLUMNS);
+    return raw && typeof raw === "object"
+      ? (raw as Record<string, boolean>)
+      : {};
+  }
+
+  public isColumnCollapsed(columnName: string): boolean {
+    return !!this.getCollapsedColumns()[columnName];
+  }
+
+  public setColumnCollapsed(columnName: string, collapsed: boolean): void {
+    const state = this.getCollapsedColumns();
+    if (collapsed) {
+      state[columnName] = true;
+    } else {
+      delete state[columnName];
+    }
+    this.config?.set(CONFIG_KEY_COLLAPSED_COLUMNS, state);
+    this.scheduleRender();
+  }
+
+  public toggleColumnCollapsed(columnName: string): void {
+    this.setColumnCollapsed(columnName, !this.isColumnCollapsed(columnName));
+  }
+
   private getGroupForColumn(columnName: string): BasesEntryGroup | null {
     for (const group of this.currentGroups) {
       if (this.getColumnName(group.key) === columnName) {
@@ -635,6 +662,23 @@ export class KanbanView extends BasesView implements HoverParent {
 
     // Legacy fallback: also write to plugin data.json
     void this.plugin.saveColumnConfig(this.getBaseId(), { columns });
+  }
+
+  public updateColumnPreferences(oldName: string, newName: string): void {
+    const collapsed = this.getCollapsedColumns();
+    if (collapsed[oldName]) {
+      delete collapsed[oldName];
+      collapsed[newName] = true;
+      this.config?.set(CONFIG_KEY_COLLAPSED_COLUMNS, collapsed);
+    }
+  }
+
+  public removeColumnPreferences(columnName: string): void {
+    const collapsed = this.getCollapsedColumns();
+    if (collapsed[columnName]) {
+      delete collapsed[columnName];
+      this.config?.set(CONFIG_KEY_COLLAPSED_COLUMNS, collapsed);
+    }
   }
 
   // ---------------------------------------------------------------------------

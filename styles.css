@@ -67,6 +67,10 @@
     transform 0.15s ease;
 }
 
+.base-board-column--collapsed {
+  max-height: none;
+}
+
 /* WIP overflow — red highlight */
 .base-board-column.base-board-column--wip-overflow[style*="--column-color"],
 .base-board-column.base-board-column--wip-overflow {
@@ -178,6 +182,31 @@
   cursor: grabbing;
 }
 
+.base-board-column-collapse-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  padding: 0;
+}
+
+.base-board-column-collapse-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+
+.base-board-column-collapse-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .base-board-column-drag-handle {
   flex-shrink: 0;
   color: var(--text-faint);
@@ -275,6 +304,19 @@
   gap: 6px;
   min-height: 40px;
   transition: background-color 0.2s ease;
+}
+
+.base-board-column--collapsed > .base-board-cards {
+  display: none;
+}
+
+/* Collapsed column expands while a card is dragged over it */
+.base-board-column--collapsed.base-board-column--drag-expanded {
+  max-height: 100%;
+}
+
+.base-board-column--collapsed.base-board-column--drag-expanded > .base-board-cards {
+  display: flex;
 }
 
 /* ---- Empty column drop zone ---- */

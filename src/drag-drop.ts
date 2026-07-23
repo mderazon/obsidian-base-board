@@ -343,8 +343,15 @@ export class DragDropManager {
       if (nextColumn !== this.lastDragOverColumn) {
         this.lastDragOverColumn?.classList.remove(
           "base-board-column--drag-over",
+          "base-board-column--drag-expanded",
         );
-        nextColumn?.classList.add("base-board-column--drag-over");
+        if (nextColumn) {
+          nextColumn.classList.add("base-board-column--drag-over");
+          // Expand a collapsed column so it can receive the drop.
+          if (nextColumn.classList.contains("base-board-column--collapsed")) {
+            nextColumn.classList.add("base-board-column--drag-expanded");
+          }
+        }
         this.lastDragOverColumn = nextColumn;
       }
     }
@@ -516,11 +523,17 @@ export class DragDropManager {
     }
     this.removePlaceholder();
     this.draggedEl = null;
-    // Remove all column drag-over highlights
     if (this.boardEl) {
       this.boardEl
-        .querySelectorAll(".base-board-column--drag-over")
-        .forEach((col) => col.classList.remove("base-board-column--drag-over"));
+        .querySelectorAll(
+          ".base-board-column--drag-over, .base-board-column--drag-expanded",
+        )
+        .forEach((col) =>
+          col.classList.remove(
+            "base-board-column--drag-over",
+            "base-board-column--drag-expanded",
+          ),
+        );
     }
     this.lastDragOverColumn = null;
     this.dragType = null;

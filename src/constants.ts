@@ -7,6 +7,9 @@ export const ORDER_PROPERTY = "kanban_order";
 /** Key used by BasesViewConfig.set/get to persist column order in the .base file. */
 export const CONFIG_KEY_COLUMNS = "boardColumns";
 
+/** Key used by BasesViewConfig.set/get to persist collapsed column state. */
+export const CONFIG_KEY_COLLAPSED_COLUMNS = "collapsedColumns";
+
 /** Key used by BasesViewConfig.set/get to persist custom tag colors in the .base file. */
 export const CONFIG_KEY_TAG_COLORS = "tagColors";
 

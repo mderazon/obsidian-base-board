@@ -30,6 +30,7 @@ export class ColumnManager {
   ): void {
     const isNoValue = columnName === NO_VALUE_COLUMN;
     const entries = this.view.getEntriesForColumn(columnName, group);
+    const isCollapsed = this.view.isColumnCollapsed(columnName);
 
     // Sort entries up-front using a stable fallback
     const sorted = [...entries].sort((a: BasesEntry, b: BasesEntry) => {
@@ -71,6 +72,7 @@ export class ColumnManager {
     boardEl.appendChild(columnEl);
     columnEl.dataset.columnName = columnName;
     columnEl.dataset.columnIndex = String(columnIndex);
+    columnEl.classList.toggle("base-board-column--collapsed", isCollapsed);
 
     // ---- WIP limit check ----
     const wipLimit = this.view.getWipLimit(columnName);
@@ -93,6 +95,19 @@ export class ColumnManager {
       cls: "base-board-column-drag-handle",
     });
     setIcon(dragHandle, "grip-vertical");
+
+    const collapseBtn = headerEl.createEl("button", {
+      cls: "base-board-column-collapse-btn",
+      attr: {
+        type: "button",
+        "aria-label": isCollapsed ? "Expand column" : "Collapse column",
+      },
+    });
+    setIcon(collapseBtn, isCollapsed ? "chevron-right" : "chevron-down");
+    collapseBtn.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
+      this.view.toggleColumnCollapsed(columnName);
+    });
 
     // Title + inline count badge
     const titleEl = headerEl.createSpan({
@@ -194,6 +209,8 @@ export class ColumnManager {
       existingCardsEl ?? columnEl.createDiv({ cls: "base-board-cards" });
     columnEl.appendChild(cardsEl);
 
+    // Cards render even when collapsed (CSS hides them) so the column stays a
+    // valid drop target that expands on drag-over.
     const visiblePaths = new Set(
       visibleCards.map((entry) => entry.file?.path ?? ""),
     );
@@ -329,6 +346,7 @@ export class ColumnManager {
   public handleDeleteColumn(columnName: string): void {
     const columns = this.view.getColumns().filter((c) => c !== columnName);
     this.view.saveColumns(columns);
+    this.view.removeColumnPreferences(columnName);
     this.view.render();
   }
 
@@ -407,6 +425,7 @@ export class ColumnManager {
       // 1. Update column config
       const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
       this.view.saveColumns(updatedColumns);
+      this.view.updateColumnPreferences(oldName, newName);
 
       // 2. Update frontmatter for all cards in this column
       if (groupByProp) {

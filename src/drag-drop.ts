@@ -1,4 +1,4 @@
-import { App, Notice } from "obsidian";
+import { App, Notice, Platform } from "obsidian";
 
 // We use dataTransfer types to distinguish card vs column drags
 const CARD_MIME = "application/x-kanban-card";
@@ -41,6 +41,22 @@ export class DragDropManager {
     this.clearDropHighlight();
   };
 
+  // --- Touch (Pointer Events) drag state ---
+  // The native HTML5 drag-and-drop API never fires on touch devices, so on
+  // mobile we drive an equivalent drag with pointer events instead.
+  private static readonly LONG_PRESS_MS = 200;
+  private static readonly MOVE_CANCEL_PX = 10;
+  private pointerId: number | null = null;
+  private pointerLongPressTimer: number | null = null;
+  private pointerStartX = 0;
+  private pointerStartY = 0;
+  private pointerGrabOffsetX = 0;
+  private pointerGrabOffsetY = 0;
+  private pointerCandidateEl: HTMLElement | null = null;
+  private pointerCandidateType: "card" | "column" | null = null;
+  private pointerDragging = false;
+  private pointerGhostEl: HTMLElement | null = null;
+
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
     dragOver: (e: DragEvent) => void;
@@ -73,6 +89,8 @@ export class DragDropManager {
     boardEl.addEventListener("dragover", this.boundHandlers.dragOver);
     boardEl.addEventListener("dragend", this.boundHandlers.dragEnd);
     boardEl.addEventListener("drop", this.boundHandlers.drop);
+    // Touch drag (mobile): native DnD does not fire on touch input.
+    boardEl.addEventListener("pointerdown", this.onPointerDown);
   }
 
   destroy(): void {
@@ -82,10 +100,12 @@ export class DragDropManager {
 
   private teardownBoard(): void {
     if (!this.boardEl) return;
+    this.cancelPointerDrag();
     this.boardEl.removeEventListener("dragstart", this.boundHandlers.dragStart);
     this.boardEl.removeEventListener("dragover", this.boundHandlers.dragOver);
     this.boardEl.removeEventListener("dragend", this.boundHandlers.dragEnd);
     this.boardEl.removeEventListener("drop", this.boundHandlers.drop);
+    this.boardEl.removeEventListener("pointerdown", this.onPointerDown);
     this.boardEl.removeClass("base-board-board--drop-settling");
     if (this.dropHighlightBoardEl === this.boardEl) {
       this.dropHighlightBoardEl = null;
@@ -132,11 +152,7 @@ export class DragDropManager {
 
       window.requestAnimationFrame(() => {
         // Insert placeholder before hiding so layout doesn't shift
-        this.placeholderEl = this.boardEl!.createDiv();
-        this.placeholderEl.className = "base-board-column-placeholder";
-        columnEl.parentElement?.insertBefore(this.placeholderEl, columnEl);
-        columnEl.addClass("base-board-column--dragging");
-        this.boardEl?.addClass("base-board-board--is-dragging");
+        this.beginColumnDragVisuals(columnEl);
       });
       return;
     }
@@ -271,27 +287,46 @@ export class DragDropManager {
     // Clean up the ghost after the browser captures it, and dim cards
     window.requestAnimationFrame(() => {
       ghostWrapper.remove();
-
-      // Collapse the dragged card and insert placeholder
-      this.placeholderEl = this.boardEl!.createDiv();
-      this.placeholderEl.className = "base-board-card-placeholder";
-      this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
-      cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
-      cardEl.addClass("base-board-card--dragging");
-      this.boardEl?.addClass("base-board-board--is-dragging");
-
-      // Dim all other selected cards during multi-drag
-      if (isMultiDrag && this.boardEl) {
-        this.multiDragEls = Array.from(
-          this.boardEl.querySelectorAll<HTMLElement>(".base-board-card"),
-        ).filter(
-          (el) => el !== cardEl && selectedCards.has(el.dataset.filePath ?? ""),
-        );
-        for (const el of this.multiDragEls) {
-          el.addClass("base-board-card--drag-ghost");
-        }
-      }
+      this.beginCardDragVisuals(cardEl, isMultiDrag, selectedCards);
     });
+  }
+
+  /**
+   * Collapse the dragged card, insert its placeholder, and dim co-selected
+   * cards. Shared by the native (mouse) and pointer (touch) drag paths.
+   */
+  private beginCardDragVisuals(
+    cardEl: HTMLElement,
+    isMultiDrag: boolean,
+    selectedCards: Set<string>,
+  ): void {
+    this.placeholderEl = this.boardEl!.createDiv();
+    this.placeholderEl.className = "base-board-card-placeholder";
+    this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
+    cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
+    cardEl.addClass("base-board-card--dragging");
+    this.boardEl?.addClass("base-board-board--is-dragging");
+
+    // Dim all other selected cards during multi-drag
+    if (isMultiDrag && this.boardEl) {
+      this.multiDragEls = Array.from(
+        this.boardEl.querySelectorAll<HTMLElement>(".base-board-card"),
+      ).filter(
+        (el) => el !== cardEl && selectedCards.has(el.dataset.filePath ?? ""),
+      );
+      for (const el of this.multiDragEls) {
+        el.addClass("base-board-card--drag-ghost");
+      }
+    }
+  }
+
+  /** Insert the column placeholder and collapse the dragged column. */
+  private beginColumnDragVisuals(columnEl: HTMLElement): void {
+    this.placeholderEl = this.boardEl!.createDiv();
+    this.placeholderEl.className = "base-board-column-placeholder";
+    columnEl.parentElement?.insertBefore(this.placeholderEl, columnEl);
+    columnEl.addClass("base-board-column--dragging");
+    this.boardEl?.addClass("base-board-board--is-dragging");
   }
 
   // ---------------------------------------------------------------------------
@@ -302,28 +337,33 @@ export class DragDropManager {
     e.preventDefault();
     if (!e.dataTransfer) return;
     e.dataTransfer.dropEffect = "move";
+    this.processDragOver(e.clientX, e.clientY, e.target as HTMLElement);
+  }
 
-    this.updateAutoScroll(e.clientX, e.clientY, e.target as HTMLElement);
-
+  /** Shared drag-over logic for native (mouse) and pointer (touch) drags. */
+  private processDragOver(
+    clientX: number,
+    clientY: number,
+    targetEl: HTMLElement,
+  ): void {
+    this.updateAutoScroll(clientX, clientY, targetEl);
     if (this.dragType === "column") {
-      this.handleColumnDragOver(e);
+      this.handleColumnDragOver(clientX);
     } else if (this.dragType === "card") {
-      this.handleCardDragOver(e);
+      this.handleCardDragOver(clientY, targetEl);
     }
   }
 
-  private handleCardDragOver(e: DragEvent): void {
+  private handleCardDragOver(clientY: number, targetEl: HTMLElement): void {
     // Find the cards container we're hovering over
-    const closestCardsContainer = (e.target as HTMLElement).closest(
-      ".base-board-cards",
-    );
+    const closestCardsContainer = targetEl.closest(".base-board-cards");
     let cardsContainer =
       closestCardsContainer instanceof HTMLElement
         ? closestCardsContainer
         : null;
 
     if (!cardsContainer) {
-      const columnEl = (e.target as HTMLElement).closest(".base-board-column");
+      const columnEl = targetEl.closest(".base-board-column");
       if (columnEl instanceof HTMLElement) {
         const qc = columnEl.querySelector(".base-board-cards");
         if (qc instanceof HTMLElement) {
@@ -370,7 +410,7 @@ export class DragDropManager {
     const afterElement = this.getDragAfterElement(
       cardsContainer,
       ".base-board-card:not(.base-board-card--dragging)",
-      e.clientY,
+      clientY,
       "vertical",
     );
 
@@ -390,7 +430,7 @@ export class DragDropManager {
     }
   }
 
-  private handleColumnDragOver(e: DragEvent): void {
+  private handleColumnDragOver(clientX: number): void {
     if (!this.boardEl) return;
 
     if (!this.placeholderEl) {
@@ -401,7 +441,7 @@ export class DragDropManager {
     const afterElement = this.getDragAfterElement(
       this.boardEl,
       ".base-board-column:not(.base-board-column--dragging)",
-      e.clientX,
+      clientX,
       "horizontal",
     );
 
@@ -545,16 +585,26 @@ export class DragDropManager {
 
   private async onDrop(e: DragEvent): Promise<void> {
     e.preventDefault();
-
-    if (this.dragType === "column") {
-      this.handleColumnDrop(e);
-      this.onDragEnd();
-    } else if (this.dragType === "card") {
-      await this.handleCardDrop(e);
-    }
+    await this.commitDrop(e.target as HTMLElement);
   }
 
-  private handleColumnDrop(e: DragEvent): void {
+  /**
+   * Shared drop commit for native (mouse) and pointer (touch) drags.
+   *
+   * onDragEnd() is idempotent and always runs here so the pointer path — which
+   * has no native `dragend` event to fall back on — is guaranteed to clean up
+   * even when the drop lands outside a valid column.
+   */
+  private async commitDrop(targetEl: HTMLElement): Promise<void> {
+    if (this.dragType === "column") {
+      this.handleColumnDrop();
+    } else if (this.dragType === "card") {
+      await this.handleCardDrop(targetEl);
+    }
+    this.onDragEnd();
+  }
+
+  private handleColumnDrop(): void {
     if (!this.boardEl) return;
     const draggedColumnName = this.draggedEl?.dataset.columnName;
     if (!draggedColumnName) return;
@@ -582,11 +632,11 @@ export class DragDropManager {
     this.callbacks.onColumnReorder(orderedNames);
   }
 
-  private async handleCardDrop(e: DragEvent): Promise<void> {
+  private async handleCardDrop(targetEl: HTMLElement): Promise<void> {
     const filePath = this.draggedEl?.dataset.filePath;
     if (!filePath) return;
 
-    const columnEl = (e.target as HTMLElement).closest(".base-board-column");
+    const columnEl = targetEl.closest(".base-board-column");
     if (!(columnEl instanceof HTMLElement)) return;
 
     const targetColumnName = columnEl.dataset.columnName;
@@ -671,6 +721,275 @@ export class DragDropManager {
       }
       new Notice(`Could not move card: ${String(error)}`);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Touch drag (Pointer Events)
+  //
+  //  The HTML5 drag-and-drop API never fires on touch input, so on mobile we
+  //  reproduce the same drag with pointer events: a long-press starts the drag
+  //  (so normal scrolling still works), a ghost follows the finger, and drops
+  //  reuse the exact same commit path as the desktop drag.
+  // ---------------------------------------------------------------------------
+
+  private readonly onPointerDown = (e: PointerEvent): void => {
+    // Desktop continues to use the native HTML5 drag-and-drop API.
+    if (!Platform.isMobile || e.pointerType === "mouse") return;
+    if (this.pointerId !== null || !this.boardEl) return;
+
+    const target = e.target as HTMLElement;
+    // Never hijack taps on interactive controls.
+    if (
+      target.closest(
+        "input, button, a, .base-board-column-title, .base-board-column-count, .base-board-column-delete, .base-board-card-chip-more",
+      )
+    ) {
+      return;
+    }
+
+    let candidate: HTMLElement | null = null;
+    let type: "card" | "column" | null = null;
+
+    const headerEl = target.closest(".base-board-column-header");
+    if (headerEl) {
+      const columnEl = headerEl.closest(".base-board-column");
+      if (columnEl instanceof HTMLElement) {
+        candidate = columnEl;
+        type = "column";
+      }
+    } else {
+      const cardEl = target.closest(".base-board-card");
+      if (cardEl instanceof HTMLElement) {
+        candidate = cardEl;
+        type = "card";
+      }
+    }
+    if (!candidate || !type) return;
+
+    this.pointerId = e.pointerId;
+    this.pointerStartX = e.clientX;
+    this.pointerStartY = e.clientY;
+    this.pointerCandidateEl = candidate;
+    this.pointerCandidateType = type;
+
+    activeDocument.addEventListener("pointermove", this.onPointerPreMove, true);
+    activeDocument.addEventListener("pointerup", this.onPointerUp, true);
+    activeDocument.addEventListener("pointercancel", this.onPointerUp, true);
+
+    this.pointerLongPressTimer = window.setTimeout(() => {
+      this.pointerLongPressTimer = null;
+      this.beginPointerDrag();
+    }, DragDropManager.LONG_PRESS_MS);
+  };
+
+  /** Before the long-press fires, real movement means the user is scrolling. */
+  private readonly onPointerPreMove = (e: PointerEvent): void => {
+    if (e.pointerId !== this.pointerId) return;
+    const dist = Math.hypot(
+      e.clientX - this.pointerStartX,
+      e.clientY - this.pointerStartY,
+    );
+    if (dist > DragDropManager.MOVE_CANCEL_PX) {
+      this.cancelPointerDrag();
+    }
+  };
+
+  private beginPointerDrag(): void {
+    const candidate = this.pointerCandidateEl;
+    const type = this.pointerCandidateType;
+    if (!candidate || !type || !this.boardEl || this.pointerId === null) {
+      this.cancelPointerDrag();
+      return;
+    }
+
+    activeDocument.removeEventListener(
+      "pointermove",
+      this.onPointerPreMove,
+      true,
+    );
+    activeDocument.addEventListener("pointermove", this.onPointerMove, true);
+    // A non-passive touchmove listener lets us cancel native scrolling for the
+    // duration of the drag (changing touch-action mid-gesture would not work).
+    activeDocument.addEventListener("touchmove", this.onTouchMovePrevent, {
+      passive: false,
+    });
+
+    this.pointerDragging = true;
+    this.dragType = type;
+    this.draggedEl = candidate;
+    this.clearDropHighlight();
+
+    // Capture on the always-visible board so events keep coming even though the
+    // source card collapses to display:none while dragging.
+    try {
+      this.boardEl.setPointerCapture(this.pointerId);
+    } catch {
+      /* capture is best-effort */
+    }
+    navigator.vibrate?.(10);
+
+    const ghostSource =
+      type === "card"
+        ? candidate
+        : (candidate.querySelector<HTMLElement>(".base-board-column-header") ??
+          candidate);
+    const rect = ghostSource.getBoundingClientRect();
+    this.pointerGrabOffsetX = this.pointerStartX - rect.left;
+    this.pointerGrabOffsetY = this.pointerStartY - rect.top;
+
+    if (type === "card") {
+      this.draggedCardHeight = candidate.getBoundingClientRect().height;
+      const selectedCards = this.callbacks.getSelectedCards();
+      const filePath = candidate.dataset.filePath ?? "";
+      const isMultiDrag = selectedCards.size > 1 && selectedCards.has(filePath);
+      const dragCount = isMultiDrag ? selectedCards.size : 1;
+      this.pointerGhostEl = this.createPointerGhost(ghostSource, dragCount);
+      this.beginCardDragVisuals(candidate, isMultiDrag, selectedCards);
+    } else {
+      this.pointerGhostEl = this.createPointerGhost(ghostSource, 1);
+      this.beginColumnDragVisuals(candidate);
+    }
+
+    this.positionPointerGhost(this.pointerStartX, this.pointerStartY);
+  }
+
+  private readonly onPointerMove = (e: PointerEvent): void => {
+    if (!this.pointerDragging || e.pointerId !== this.pointerId) return;
+    e.preventDefault();
+    this.positionPointerGhost(e.clientX, e.clientY);
+    const targetEl = this.pointerHitTest(e.clientX, e.clientY);
+    if (targetEl) {
+      this.processDragOver(e.clientX, e.clientY, targetEl);
+    }
+  };
+
+  private readonly onTouchMovePrevent = (e: TouchEvent): void => {
+    if (this.pointerDragging) e.preventDefault();
+  };
+
+  private readonly onPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.pointerId) return;
+
+    const wasDragging = this.pointerDragging;
+    const dropTarget = wasDragging
+      ? this.pointerHitTest(e.clientX, e.clientY)
+      : null;
+
+    if (this.pointerId !== null) {
+      try {
+        this.boardEl?.releasePointerCapture(this.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (this.pointerGhostEl) {
+      this.pointerGhostEl.remove();
+      this.pointerGhostEl = null;
+    }
+
+    this.resetPointerState();
+
+    if (wasDragging) {
+      // Swallow the tap-to-open click the browser emits after the gesture.
+      this.suppressNextClick();
+      void this.commitDrop(dropTarget ?? (this.boardEl as HTMLElement));
+    }
+  };
+
+  private pointerHitTest(x: number, y: number): HTMLElement | null {
+    // The ghost has pointer-events:none, so elementFromPoint ignores it.
+    const el = activeDocument.elementFromPoint(x, y);
+    return el instanceof HTMLElement ? el : null;
+  }
+
+  private positionPointerGhost(clientX: number, clientY: number): void {
+    if (!this.pointerGhostEl) return;
+    const x = clientX - this.pointerGrabOffsetX;
+    const y = clientY - this.pointerGrabOffsetY;
+    this.pointerGhostEl.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(2deg)`;
+  }
+
+  private createPointerGhost(
+    sourceEl: HTMLElement,
+    dragCount: number,
+  ): HTMLElement {
+    const rect = sourceEl.getBoundingClientRect();
+    const wrapper = activeDocument.body.createDiv({
+      cls: "base-board-pointer-ghost",
+    });
+    wrapper.style.width = `${rect.width}px`;
+
+    const clone = sourceEl.cloneNode(true) as HTMLElement;
+    clone.classList.remove(
+      "base-board-card--selected",
+      "base-board-card--dragging",
+    );
+    wrapper.appendChild(clone);
+
+    if (dragCount > 1) {
+      const badge = wrapper.createDiv({
+        cls: "base-board-pointer-ghost-badge",
+      });
+      badge.textContent = String(dragCount);
+    }
+    return wrapper;
+  }
+
+  private suppressNextClick(): void {
+    const swallow = (ev: Event): void => {
+      ev.stopPropagation();
+      ev.preventDefault();
+    };
+    activeDocument.addEventListener("click", swallow, {
+      capture: true,
+      once: true,
+    });
+    // If no click follows, drop the listener so a later tap is unaffected.
+    window.setTimeout(() => {
+      activeDocument.removeEventListener("click", swallow, true);
+    }, 400);
+  }
+
+  /** Tear down any pending or active pointer drag and restore the board. */
+  private cancelPointerDrag(): void {
+    const wasDragging = this.pointerDragging;
+    if (this.pointerId !== null && wasDragging) {
+      try {
+        this.boardEl?.releasePointerCapture(this.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (this.pointerGhostEl) {
+      this.pointerGhostEl.remove();
+      this.pointerGhostEl = null;
+    }
+    this.resetPointerState();
+    if (wasDragging) this.onDragEnd();
+  }
+
+  private resetPointerState(): void {
+    if (this.pointerLongPressTimer !== null) {
+      window.clearTimeout(this.pointerLongPressTimer);
+      this.pointerLongPressTimer = null;
+    }
+    activeDocument.removeEventListener(
+      "pointermove",
+      this.onPointerPreMove,
+      true,
+    );
+    activeDocument.removeEventListener("pointermove", this.onPointerMove, true);
+    activeDocument.removeEventListener("pointerup", this.onPointerUp, true);
+    activeDocument.removeEventListener("pointercancel", this.onPointerUp, true);
+    activeDocument.removeEventListener(
+      "touchmove",
+      this.onTouchMovePrevent,
+      false,
+    );
+    this.pointerId = null;
+    this.pointerCandidateEl = null;
+    this.pointerCandidateType = null;
+    this.pointerDragging = false;
   }
 
   // ---------------------------------------------------------------------------

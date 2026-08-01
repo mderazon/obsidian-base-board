@@ -357,26 +357,33 @@
   max-height: 100%;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-header {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-header {
   flex-direction: row;
   padding: 10px 12px;
   height: auto;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-drag-handle,
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-header-spacer,
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-add-card,
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-more-btn {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-drag-handle,
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-header-spacer,
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-add-card,
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-more-btn {
   display: flex;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-title {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-title {
   writing-mode: horizontal-tb;
   transform: none;
   max-height: none;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded > .base-board-cards {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  > .base-board-cards {
   display: flex;
 }
 
@@ -1021,4 +1028,46 @@
 .is-phone .base-board-card-edit-btn,
 .is-tablet .base-board-card-edit-btn {
   opacity: 0.6;
+}
+
+/* Suppress the long-press callout/selection so it doesn't fight the touch drag. */
+.is-mobile .base-board-card,
+.is-mobile .base-board-column-header {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ---- Touch drag ghost (mobile pointer drag) ---- */
+.base-board-pointer-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--layer-menu, 9999);
+  pointer-events: none;
+  opacity: 0.92;
+  border-radius: var(--radius-s);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  will-change: transform;
+}
+
+.base-board-pointer-ghost > * {
+  margin: 0;
+}
+
+.base-board-pointer-ghost-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  line-height: 22px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-on-accent, #fff);
+  background: var(--interactive-accent);
+  border-radius: 11px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }

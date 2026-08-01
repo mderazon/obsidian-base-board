@@ -113,7 +113,9 @@ export class CardManager {
       if (cardEl.dataset.renderVersion === renderVersion) return;
       cardEl.innerHTML = "";
     } else {
-      cardEl.setAttr("draggable", "true");
+      // On mobile the board drags via pointer events (see DragDropManager);
+      // native HTML5 dragging would only interfere with touch.
+      cardEl.setAttr("draggable", Platform.isMobile ? "false" : "true");
       cardEl.dataset.filePath = filePath;
       cardEl.dataset.columnName = columnName;
     }

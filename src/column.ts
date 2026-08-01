@@ -89,7 +89,8 @@ export class ColumnManager {
 
     // ---- Header ----
     const headerEl = columnEl.createDiv({ cls: "base-board-column-header" });
-    headerEl.setAttr("draggable", "true");
+    // On mobile the header drags via pointer events (see DragDropManager).
+    headerEl.setAttr("draggable", Platform.isMobile ? "false" : "true");
 
     const dragHandle = headerEl.createDiv({
       cls: "base-board-column-drag-handle",

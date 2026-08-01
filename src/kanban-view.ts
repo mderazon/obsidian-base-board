@@ -3,10 +3,12 @@ import {
   BasesEntry,
   BasesEntryGroup,
   BasesAllOptions,
+  BooleanValue,
   HoverParent,
   HoverPopover,
-  QueryController,
+  NumberValue,
   NullValue,
+  QueryController,
   setIcon,
   TFile,
   WorkspaceLeaf,
@@ -348,23 +350,18 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   /**
-   * Infer the JS type of the groupBy property from the values that existing
-   * notes actually store. Booleans win outright so a mix of real checkboxes
-   * and already-corrupted "false" strings still resolves to "boolean".
+   * Infer the JS type of the groupBy property from the group keys that Bases
+   * actually produced. Bases exposes group keys as typed Value objects, so a
+   * checkbox-grouped board yields BooleanValue keys and a numeric one yields
+   * NumberValue keys. Booleans win outright so a mix of real checkboxes and
+   * already-corrupted "false" strings still resolves to "boolean".
    */
-  private groupByValueType(prop: string): GroupByValueType {
-    let sawNumber = false;
-    for (const entry of this.data?.data ?? []) {
-      const path = entry.file?.path;
-      if (!path) continue;
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile)) continue;
-      const value: unknown =
-        this.app.metadataCache.getFileCache(file)?.frontmatter?.[prop];
-      if (typeof value === "boolean") return "boolean";
-      if (typeof value === "number") sawNumber = true;
+  private groupByValueType(): GroupByValueType {
+    for (const group of this.currentGroups) {
+      if (group.key instanceof BooleanValue) return "boolean";
+      if (group.key instanceof NumberValue) return "number";
     }
-    return sawNumber ? "number" : "other";
+    return "other";
   }
 
   /**
@@ -383,10 +380,7 @@ export class KanbanView extends BasesView implements HoverParent {
       delete fm[groupByProp];
       return;
     }
-    fm[groupByProp] = coerceColumnValue(
-      columnName,
-      this.groupByValueType(groupByProp),
-    );
+    fm[groupByProp] = coerceColumnValue(columnName, this.groupByValueType());
   }
 
   /**

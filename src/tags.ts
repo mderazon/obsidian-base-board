@@ -1,5 +1,6 @@
 import { KanbanView } from "./kanban-view";
-import { CONFIG_KEY_TAG_COLORS } from "./constants";
+import { CONFIG_KEY_TAG_COLORS, CONFIG_KEY_TAG_PROPERTIES } from "./constants";
+import { deriveTags, parseTagProperties } from "./derived-tags";
 import { App, Modal, TFile, setIcon, setTooltip, Setting } from "obsidian";
 import { TagEditModal } from "./tag-edit-modal";
 import { relativeLuminance } from "./color-utils";
@@ -73,11 +74,35 @@ export class Tags {
     }
     // Strip '#' prefix — Obsidian's MetadataCache sometimes normalises
     // frontmatter tags with a leading '#' (e.g. "#my-tag" instead of "my-tag").
-    return fileTags.map((t) => (t.startsWith("#") ? t.slice(1) : t));
+    const result = fileTags.map((t) => (t.startsWith("#") ? t.slice(1) : t));
+
+    // Append derived tags (from configured frontmatter properties), deduped.
+    for (const derived of this.deriveTagsFromProperties(file)) {
+      if (!result.includes(derived)) result.push(derived);
+    }
+    return result;
+  }
+
+  /** Frontmatter property names configured as derived-tag sources. */
+  public getTagProperties(): string[] {
+    return parseTagProperties(this.view.config?.get(CONFIG_KEY_TAG_PROPERTIES));
+  }
+
+  /** Derive virtual tags for a file from the configured properties. */
+  public deriveTagsFromProperties(file: TFile): string[] {
+    const props = this.getTagProperties();
+    if (props.length === 0) return [];
+    const fm = this.view.app.metadataCache.getFileCache(file)?.frontmatter;
+    return deriveTags(fm, props);
   }
 
   public promptEditTags(file: TFile): void {
-    const currentTags = this.extractTagsFromFile(file);
+    // Derived tags are excluded: they live in their source property, not in
+    // the `tags` frontmatter, so the edit modal must not re-persist them.
+    const derived = this.deriveTagsFromProperties(file);
+    const currentTags = this.extractTagsFromFile(file).filter(
+      (t) => !derived.includes(t),
+    );
     new TagEditModal(this.view.app, currentTags, this, (newTags: string[]) => {
       void this.view.app.fileManager.processFrontMatter(
         file,

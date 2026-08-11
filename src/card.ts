@@ -16,6 +16,7 @@ import {
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
 import { relativeLuminance } from "./color-utils";
+import { isLinkableUrlValue } from "./value-utils";
 import type { OrderValue } from "./order";
 import { CardDetailModal } from "./card-detail-modal";
 
@@ -449,6 +450,31 @@ export class CardManager {
     if (val && propId?.startsWith("formula.")) {
       valueEl.addClass("base-board-chip-value--formula");
       val.renderTo(valueEl, this.view.app.renderContext);
+    } else if (isLinkableUrlValue(value)) {
+      // URL-valued chips (any safe scheme, e.g. https:// or a custom
+      // protocol like obsidian://) render as clickable links instead of
+      // plain text, matching how native Bases views treat URL properties.
+      const link = valueEl.createEl("a", {
+        text: value,
+        href: value,
+        cls: "external-link",
+      });
+      const openChipUrl = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation(); // Don't also open the card's note
+        window.open(value);
+      };
+      link.addEventListener("click", openChipUrl);
+      // Middle-click fires auxclick, not click: without this it would both
+      // bubble into the card's open-note-in-tab handler and let Chromium
+      // natively navigate the anchor, bypassing the controlled open above.
+      link.addEventListener("auxclick", (e: MouseEvent) => {
+        if (e.button === 1) {
+          openChipUrl(e);
+        } else {
+          e.stopPropagation();
+        }
+      });
     } else {
       valueEl.setText(value);
     }

@@ -1,0 +1,42 @@
+---
+filters:
+  - type: function
+    query: "inFolder('example-board')"
+views:
+  - name: "Example Board"
+    type: kanban
+    config:
+      columns:
+        - id: "col-todo"
+          name: "Todo"
+          color: "#ff6b6b"
+          wipLimit: 0
+          order: 0
+        - id: "col-progress"
+          name: "In Progress"
+          color: "#ffd93d"
+          wipLimit: 3
+          order: 1
+        - id: "col-done"
+          name: "Done"
+          color: "#6bcb77"
+          wipLimit: 0
+          order: 2
+      coverProperty: "cover"
+      cardTitleProperty: "title"
+      firstEmbed: true
+      chipProperties:
+        - property: "status"
+          style: "pill"
+          colorMap:
+            todo: "#ff6b6b"
+            in-progress: "#ffd93d"
+            done: "#6bcb77"
+        - property: "priority"
+          style: "tag"
+          colorMap:
+            high: "#ff0000"
+            medium: "#ffa500"
+            low: "#00ff00"
+      openBehavior: "split"
+---

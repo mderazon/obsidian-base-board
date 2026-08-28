@@ -55,6 +55,16 @@
   display: none;
 }
 
+/* Disable transitions during drag to avoid layout/paint backlog (ba14d45) */
+.base-board-board--is-dragging .base-board-cards,
+.base-board-board--is-dragging .base-board-cards:empty,
+.base-board-board--is-dragging .base-board-card-placeholder,
+.base-board-board--is-dragging .base-board-card--drag-ghost,
+.base-board-board--is-dragging .base-board-column-placeholder {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* ---- Placeholder (no groupBy set) ---- */
 
 .base-board-placeholder {
@@ -377,6 +387,13 @@
 .base-board-card img {
   -webkit-user-drag: none;
   user-drag: none;
+}
+
+/* ---- Mobile-specific overrides (e9b270b) ---- */
+
+.is-phone .base-board-card-edit-btn,
+.is-tablet .base-board-card-edit-btn {
+  opacity: 0.6;
 }
 
 
@@ -1352,6 +1369,33 @@
 }
 
 .base-board-column-add-card:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+
+/* ---- Column header menu button (e9b270b — mobile + desktop) ---- */
+
+.base-board-column-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.base-board-column-menu-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-column-menu-btn:hover {
   background-color: var(--background-modifier-hover);
   color: var(--interactive-accent);
 }

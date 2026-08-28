@@ -1,4 +1,4 @@
-import { setIcon, TFile, Notice, Menu, Keymap } from "obsidian";
+import { setIcon, TFile, Notice, Menu, Keymap, Platform } from "obsidian";
 import type { CardData } from "@base-board/board-core/types";
 import { KanbanView } from "./kanban-view";
 import {
@@ -155,18 +155,13 @@ export class CardManager {
     }
 
     // Open the note on click; guard against accidental clicks after a drag
-    let dragging = false;
-    cardEl.addEventListener("dragstart", () => {
-      dragging = true;
-    });
+    let dragEndTime = 0;
     cardEl.addEventListener("dragend", () => {
-      window.setTimeout(() => {
-        dragging = false;
-      }, 0);
+      dragEndTime = Date.now();
     });
 
     cardEl.addEventListener("click", (e: MouseEvent) => {
-      if (dragging) return;
+      if (Date.now() - dragEndTime < 100) return;
 
       const isAlt = e.altKey;
       const isShift = e.shiftKey;
@@ -232,6 +227,7 @@ export class CardManager {
     // Right-click → batch move menu when cards are selected, otherwise standard file menu
     cardEl.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
+      if (Platform.isMobile) return;
       const file = this.view.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) return;
 

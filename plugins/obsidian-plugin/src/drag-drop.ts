@@ -1,4 +1,4 @@
-import { App } from "obsidian";
+import { App, Platform } from "obsidian";
 
 // We use dataTransfer types to distinguish card vs column drags
 const CARD_MIME = "application/x-kanban-card";
@@ -35,6 +35,7 @@ export class DragDropManager {
   private autoScrollSpeed = 0; // horizontal (boardEl)
   private autoScrollVerticalSpeed = 0; // vertical (active cards container)
   private autoScrollVerticalEl: HTMLElement | null = null;
+  private lastDragOverColumn: HTMLElement | null = null;
 
   private boundHandlers: {
     dragStart: (e: DragEvent) => void;
@@ -121,6 +122,7 @@ export class DragDropManager {
         this.placeholderEl.className = "base-board-column-placeholder";
         columnEl.parentElement?.insertBefore(this.placeholderEl, columnEl);
         columnEl.addClass("base-board-column--dragging");
+        this.boardEl?.addClass("base-board-board--is-dragging");
       });
       return;
     }
@@ -262,6 +264,7 @@ export class DragDropManager {
       this.placeholderEl.style.height = `${this.draggedCardHeight}px`;
       cardEl.parentElement?.insertBefore(this.placeholderEl, cardEl);
       cardEl.addClass("base-board-card--dragging");
+      this.boardEl?.addClass("base-board-board--is-dragging");
 
       // Dim all other selected cards during multi-drag
       if (isMultiDrag && this.boardEl) {
@@ -315,20 +318,21 @@ export class DragDropManager {
       }
     }
 
-    // Update column drag-over highlight
+    // Update column drag-over highlight — only when hovered column changes (ba14d45)
     const hoveredColumn = cardsContainer?.closest(
       ".base-board-column",
     ) as HTMLElement | null;
 
     if (this.boardEl) {
-      const allColumns = this.boardEl.querySelectorAll(".base-board-column");
-      allColumns.forEach((col) => {
-        if (col === hoveredColumn) {
-          col.classList.add("base-board-column--drag-over");
-        } else {
-          col.classList.remove("base-board-column--drag-over");
-        }
-      });
+      const nextColumn =
+        hoveredColumn instanceof HTMLElement ? hoveredColumn : null;
+      if (nextColumn !== this.lastDragOverColumn) {
+        this.lastDragOverColumn?.classList.remove(
+          "base-board-column--drag-over",
+        );
+        nextColumn?.classList.add("base-board-column--drag-over");
+        this.lastDragOverColumn = nextColumn;
+      }
     }
 
     if (!cardsContainer) {
@@ -348,6 +352,17 @@ export class DragDropManager {
       e.clientY,
       "vertical",
     );
+
+    // Skip redundant DOM mutation if placeholder already at correct position (ba14d45)
+    const desiredParent = cardsContainer;
+    const desiredNext = afterElement;
+    if (
+      this.placeholderEl.parentElement === desiredParent &&
+      this.placeholderEl.nextElementSibling === desiredNext
+    ) {
+      return;
+    }
+
     if (afterElement) {
       cardsContainer.insertBefore(this.placeholderEl, afterElement);
     } else {
@@ -465,6 +480,8 @@ export class DragDropManager {
   }
 
   private onDragEnd(): void {
+    this.boardEl?.removeClass("base-board-board--is-dragging");
+
     // Stop any in-progress auto-scroll
     if (this.autoScrollRAF !== null) {
       cancelAnimationFrame(this.autoScrollRAF);
@@ -497,6 +514,7 @@ export class DragDropManager {
         .querySelectorAll(".base-board-column--drag-over")
         .forEach((col) => col.classList.remove("base-board-column--drag-over"));
     }
+    this.lastDragOverColumn = null;
     this.dragType = null;
   }
 
@@ -513,14 +531,18 @@ export class DragDropManager {
     } else if (this.dragType === "card") {
       const success = await this.handleCardDrop(e);
       this.cardDropped = success;
-      // Don't call onDragEnd here — the browser fires dragend automatically,
+      // Don't call onDragEnd here on desktop — the browser fires dragend automatically,
       // and our flag ensures we skip visual cleanup on success.
+      // On mobile, the dragend event is often not fired, so we must call it manually.
+      if (Platform.isMobile) {
+        this.onDragEnd();
+      }
     }
   }
 
   private handleColumnDrop(e: DragEvent): void {
     if (!this.boardEl) return;
-    const draggedColumnName = e.dataTransfer?.getData(COLUMN_MIME);
+    const draggedColumnName = this.draggedEl?.dataset.columnName;
     if (!draggedColumnName) return;
 
     // Collect column names in DOM order (placeholder marks the new position)
@@ -547,7 +569,7 @@ export class DragDropManager {
   }
 
   private async handleCardDrop(e: DragEvent): Promise<boolean> {
-    const filePath = e.dataTransfer?.getData(CARD_MIME);
+    const filePath = this.draggedEl?.dataset.filePath;
     if (!filePath) return false;
 
     const columnEl = (e.target as HTMLElement).closest(".base-board-column");

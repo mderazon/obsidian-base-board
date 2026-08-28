@@ -214,6 +214,33 @@
   color: var(--interactive-accent);
 }
 
+/* ---- Column header menu button (e9b270b — mobile + desktop) ---- */
+
+.base-board-column-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.base-board-column-menu-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-board-column-menu-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+
 /* ---- Cards container (scrollable) ---- */
 
 .base-board-cards {

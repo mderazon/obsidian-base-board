@@ -299,3 +299,10 @@
   -webkit-user-drag: none;
   user-drag: none;
 }
+
+/* ---- Mobile-specific overrides (e9b270b) ---- */
+
+.is-phone .base-board-card-edit-btn,
+.is-tablet .base-board-card-edit-btn {
+  opacity: 0.6;
+}

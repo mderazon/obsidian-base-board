@@ -785,7 +785,7 @@ export class CardManager {
     position += 1_000_000;
 
     const overrides = (fm: Record<string, unknown>) => {
-      fm[groupByProp] = columnName;
+      this.view.applyGroupByValue(fm, groupByProp, columnName);
       fm[ORDER_PROPERTY] = position;
     };
 
@@ -924,7 +924,7 @@ export class CardManager {
         return this.view.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
-            fm[groupByProp] = targetColumn;
+            this.view.applyGroupByValue(fm, groupByProp, targetColumn);
             fm[ORDER_PROPERTY] = position;
           },
         );

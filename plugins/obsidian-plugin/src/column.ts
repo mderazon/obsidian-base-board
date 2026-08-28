@@ -310,7 +310,7 @@ export class ColumnManager {
           return this.view.app.fileManager.processFrontMatter(
             file,
             (fm: Record<string, unknown>) => {
-              fm[groupByProp] = newName;
+              this.view.applyGroupByValue(fm, groupByProp, newName);
             },
           );
         });

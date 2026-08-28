@@ -3,10 +3,12 @@ import {
   BasesEntry,
   BasesEntryGroup,
   BasesAllOptions,
+  BooleanValue,
   HoverParent,
   HoverPopover,
-  QueryController,
   NullValue,
+  NumberValue,
+  QueryController,
   setIcon,
   TFile,
   WorkspaceLeaf,
@@ -46,6 +48,7 @@ import {
   renormalizeColumn,
   type PositionContext,
 } from "./order";
+import { coerceColumnValue, GroupByValueType } from "./value-utils";
 
 // ---------------------------------------------------------------------------
 //  Kanban View
@@ -63,6 +66,8 @@ export class KanbanView extends BasesView implements HoverParent {
   private columnManager: ColumnManager;
   /** Board-core Column objects derived from BasesEntryGroup data. */
   public currentGroups: Column[] = [];
+  /** Raw Bases typed groups — preserved for groupBy type inference (Boolean/NumberValue) */
+  private typedGroups: BasesEntryGroup[] = [];
   /** Raw Bases entries (kept for source-column lookups during card drops) */
   private rawEntries: BasesEntry[] = [];
   public cardManager: CardManager;
@@ -416,6 +421,40 @@ export class KanbanView extends BasesView implements HoverParent {
   }
 
   /**
+   * Infer the JS type of the groupBy property from the group keys that Bases
+   * actually produced. Bases exposes group keys as typed Value objects, so a
+   * checkbox-grouped board yields BooleanValue keys and a numeric one yields
+   * NumberValue keys. Booleans win outright so a mix of real checkboxes and
+   * already-corrupted "false" strings still resolves to "boolean".
+   */
+  private groupByValueType(): GroupByValueType {
+    for (const group of this.typedGroups) {
+      if (group.key instanceof BooleanValue) return "boolean";
+      if (group.key instanceof NumberValue) return "number";
+    }
+    return "other";
+  }
+
+  /**
+   * Write the groupBy property for a card into `fm`, preserving its real type.
+   *
+   * The "(No value)" column removes the property entirely; every other column
+   * stores a correctly-typed value so a checkbox `false` is never turned into
+   * the string "false" (which is truthy and breaks grouping).
+   */
+  public applyGroupByValue(
+    fm: Record<string, unknown>,
+    groupByProp: string,
+    columnName: string,
+  ): void {
+    if (columnName === NO_VALUE_COLUMN) {
+      delete fm[groupByProp];
+      return;
+    }
+    fm[groupByProp] = coerceColumnValue(columnName, this.groupByValueType());
+  }
+
+  /**
    * Read kanban_order from metadataCache (more reliable than entry.values
    * since the Bases engine may not expose all properties).
    */
@@ -532,6 +571,7 @@ export class KanbanView extends BasesView implements HoverParent {
 
     // Map raw BasesEntryGroup → board-core Column
     this.rawEntries = groupedData.flatMap((g) => g.entries);
+    this.typedGroups = groupedData;
     this.currentGroups = groupedData.map((g) => this.toColumn(g));
     const columns = this.getColumns();
     const boardEl = this.containerEl.createDiv({ cls: "base-board-board" });
@@ -692,11 +732,7 @@ export class KanbanView extends BasesView implements HoverParent {
         return this.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
-            if (targetColumnName === NO_VALUE_COLUMN) {
-              delete fm[groupByProp];
-            } else {
-              fm[groupByProp] = targetColumnName;
-            }
+            this.applyGroupByValue(fm, groupByProp, targetColumnName);
           },
         );
       });

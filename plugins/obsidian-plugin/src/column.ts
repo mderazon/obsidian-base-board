@@ -5,6 +5,7 @@ import { InputModal } from "./modals";
 import { NO_VALUE_COLUMN } from "./constants";
 import { ColorPickerModal } from "./tags";
 import { WipLimitModal } from "./modals";
+import type { RenderContext } from "./render-context";
 
 export class ColumnManager {
   private view: KanbanView;
@@ -18,27 +19,29 @@ export class ColumnManager {
     columnName: string,
     column: Column | null,
     columnIndex: number,
+    ctx: RenderContext,
   ): void {
     const isNoValue = columnName === NO_VALUE_COLUMN;
     const cards = column ? column.cards : [];
 
-    // Sort cards up-front so the header add-card button can reference sorted.length
-    const sorted = [...cards].sort((a: CardData, b: CardData) => {
-      return (
-        this.view.getFileOrder(a.filePath) - this.view.getFileOrder(b.filePath)
-      );
-    });
+    // Sort cards up-front so the header add-card button can reference sorted.length.
+    // Cards without a kanban_order sort last; mapping them to MAX_SAFE_INTEGER
+    // keeps the comparator finite (NaN from Infinity-Infinity would make the
+    // sort order undefined). V8's sort is stable, so ties keep entry order.
+    const sortPos = (c: CardData): number => {
+      const o = ctx.orderOf(c.filePath);
+      return Number.isFinite(o) ? o : Number.MAX_SAFE_INTEGER;
+    };
+    const sorted = [...cards].sort(
+      (a: CardData, b: CardData) => sortPos(a) - sortPos(b),
+    );
 
     const activeFilters = this.view.tags.activeFilters;
     const visibleCards =
       activeFilters.size > 0
         ? sorted.filter((card) => {
-            // Tags are extracted from the actual vault file, not the card data
-            const file = this.view.app.vault.getAbstractFileByPath(
-              card.filePath,
-            );
-            if (!(file instanceof TFile)) return false;
-            const fileTags = this.view.tags.extractTagsFromFile(file);
+            // Tags come from the per-render snapshot (no per-card cache lookups)
+            const fileTags = ctx.tagsOf(card.filePath);
             return Array.from(activeFilters).some((filter) =>
               fileTags.includes(filter),
             );
@@ -103,10 +106,9 @@ export class ColumnManager {
       setIcon(addCardHeaderBtn, "plus");
       addCardHeaderBtn.addEventListener("click", (e: MouseEvent) => {
         e.stopPropagation();
-        this.view.cardManager.startInlineCardCreation(
+        this.view.cardManager.actions.startInlineCardCreation(
           addCardHeaderBtn!,
           columnName,
-          sorted,
         );
       });
     }
@@ -149,9 +151,11 @@ export class ColumnManager {
 
     // ---- Cards container ----
     const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
+    this.view.cardManager.attachCardContainerListeners(cardsEl);
+    this.view.cardManager.ensureLazyColumn(cardsEl);
 
     visibleCards.forEach((card) => {
-      this.view.cardManager.renderCard(cardsEl, card, columnName);
+      this.view.cardManager.renderCard(cardsEl, card, columnName, ctx);
     });
   }
 
@@ -175,7 +179,7 @@ export class ColumnManager {
         }
         columns.push(name);
         this.view.saveColumns(columns);
-        this.view.render();
+        this.view.scheduleUpdate();
       },
     ).open();
   }
@@ -183,7 +187,7 @@ export class ColumnManager {
   public handleDeleteColumn(columnName: string): void {
     const columns = this.view.getColumns().filter((c) => c !== columnName);
     this.view.saveColumns(columns);
-    this.view.render();
+    this.view.scheduleUpdate();
   }
 
   private showColumnMenu(
@@ -195,7 +199,16 @@ export class ColumnManager {
     addCardHeaderBtn?: HTMLElement | null,
     menuBtn?: HTMLElement | null,
   ): void {
-    const isNoValue = columnName === NO_VALUE_COLUMN;
+    // Resolve the LIVE column identity — the caller's closures go stale as
+    // soon as the reconciler renames/updates the column.
+    const colEl = (e.target as HTMLElement).closest<HTMLElement>(
+      ".base-board-column",
+    );
+    const liveName = colEl?.dataset.columnName ?? columnName;
+    const liveCards =
+      this.view.currentGroups.find((g) => g.name === liveName)?.cards ?? cards;
+
+    const isNoValue = liveName === NO_VALUE_COLUMN;
     const menu = new Menu();
 
     if (!isNoValue) {
@@ -206,8 +219,8 @@ export class ColumnManager {
           .onClick(() => {
             this.startColumnRename(
               titleEl,
-              columnName,
-              cards,
+              liveName,
+              liveCards,
               countEl,
               addCardHeaderBtn,
               menuBtn,
@@ -217,7 +230,7 @@ export class ColumnManager {
       menu.addSeparator();
     }
 
-    const currentColor = this.view.getColumnColor(columnName) ?? "";
+    const currentColor = this.view.getColumnColor(liveName) ?? "";
     menu.addItem((item) => {
       item
         .setTitle("Change color")
@@ -225,16 +238,16 @@ export class ColumnManager {
         .onClick(() => {
           new ColorPickerModal(
             this.view.app,
-            columnName,
+            liveName,
             currentColor,
             (color) => {
-              this.view.setColumnColor(columnName, color);
+              this.view.setColumnColor(liveName, color);
             },
           ).open();
         });
     });
 
-    const currentWipLimit = this.view.getWipLimit(columnName);
+    const currentWipLimit = this.view.getWipLimit(liveName);
     menu.addItem((item) => {
       item
         .setTitle(
@@ -246,10 +259,10 @@ export class ColumnManager {
         .onClick(() => {
           new WipLimitModal(
             this.view.app,
-            columnName,
+            liveName,
             currentWipLimit,
             (limit) => {
-              this.view.setWipLimit(columnName, limit);
+              this.view.setWipLimit(liveName, limit);
             },
           ).open();
         });
@@ -259,14 +272,14 @@ export class ColumnManager {
     menu.addItem((item) => {
       item
         .setTitle(
-          cards.length > 0
-            ? `Delete column (${cards.length} card${cards.length > 1 ? "s" : ""} will remain)`
+          liveCards.length > 0
+            ? `Delete column (${liveCards.length} card${liveCards.length > 1 ? "s" : ""} will remain)`
             : "Delete column",
         )
         .setIcon("lucide-trash-2")
         .setWarning(true)
         .onClick(() => {
-          this.handleDeleteColumn(columnName);
+          this.handleDeleteColumn(liveName);
         });
     });
 
@@ -281,6 +294,27 @@ export class ColumnManager {
     addCardBtn?: HTMLElement | null,
     menuBtn?: HTMLElement | null,
   ): void {
+    // Resolve the LIVE header elements: the caller's references are
+    // render-time closures and go stale once the reconciler has patched the
+    // header (e.g. renaming the same column twice in a row).
+    const colEl = this.view.containerEl.querySelector<HTMLElement>(
+      `.base-board-column[data-column-name="${CSS.escape(oldName)}"]`,
+    );
+    const headerEl =
+      colEl?.querySelector<HTMLElement>(".base-board-column-header") ?? null;
+    titleEl =
+      headerEl?.querySelector<HTMLElement>(".base-board-column-title") ??
+      titleEl;
+    countEl =
+      headerEl?.querySelector<HTMLElement>(".base-board-column-count") ??
+      countEl;
+    addCardBtn =
+      headerEl?.querySelector<HTMLElement>(".base-board-column-add-card") ??
+      addCardBtn;
+    menuBtn =
+      headerEl?.querySelector<HTMLElement>(".base-board-column-menu-btn") ??
+      menuBtn;
+
     const input = activeDocument.createElement("input");
     input.type = "text";
     input.value = oldName;
@@ -298,6 +332,15 @@ export class ColumnManager {
     };
 
     // Replace the span with the input
+    const restoreTitle = (text: string) => {
+      const titleSpan = activeDocument.createElement("span");
+      titleSpan.className = "base-board-column-title";
+      if (oldName === NO_VALUE_COLUMN) {
+        titleSpan.classList.add("base-board-no-value-title");
+      }
+      titleSpan.setText(text);
+      input.replaceWith(titleSpan);
+    };
     titleEl.replaceWith(input);
     input.focus();
     input.select();
@@ -309,10 +352,11 @@ export class ColumnManager {
       const newName = input.value.trim();
       restoreChrome();
       if (newName && newName !== oldName) {
+        // Optimistic header update — the reconciler syncs everything else
+        restoreTitle(newName);
         void this.handleRenameColumn(oldName, newName, cards);
       } else {
-        // Revert — just re-render to restore the span
-        this.view.render();
+        restoreTitle(oldName);
       }
     };
 
@@ -324,7 +368,7 @@ export class ColumnManager {
         e.preventDefault();
         committed = true;
         restoreChrome();
-        this.view.render();
+        restoreTitle(oldName);
       }
     });
     input.addEventListener("blur", commit);
@@ -336,22 +380,52 @@ export class ColumnManager {
     cards: CardData[],
   ): Promise<void> {
     const columns = this.view.getColumns();
-    if (columns.includes(newName)) {
-      new Notice(`Column "${newName}" already exists.`);
-      this.view.render();
-      return;
+
+    // The card list to rewrite must be complete even when Bases' data is
+    // stale mid-rename: union the live group with the column's DOM cards
+    // (the reconciler keeps the DOM in sync, shells included).
+    const pathSet = new Set<string>();
+    for (const card of this.view.currentGroups.find((g) => g.name === oldName)
+      ?.cards ?? []) {
+      pathSet.add(card.filePath);
     }
+    const colEl = this.view.containerEl.querySelector<HTMLElement>(
+      `.base-board-column[data-column-name="${CSS.escape(oldName)}"]`,
+    );
+    colEl?.querySelectorAll<HTMLElement>(".base-board-card").forEach((el) => {
+      const p = el.dataset.filePath;
+      if (p) pathSet.add(p);
+    });
+    const freshCards: CardData[] = [...pathSet].map((filePath) => ({
+      filePath,
+      displayName: "",
+      properties: {},
+    }));
+
+    // Renaming onto an existing column name merges: all cards move to the
+    // target column and the old name is dropped from the config.
+    const merge = columns.includes(newName);
 
     const groupByProp = this.view.getGroupByProperty();
 
+    // Let the reconciler shield this column while Bases propagates the
+    // rename (partial/empty mid-regroup waves), and restore its scroll
+    // position if a full render happens anyway.
+    this.view.registerColumnRename(oldName, newName, freshCards.length);
+
     await this.view.applyBatchUpdate(async () => {
       // 1. Update column config
-      const updatedColumns = columns.map((c) => (c === oldName ? newName : c));
+      const updatedColumns = merge
+        ? columns.filter((c) => c !== oldName)
+        : columns.map((c) => (c === oldName ? newName : c));
       this.view.saveColumns(updatedColumns);
 
-      // 2. Update frontmatter for all cards in this column
+      // 2. Migrate per-column config keyed by name (colors, WIP limits)
+      this.view.migrateColumnKeyedConfig(oldName, merge ? newName : null);
+
+      // 3. Update frontmatter for all cards in this column
       if (groupByProp) {
-        const updatePromises = cards.map((card) => {
+        const updatePromises = freshCards.map((card) => {
           const file = this.view.app.vault.getAbstractFileByPath(card.filePath);
           if (!file || !(file instanceof TFile)) return Promise.resolve();
           return this.view.app.fileManager.processFrontMatter(

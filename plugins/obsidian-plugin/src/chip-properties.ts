@@ -32,9 +32,42 @@ export interface ChipStyleRule {
 /** Per-property style rules map. */
 export type ChipStyleRulesMap = Record<string, ChipStyleRule[]>;
 
+/** Check style rules for a value and return the first match (color + icon). */
+export function matchStyleRule(
+  rules: ChipStyleRule[],
+  value: string,
+): { color: string; icon?: string } | null {
+  for (const rule of rules) {
+    if (!rule.pattern) continue;
+    const lowerValue = value.toLowerCase();
+    const lowerPattern = rule.pattern.toLowerCase();
+
+    let matches = false;
+    switch (rule.operator) {
+      case "equals":
+        matches = lowerValue === lowerPattern;
+        break;
+      case "contains":
+        matches = lowerValue.includes(lowerPattern);
+        break;
+      case "starts-with":
+        matches = lowerValue.startsWith(lowerPattern);
+        break;
+      case "ends-with":
+        matches = lowerValue.endsWith(lowerPattern);
+        break;
+    }
+
+    if (matches) {
+      return { color: rule.color, icon: rule.icon };
+    }
+  }
+  return null;
+}
+
 // File properties that are redundant (shown as the card title) or are
 // complex list types that don't render usefully as a short chip value.
-const FILE_PROPS_TO_SKIP = new Set([
+export const FILE_PROPS_TO_SKIP = new Set([
   "name",
   "basename",
   "fullname",
@@ -259,45 +292,14 @@ export class ChipPropertiesManager {
 
     if (mode === "style-rules") {
       // Only style rules apply in this mode — no fallback to per-value or fixed
-      return this.getColorFromStyleRules(propName, value);
+      return (
+        matchStyleRule(this.getStyleRulesForProperty(propName), value)?.color ??
+        null
+      );
     }
 
     // per-value (default / unknown mode) — only per-value mapping applies
     return this.getChipColors()[propName]?.[value] ?? null;
-  }
-
-  /** Check style rules for a property value and return color if any rule matches. */
-  private getColorFromStyleRules(
-    propName: string,
-    value: string,
-  ): string | null {
-    const rules = this.getStyleRulesForProperty(propName);
-    for (const rule of rules) {
-      if (!rule.pattern) continue;
-      const lowerValue = value.toLowerCase();
-      const lowerPattern = rule.pattern.toLowerCase();
-
-      let matches = false;
-      switch (rule.operator) {
-        case "equals":
-          matches = lowerValue === lowerPattern;
-          break;
-        case "contains":
-          matches = lowerValue.includes(lowerPattern);
-          break;
-        case "starts-with":
-          matches = lowerValue.startsWith(lowerPattern);
-          break;
-        case "ends-with":
-          matches = lowerValue.endsWith(lowerPattern);
-          break;
-      }
-
-      if (matches && rule.color) {
-        return rule.color;
-      }
-    }
-    return null;
   }
 
   /** Check style rules and return matching color + icon, or null. */
@@ -305,33 +307,7 @@ export class ChipPropertiesManager {
     propName: string,
     value: string,
   ): { color: string; icon?: string } | null {
-    const rules = this.getStyleRulesForProperty(propName);
-    for (const rule of rules) {
-      if (!rule.pattern) continue;
-      const lowerValue = value.toLowerCase();
-      const lowerPattern = rule.pattern.toLowerCase();
-
-      let matches = false;
-      switch (rule.operator) {
-        case "equals":
-          matches = lowerValue === lowerPattern;
-          break;
-        case "contains":
-          matches = lowerValue.includes(lowerPattern);
-          break;
-        case "starts-with":
-          matches = lowerValue.startsWith(lowerPattern);
-          break;
-        case "ends-with":
-          matches = lowerValue.endsWith(lowerPattern);
-          break;
-      }
-
-      if (matches) {
-        return { color: rule.color, icon: rule.icon };
-      }
-    }
-    return null;
+    return matchStyleRule(this.getStyleRulesForProperty(propName), value);
   }
 
   /** Get all color mappings for a property. */

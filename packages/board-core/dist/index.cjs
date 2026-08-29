@@ -35,6 +35,7 @@ __export(index_exports, {
   CONFIG_KEY_TAG_COLORS: () => CONFIG_KEY_TAG_COLORS,
   CONFIG_KEY_WIP_LIMITS: () => CONFIG_KEY_WIP_LIMITS,
   DEFAULT_BOARD_CONFIG: () => DEFAULT_BOARD_CONFIG,
+  LazyList: () => LazyList,
   NO_VALUE_COLUMN: () => NO_VALUE_COLUMN,
   ORDER_PROPERTY: () => ORDER_PROPERTY,
   UNSAFE_FILENAME_CHARS: () => UNSAFE_FILENAME_CHARS,
@@ -106,6 +107,65 @@ function updateBaseFolderReferences(content, oldPath, newPath) {
   );
   return changed ? updated : null;
 }
+
+// src/virtual-list.ts
+var LazyList = class {
+  constructor(root, options = {}) {
+    this.observer = null;
+    this.pending = /* @__PURE__ */ new Map();
+    this.root = root;
+    this.rootMargin = options.rootMargin ?? "1000px";
+  }
+  /**
+   * Register a shell element. `hydrate` is invoked at most once, when the
+   * element comes within the root margin of the scroll container's viewport.
+   */
+  register(el, hydrate) {
+    if (!this.observer) {
+      this.observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            const el2 = entry.target;
+            const callback = this.pending.get(el2);
+            if (!callback) continue;
+            this.pending.delete(el2);
+            this.observer?.unobserve(el2);
+            callback();
+          }
+        },
+        { root: this.root, rootMargin: this.rootMargin }
+      );
+    }
+    this.pending.set(el, hydrate);
+    this.observer.observe(el);
+  }
+  /**
+   * Hydrate a registered shell immediately instead of waiting for the
+   * observer. Used for cards created while visible (e.g. reconciliation)
+   * so they never paint as hidden placeholders.
+   */
+  hydrateNow(el) {
+    const callback = this.pending.get(el);
+    if (!callback) return;
+    this.pending.delete(el);
+    this.observer?.unobserve(el);
+    callback();
+  }
+  /** Hydrate every remaining shell immediately (e.g. before teardown). */
+  flush() {
+    for (const callback of this.pending.values()) callback();
+    this.pending.clear();
+    this.observer?.disconnect();
+    this.observer = null;
+  }
+  /** Disconnect the observer. Unhydrated shells stay as shells. */
+  destroy() {
+    this.observer?.disconnect();
+    this.observer = null;
+    this.pending.clear();
+  }
+};
 
 // src/types.ts
 var DEFAULT_BOARD_CONFIG = {

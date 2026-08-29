@@ -12,6 +12,7 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
+      "@base-board/board-core": ["../../packages/board-core/src/index.ts"],
       "@base-board/board-core/*": ["../../packages/board-core/src/*"]
     }
   },

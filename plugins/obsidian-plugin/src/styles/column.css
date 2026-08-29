@@ -246,6 +246,9 @@
 .base-board-cards {
   flex: 1 1 auto;
   overflow-y: auto;
+  /* Reserve scrollbar space so adding/removing cards never shifts the
+     column's content horizontally (visible as board-wide jitter). */
+  scrollbar-gutter: stable;
   padding: 8px;
   display: flex;
   flex-direction: column;

@@ -42,10 +42,12 @@ export function getDropPosition(
 ): number {
   // Build a position map: filePath → kanban_order
   const posMap = new Map<string, number>();
+  let maxFinite = 0;
   for (const card of allCards) {
     const order = ctx.getFileOrder(card.filePath);
     if (order !== Infinity) {
       posMap.set(card.filePath, order);
+      if (Number.isFinite(order) && order > maxFinite) maxFinite = order;
     }
   }
 
@@ -62,8 +64,14 @@ export function getDropPosition(
       ? getPos(orderedPaths[index + 1])
       : Infinity;
 
+  // Fallback for any path where the math yields a non-finite position
+  // (e.g. a neighbor without a kanban_order property): sort after every
+  // card that has a known position.
+  const fallback = maxFinite + SPACING;
+
   if (nextPos === Infinity) {
     // Append at end
+    if (!Number.isFinite(prevPos)) return fallback;
     return prevPos === 0 ? SPACING : prevPos + SPACING;
   }
   const atStart = index === 0; // truly at the start of the column
@@ -81,22 +89,23 @@ export function getDropPosition(
     return nextPos / 2;
   }
   // Insert between two cards
-  return (prevPos + nextPos) / 2;
+  const position = (prevPos + nextPos) / 2;
+  return Number.isFinite(position) ? position : fallback;
 }
 
 /**
  * Renumber all cards in a column with fresh multiples of SPACING.
- * Expects `sortedCards` to already be sorted by current order (caller's
+ * Expects `orderedCards` to already be sorted by current order (caller's
  * responsibility — it has access to getFileOrder).
  *
  * Called when adjacent gaps shrink below REINDEX_THRESHOLD.
  */
 export async function renormalizeColumn(
-  sortedCards: CardData[],
+  orderedCards: ReadonlyArray<{ filePath: string }>,
   updateOrder: (filePath: string, position: number) => Promise<void>,
 ): Promise<void> {
   await Promise.all(
-    sortedCards.map((card, i) => {
+    orderedCards.map((card, i) => {
       const position = (i + 1) * SPACING;
       return updateOrder(card.filePath, position);
     }),

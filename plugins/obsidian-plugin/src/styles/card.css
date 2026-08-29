@@ -28,6 +28,14 @@
     opacity 0.2s ease,
     border-color 0.15s ease;
   user-select: none;
+  /* Skip layout/paint for offscreen cards — critical for large boards.
+     contain-intrinsic-size gives an estimated height (cards with a cover
+     are ~155px, text-only cards less) until the card is scrolled into
+     view, at which point the real size is remembered automatically. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+  /* Card border via CSS variable (configured border property) */
+  border-left: 3px solid var(--card-border-color, transparent);
 }
 
 .base-board-card-thumbnail {
@@ -64,6 +72,12 @@
   display: none;
 }
 
+/* Virtual (not yet hydrated) shells: occupy space but show nothing.
+   The class is removed when the LazyList hydrates the card. */
+.base-board-card--virtual {
+  visibility: hidden;
+}
+
 /* Multi-select highlight */
 .base-board-card--selected {
   border-color: var(--interactive-accent);
@@ -82,6 +96,7 @@
   opacity: 0.35;
   transform: scale(0.97);
   pointer-events: none;
+  will-change: opacity, transform;
   transition:
     opacity 0.15s ease,
     transform 0.15s ease;
@@ -288,11 +303,7 @@
   color: var(--text-faint);
 }
 
-/* ---- Card border via CSS variable (applied after base card border) ---- */
-
-.base-board-card {
-  border-left: 3px solid var(--card-border-color, transparent);
-}
+/* ---- Card images: never participate in native drag ---- */
 
 .base-board-card-thumbnail-img,
 .base-board-card img {

@@ -2,7 +2,8 @@ import { KanbanView } from "./kanban-view";
 import { CONFIG_KEY_TAG_COLORS } from "./constants";
 import { App, Modal, TFile, setIcon, setTooltip, Setting } from "obsidian";
 import { TagEditModal } from "./tag-edit-modal";
-import { relativeLuminance } from "./color-utils";
+import { relativeLuminance } from "@base-board/board-core";
+import type { RenderContext } from "./render-context";
 
 export class Tags {
   private view: KanbanView;
@@ -60,7 +61,7 @@ export class Tags {
       delete colors[tag];
     }
     this.view.config?.set(CONFIG_KEY_TAG_COLORS, colors);
-    this.view.scheduleRender();
+    this.view.scheduleUpdate();
   }
 
   public extractTagsFromFile(file: TFile): string[] {
@@ -98,16 +99,25 @@ export class Tags {
     }).open();
   }
 
-  public renderFilterBar(container: HTMLElement): void {
+  public renderFilterBar(
+    container: HTMLElement,
+    ctx: RenderContext | null,
+  ): void {
     const allTags = new Set<string>();
 
     for (const column of this.view.currentGroups) {
       for (const card of column.cards) {
-        const file = this.view.app.vault.getAbstractFileByPath(card.filePath);
-        if (file instanceof TFile) {
-          const fileTags = this.extractTagsFromFile(file);
-          fileTags.forEach((t) => allTags.add(t));
-        }
+        const fileTags = ctx
+          ? ctx.tagsOf(card.filePath)
+          : (() => {
+              const file = this.view.app.vault.getAbstractFileByPath(
+                card.filePath,
+              );
+              return file instanceof TFile
+                ? this.extractTagsFromFile(file)
+                : [];
+            })();
+        fileTags.forEach((t) => allTags.add(t));
       }
     }
 
@@ -168,7 +178,7 @@ export class Tags {
         } else {
           this.activeFilters.add(tag);
         }
-        this.view.scheduleRender();
+        this.view.scheduleUpdate();
       });
     }
 
@@ -189,7 +199,7 @@ export class Tags {
       });
       clearBtn.addEventListener("click", () => {
         this.activeFilters.clear();
-        this.view.scheduleRender();
+        this.view.scheduleUpdate();
       });
     }
   }

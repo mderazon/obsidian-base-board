@@ -9,7 +9,7 @@ import {
 import { KanbanView } from "./kanban-view";
 import { sanitizeFilename } from "./constants";
 import { CreateBoardModal, BoardConfig } from "./modals";
-import { updateBaseFolderReferences } from "./folder-rename";
+import { updateBaseFolderReferences } from "@base-board/board-core";
 
 // ---------------------------------------------------------------------------
 //  Plugin

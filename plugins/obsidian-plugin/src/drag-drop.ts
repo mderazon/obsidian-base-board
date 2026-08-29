@@ -529,11 +529,20 @@ export class DragDropManager {
       this.handleColumnDrop(e);
       this.onDragEnd();
     } else if (this.dragType === "card") {
+      // Mark as handled BEFORE the async write: dragend fires while the
+      // drop's awaits are still running, and without this the pre-drop
+      // visuals (hidden card + placeholder at the old spot) would be
+      // restored for a frame — visible as a flicker on every drop.
+      this.cardDropped = true;
       const success = await this.handleCardDrop(e);
-      this.cardDropped = success;
-      // Don't call onDragEnd here on desktop — the browser fires dragend automatically,
-      // and our flag ensures we skip visual cleanup on success.
-      // On mobile, the dragend event is often not fired, so we must call it manually.
+      if (!success) {
+        // Drop landed outside a column — restore pre-drag state ourselves.
+        this.draggedEl?.removeClass("base-board-card--dragging");
+        this.removePlaceholder();
+        this.cardDropped = false;
+      }
+      // On mobile, the dragend event is often not fired, so we must call
+      // onDragEnd manually. On desktop dragend runs during the await above.
       if (Platform.isMobile) {
         this.onDragEnd();
       }

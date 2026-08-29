@@ -49,6 +49,9 @@ import {
   type PositionContext,
 } from "./order";
 import { coerceColumnValue, GroupByValueType } from "./value-utils";
+import { createRenderContext } from "./render-context";
+import { BoardReconciler } from "./reconciler";
+import { ColumnRenameTracker } from "./column-rename-tracker";
 
 // ---------------------------------------------------------------------------
 //  Kanban View
@@ -63,13 +66,13 @@ export class KanbanView extends BasesView implements HoverParent {
   plugin: BaseBoardPlugin;
 
   private dragDropManager: DragDropManager;
-  private columnManager: ColumnManager;
+  public columnManager: ColumnManager;
   /** Board-core Column objects derived from BasesEntryGroup data. */
   public currentGroups: Column[] = [];
   /** Raw Bases typed groups — preserved for groupBy type inference (Boolean/NumberValue) */
   private typedGroups: BasesEntryGroup[] = [];
   /** Raw Bases entries (kept for source-column lookups during card drops) */
-  private rawEntries: BasesEntry[] = [];
+  public rawEntries: BasesEntry[] = [];
   public cardManager: CardManager;
   public chipProperties: ChipPropertiesManager;
 
@@ -79,13 +82,27 @@ export class KanbanView extends BasesView implements HoverParent {
   private pendingRender = false;
   /** True until the first successful render completes. */
   private isFirstRender = true;
-  /** Debounce timer for render calls. */
+  /** Debounce timer for render/update calls. */
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * What the pending debounced call should do. Data updates reconcile the
+   * existing DOM in place (Trello-style); config changes request a full
+   * render. "full" wins over "update" if both are requested in one window.
+   */
+  private pendingUpdateKind: "full" | "update" = "update";
+  /** Incremental DOM reconciler for data-driven updates. */
+  public reconciler: BoardReconciler;
   /** Label Manager for tags and filters */
   public tags: Tags;
   /** Currently selected card file paths (for batch operations) */
   public selectedCards: Set<string> = new Set();
   public detailLeaf: WorkspaceLeaf | null = null;
+  /**
+   * Single source of truth for in-flight / recent column renames (see
+   * ColumnRenameTracker): element claiming, mid-propagation shielding,
+   * stale-name scrubbing and scroll restoration all derive from it.
+   */
+  public renameTracker: ColumnRenameTracker;
 
   constructor(
     controller: QueryController,
@@ -158,6 +175,19 @@ export class KanbanView extends BasesView implements HoverParent {
     this.cardManager = new CardManager(this);
     this.columnManager = new ColumnManager(this);
     this.chipProperties = new ChipPropertiesManager(this);
+    this.renameTracker = new ColumnRenameTracker({
+      onSettled: (oldName) => {
+        // Scrub the old name from the stored column config — Bases may
+        // re-persist a mid-rename column list to the .base file.
+        const storedList = this.config?.get(CONFIG_KEY_COLUMNS) as
+          | string[]
+          | undefined;
+        if (Array.isArray(storedList) && storedList.includes(oldName)) {
+          this.saveColumns(storedList.filter((c) => c !== oldName));
+        }
+      },
+    });
+    this.reconciler = new BoardReconciler(this);
 
     this.dragDropManager = new DragDropManager(this.app, {
       onCardDrop: (
@@ -175,6 +205,7 @@ export class KanbanView extends BasesView implements HoverParent {
 
   onunload(): void {
     this.dragDropManager.destroy();
+    this.cardManager.resetLazyColumns();
     if (this.renderTimer) window.clearTimeout(this.renderTimer);
   }
 
@@ -187,7 +218,7 @@ export class KanbanView extends BasesView implements HoverParent {
       this.pendingRender = true;
       return;
     }
-    this.scheduleRender();
+    this.scheduleUpdate();
   }
 
   /**
@@ -206,10 +237,10 @@ export class KanbanView extends BasesView implements HoverParent {
       this.isUpdating = false;
     }
 
-    // If Bases fired onDataUpdated during our batch, schedule a debounced render.
+    // If Bases fired onDataUpdated during our batch, schedule a debounced update.
     if (this.pendingRender) {
       this.pendingRender = false;
-      this.scheduleRender();
+      this.scheduleUpdate();
     }
   }
 
@@ -372,7 +403,7 @@ export class KanbanView extends BasesView implements HoverParent {
       delete colors[columnName];
     }
     this.config?.set(CONFIG_KEY_COLUMN_COLORS, colors);
-    this.scheduleRender();
+    this.scheduleUpdate();
   }
 
   // ---------------------------------------------------------------------------
@@ -400,7 +431,7 @@ export class KanbanView extends BasesView implements HoverParent {
       delete limits[columnName];
     }
     this.config?.set(CONFIG_KEY_WIP_LIMITS, limits);
-    this.scheduleRender();
+    this.scheduleUpdate();
   }
 
   private getColumnName(key: unknown): string {
@@ -514,8 +545,19 @@ export class KanbanView extends BasesView implements HoverParent {
   //  Rendering
   // ---------------------------------------------------------------------------
 
+  /** Re-map the live Bases query result into currentGroups (shared by render + reconcile). */
+  public refreshGroups(): BasesEntryGroup[] {
+    const groupedData: BasesEntryGroup[] = this.data?.groupedData ?? [];
+    this.rawEntries = groupedData.flatMap((g) => g.entries);
+    this.typedGroups = groupedData;
+    this.currentGroups = groupedData.map((g) => this.toColumn(g));
+    return groupedData;
+  }
+
   public render(): void {
     this.selectedCards.clear();
+    this.cardManager.resetLazyColumns();
+    this.reconciler.invalidate();
 
     // Save scroll positions before destroying the DOM so we can restore
     // them after rebuild.  Without this the board jumps back to 0 on every
@@ -539,7 +581,7 @@ export class KanbanView extends BasesView implements HoverParent {
     this.containerEl.empty();
 
     // Use the official API: this.data is a BasesQueryResult
-    const groupedData: BasesEntryGroup[] = this.data?.groupedData ?? [];
+    const groupedData = this.refreshGroups();
     const hasGroupBy =
       groupedData.length > 1 ||
       (groupedData.length === 1 &&
@@ -570,23 +612,20 @@ export class KanbanView extends BasesView implements HoverParent {
     }
 
     // Map raw BasesEntryGroup → board-core Column
-    this.rawEntries = groupedData.flatMap((g) => g.entries);
-    this.typedGroups = groupedData;
-    this.currentGroups = groupedData.map((g) => this.toColumn(g));
     const columns = this.getColumns();
+    const ctx = createRenderContext(this);
     const boardEl = this.containerEl.createDiv({ cls: "base-board-board" });
-
     // Only animate cards on the very first render
     if (this.isFirstRender) {
       boardEl.addClass("base-board-board--animate");
       this.isFirstRender = false;
     }
 
-    this.tags.renderFilterBar(this.containerEl);
+    this.tags.renderFilterBar(this.containerEl, ctx);
 
     columns.forEach((columnName, idx) => {
       const column = this.getGroupForColumn(columnName);
-      this.columnManager.renderColumn(boardEl, columnName, column, idx);
+      this.columnManager.renderColumn(boardEl, columnName, column, idx, ctx);
     });
 
     this.columnManager.renderAddColumnButton(boardEl);
@@ -604,7 +643,11 @@ export class KanbanView extends BasesView implements HoverParent {
         boardEl.querySelectorAll(".base-board-column").forEach((col) => {
           const name = (col as HTMLElement).dataset.columnName;
           const cardsEl = col.querySelector(".base-board-cards");
-          const scroll = name ? savedColumnScrolls[name] : undefined;
+          // Follow rename history so a renamed column keeps its scroll
+          const scroll = name
+            ? (savedColumnScrolls[name] ??
+              savedColumnScrolls[this.renameTracker.previousNameOf(name) ?? ""])
+            : undefined;
           if (cardsEl && scroll != null && scroll > 0) {
             cardsEl.scrollTop = scroll;
           }
@@ -613,13 +656,50 @@ export class KanbanView extends BasesView implements HoverParent {
     }
   }
 
+  /**
+   * Move per-column config entries (colors, WIP limits) from `oldName` to
+   * `newName` after a rename. With `newName` null (merge into an existing
+   * column) the old entry is dropped unless the target lacks one.
+   */
+  public migrateColumnKeyedConfig(
+    oldName: string,
+    newName: string | null,
+  ): void {
+    const colors = this.getColumnColors();
+    if (Object.prototype.hasOwnProperty.call(colors, oldName)) {
+      const color = colors[oldName];
+      delete colors[oldName];
+      if (newName && !colors[newName]) colors[newName] = color;
+      this.config?.set(CONFIG_KEY_COLUMN_COLORS, colors);
+    }
+    const limits = this.getWipLimits();
+    if (Object.prototype.hasOwnProperty.call(limits, oldName)) {
+      const limit = limits[oldName];
+      delete limits[oldName];
+      if (newName && !limits[newName]) limits[newName] = limit;
+      this.config?.set(CONFIG_KEY_WIP_LIMITS, limits);
+    }
+  }
+
+  /**
+   * Record a column rename in the tracker: element claiming, mid-propagation
+   * shielding, stale-name scrubbing and scroll restore all derive from it.
+   */
+  public registerColumnRename(
+    oldName: string,
+    newName: string,
+    expectedCount = 0,
+  ): void {
+    this.renameTracker.register(oldName, newName, expectedCount);
+  }
+
   // ---------------------------------------------------------------------------
   //  Column & Filter management helpers
   // ---------------------------------------------------------------------------
 
   private handleColumnReorder(orderedNames: string[]): void {
     this.saveColumns(orderedNames);
-    this.render();
+    this.scheduleUpdate();
   }
 
   /**
@@ -635,27 +715,29 @@ export class KanbanView extends BasesView implements HoverParent {
   // ---------------------------------------------------------------------------
 
   /**
-   * Check if any adjacent pair in the column has a gap below the threshold.
-   * Renormalizes if needed.
+   * Renormalize the given final card arrangement if any adjacent gap is
+   * below the threshold.
+   *
+   * Unlike the old group-based check this reads live kanban_order values
+   * AFTER the drop writes have landed and uses the caller-provided order
+   * (which includes just-moved cards), so a re-index can never overwrite
+   * or scramble the positions a drop just wrote.
    */
-  public async checkAndRenormalize(columnName: string): Promise<void> {
-    const column = this.currentGroups.find((g) => g.name === columnName);
-    if (!column || column.cards.length < 2) return;
+  public async renormalizeIfNeeded(orderedPaths: string[]): Promise<void> {
+    if (orderedPaths.length < 2) return;
 
-    const sorted = [...column.cards].sort(
-      (a, b) => this.getFileOrder(a.filePath) - this.getFileOrder(b.filePath),
-    );
-
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = this.getFileOrder(sorted[i - 1].filePath);
-      const curr = this.getFileOrder(sorted[i].filePath);
+    const orders = orderedPaths.map((fp) => this.getFileOrder(fp));
+    for (let i = 1; i < orders.length; i++) {
+      const prev = orders[i - 1];
+      const curr = orders[i];
       if (
-        prev !== Infinity &&
-        curr !== Infinity &&
+        Number.isFinite(prev) &&
+        Number.isFinite(curr) &&
         curr - prev < REINDEX_THRESHOLD
       ) {
-        await renormalizeColumn(sorted, (fp, pos) =>
-          this.updateCardOrder(fp, pos),
+        await renormalizeColumn(
+          orderedPaths.map((fp) => ({ filePath: fp })),
+          (fp, pos) => this.updateCardOrder(fp, pos),
         );
         return;
       }
@@ -745,8 +827,13 @@ export class KanbanView extends BasesView implements HoverParent {
         ? [filePath, ...otherSelected]
         : [filePath];
 
-      const ctx: PositionContext = {
-        getFileOrder: (fp: string) => this.getFileOrder(fp),
+      // Compute positions sequentially so co-moved cards can use each
+      // other's new positions as neighbors (their old orders are stale or
+      // belong to a different column).
+      const positionOverrides = new Map<string, number>();
+      const positionCtx: PositionContext = {
+        getFileOrder: (fp: string) =>
+          positionOverrides.get(fp) ?? this.getFileOrder(fp),
       };
 
       const orderPromises = movedPaths.map((movedPath) => {
@@ -758,8 +845,9 @@ export class KanbanView extends BasesView implements HoverParent {
           idx,
           fullOrderedPaths,
           allCardsInColumn,
-          ctx,
+          positionCtx,
         );
+        positionOverrides.set(movedPath, position);
         return this.app.fileManager.processFrontMatter(
           file,
           (fm: Record<string, unknown>) => {
@@ -769,21 +857,41 @@ export class KanbanView extends BasesView implements HoverParent {
       });
       await Promise.all(orderPromises);
 
-      // Check if adjacent gaps shrank too small and renormalize if needed.
-      await this.checkAndRenormalize(targetColumnName);
+      // Renormalize based on the FINAL arrangement (not the stale render
+      // data), so a re-index can never overwrite the positions just written.
+      await this.renormalizeIfNeeded(fullOrderedPaths);
     });
 
     // Always ensure a re-render, even if Bases hasn't fired onDataUpdated yet.
-    // The scheduleRender is debounced, so if Bases fires later it just coalesces.
-    this.scheduleRender();
+    // The scheduleUpdate is debounced, so if Bases fires later it just coalesces.
+    this.scheduleUpdate();
   }
 
-  /** Debounced render — coalesces multiple calls into one. */
+  /** Request a full board rebuild (config changes, structural switches). */
   public scheduleRender(): void {
+    this.pendingUpdateKind = "full";
+    this.scheduleDebounced();
+  }
+
+  /**
+   * Request an incremental update: diff fresh data against the existing DOM
+   * and patch it in place (no teardown, scroll/selection preserved).
+   */
+  public scheduleUpdate(): void {
+    this.scheduleDebounced();
+  }
+
+  private scheduleDebounced(): void {
     if (this.renderTimer) window.clearTimeout(this.renderTimer);
     this.renderTimer = window.setTimeout(() => {
       this.renderTimer = null;
-      this.render();
+      const kind = this.pendingUpdateKind;
+      this.pendingUpdateKind = "update";
+      if (kind === "full") {
+        this.render();
+      } else {
+        this.reconciler.update();
+      }
     }, 50);
   }
 

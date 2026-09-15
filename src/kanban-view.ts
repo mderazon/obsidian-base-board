@@ -36,6 +36,7 @@ import {
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
   CONFIG_KEY_ADD_TO_TOP,
+  VIEW_TYPE,
 } from "./constants";
 
 interface BoardScrollState {
@@ -49,7 +50,7 @@ interface BoardScrollState {
 // ---------------------------------------------------------------------------
 
 export class KanbanView extends BasesView implements HoverParent {
-  type = "kanban";
+  type = VIEW_TYPE;
   // Required by HoverParent — Obsidian manages the popover lifecycle.
   hoverPopover: HoverPopover | null = null;
   scrollEl: HTMLElement;

@@ -1,3 +1,12 @@
+/** Serialized Bases view-type id. Namespaced to this plugin so it never
+ * collides with Obsidian's native Bases views (native "kanban" arrived in
+ * Obsidian 1.14 — see #62). The displayed name is "Base Board". */
+export const VIEW_TYPE = "base-board";
+
+/** Legacy view-type id used before the #62 rename. Existing boards created by
+ * older Base Board versions serialize this as their view `type`. */
+export const LEGACY_VIEW_TYPE = "kanban";
+
 /** Column label used when an entry has no value for the groupBy property. */
 export const NO_VALUE_COLUMN = "(No value)";
 
@@ -27,6 +36,20 @@ export const CONFIG_KEY_COVER_PROPERTY = "cardCoverProperty";
 
 /** Key used by BasesViewConfig.set/get to persist if new cards should be added to the top in the .base file. */
 export const CONFIG_KEY_ADD_TO_TOP = "newCardsToTop";
+
+/** The Base Board-specific view-config keys. A `.base` view carrying any of
+ * these was configured by Base Board, which lets the migration auto-identify
+ * legacy `type: kanban` views that are really Base Board boards. */
+export const BASE_BOARD_CONFIG_KEYS = [
+  CONFIG_KEY_COLUMNS,
+  CONFIG_KEY_COLLAPSED_COLUMNS,
+  CONFIG_KEY_TAG_COLORS,
+  CONFIG_KEY_OPEN_BEHAVIOR,
+  CONFIG_KEY_COLUMN_COLORS,
+  CONFIG_KEY_WIP_LIMITS,
+  CONFIG_KEY_COVER_PROPERTY,
+  CONFIG_KEY_ADD_TO_TOP,
+];
 
 /**
  * Regex matching characters that are invalid in file/folder names.

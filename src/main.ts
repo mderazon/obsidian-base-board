@@ -7,9 +7,10 @@ import {
   TAbstractFile,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
-import { sanitizeFilename } from "./constants";
+import { sanitizeFilename, VIEW_TYPE } from "./constants";
 import { CreateBoardModal, BoardConfig } from "./modals";
 import { updateBaseFolderReferences } from "./folder-rename";
+import { runLegacyViewMigration } from "./migrate";
 
 /** Per-base column configuration */
 export interface ColumnConfig {
@@ -40,8 +41,13 @@ export default class BaseBoardPlugin extends Plugin {
   async onload() {
     await this.loadPluginData();
 
-    this.registerBasesView("kanban", {
-      name: "Kanban",
+    // Registered under the plugin-namespaced VIEW_TYPE ("base-board") rather
+    // than "kanban": Obsidian 1.14 ships a native Bases Kanban under the
+    // "kanban" id, and a `.base` selects its view implementation by `type`, so
+    // sharing the id made the two mutually exclusive (last registration wins).
+    // See #62. `name` is the human label shown in the view picker.
+    this.registerBasesView(VIEW_TYPE, {
+      name: "Base Board",
       icon: "lucide-kanban",
       factory: (controller: QueryController, containerEl: HTMLElement) =>
         new KanbanView(controller, containerEl, this),
@@ -56,6 +62,20 @@ export default class BaseBoardPlugin extends Plugin {
         new CreateBoardModal(this.app, (config) => {
           void this.createBoard(config);
         }).open();
+      },
+    });
+
+    // -- Command: Migrate legacy boards ---------------------------------------
+    // Boards created before the #62 rename serialize `type: kanban`, which now
+    // resolves to Obsidian's native Kanban instead of Base Board. This scans
+    // for them and, on confirmation, rewrites them to `type: base-board`.
+    // Confirmation is required because a `type: kanban` view can legitimately
+    // be a NATIVE Kanban post-1.14 — a blind rewrite would hijack those.
+    this.addCommand({
+      id: "migrate-legacy-boards",
+      name: "Migrate legacy Base Board views (type: kanban → base-board)",
+      callback: () => {
+        void runLegacyViewMigration(this.app);
       },
     });
 
@@ -167,7 +187,7 @@ export default class BaseBoardPlugin extends Plugin {
       `  and:`,
       `    - file.inFolder("${tasksFolder}")`,
       `views:`,
-      `  - type: kanban`,
+      `  - type: ${VIEW_TYPE}`,
       `    name: ${name}`,
       `    groupBy:`,
       `      property: note.${groupBy}`,

@@ -1,4 +1,12 @@
-import { App, Modal, Notice, Setting, TFile, parseYaml, stringifyYaml } from "obsidian";
+import {
+  App,
+  Modal,
+  Notice,
+  Setting,
+  TFile,
+  parseYaml,
+  stringifyYaml,
+} from "obsidian";
 import {
   BASE_BOARD_CONFIG_KEYS,
   LEGACY_VIEW_TYPE,
@@ -34,7 +42,7 @@ async function findLegacyViews(app: App): Promise<LegacyView[]> {
     views.forEach((view, viewIndex) => {
       if (!view || view.type !== LEGACY_VIEW_TYPE) return;
       const confident = BASE_BOARD_CONFIG_KEYS.some((k) =>
-        Object.prototype.hasOwnProperty.call(view, k)
+        Object.prototype.hasOwnProperty.call(view, k),
       );
       found.push({
         file,
@@ -83,7 +91,7 @@ async function migrateViews(app: App, chosen: LegacyView[]): Promise<number> {
 export async function runLegacyViewMigration(app: App): Promise<void> {
   const legacy = await findLegacyViews(app);
   if (!legacy.length) {
-    new Notice("Base Board: no legacy “type: kanban” views found.");
+    new Notice("No legacy “type: kanban” views found.");
     return;
   }
   new MigrateModal(app, legacy).open();
@@ -104,7 +112,7 @@ class MigrateModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Migrate legacy Base Board views" });
+    contentEl.createEl("h2", { text: "Migrate legacy views" });
     contentEl.createEl("p", {
       text:
         `Found ${this.legacy.length} view(s) using the old "type: kanban" id. ` +
@@ -120,13 +128,13 @@ class MigrateModal extends Modal {
         .setDesc(
           v.confident
             ? "Has Base Board settings — almost certainly a Base Board board."
-            : "No Base Board settings found — could be a native Kanban. Verify before migrating."
+            : "No Base Board settings found — could be a native Kanban. Verify before migrating.",
         );
       setting.addToggle((t) =>
         t.setValue(this.selected.has(v)).onChange((on) => {
           if (on) this.selected.add(v);
           else this.selected.delete(v);
-        })
+        }),
       );
     }
 
@@ -145,12 +153,14 @@ class MigrateModal extends Modal {
             }
             const n = await migrateViews(this.app, chosen);
             new Notice(
-              `Base Board: migrated ${n} view(s) to "type: base-board". Reopen affected boards to see them.`
+              `Migrated ${n} view(s) to "type: base-board". Reopen affected boards to see them.`,
             );
             this.close();
-          })
+          }),
       )
-      .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()));
+      .addButton((btn) =>
+        btn.setButtonText("Cancel").onClick(() => this.close()),
+      );
   }
 
   onClose(): void {

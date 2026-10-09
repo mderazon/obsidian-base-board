@@ -73,7 +73,7 @@ export default class BaseBoardPlugin extends Plugin {
     // be a NATIVE Kanban post-1.14 — a blind rewrite would hijack those.
     this.addCommand({
       id: "migrate-legacy-boards",
-      name: "Migrate legacy Base Board views (type: kanban → base-board)",
+      name: "Migrate legacy views (type: kanban → base-board)",
       callback: () => {
         void runLegacyViewMigration(this.app);
       },

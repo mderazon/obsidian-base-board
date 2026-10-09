@@ -248,6 +248,19 @@ export class CardManager {
           "base-board-card",
           this.view.app.workspace.getMostRecentLeaf(),
         );
+
+        menu.addSeparator();
+        menu.addItem((item) => {
+          item
+            .setTitle("Delete")
+            .setIcon("lucide-trash-2")
+            .setWarning(true)
+            .onClick(async () => {
+              await this.view.app.fileManager.trashFile(file);
+              new Notice(`Moved "${file.basename}" to trash`);
+            });
+        });
+
         menu.showAtMouseEvent(e);
       });
     }
@@ -626,9 +639,18 @@ export class CardManager {
 
     btnEl.classList.add("base-board-hidden");
 
-    const inputWrapper = cardsEl.createDiv({
+    const addToTop = this.view.isAddNewCardsToTop();
+    const inputWrapper = createDiv({
       cls: "base-board-add-card-input-wrapper",
     });
+    if (addToTop) {
+      cardsEl.prepend(inputWrapper);
+      cardsEl.scrollTop = 0;
+    } else {
+      cardsEl.appendChild(inputWrapper);
+      cardsEl.scrollTop = cardsEl.scrollHeight;
+    }
+
     const input = inputWrapper.createEl("input", {
       cls: "base-board-add-card-input",
       attr: { type: "text", placeholder: "Card title…" },

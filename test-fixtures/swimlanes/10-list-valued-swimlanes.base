@@ -1,0 +1,20 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/10-list-valued-swimlanes")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "List-valued swimlane property"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"
+    swimlaneProperty: priority
+    boardSwimlanes:
+      - "Design, Research"
+      - "Engineering"
+      - "(No value)"

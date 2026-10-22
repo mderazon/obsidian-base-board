@@ -27,6 +27,15 @@ import {
 } from "./order";
 import { coerceColumnValue, GroupByValueType } from "./value-utils";
 import {
+  deleteSwimlaneOperation,
+  applyCardMoveProperties,
+  buildSwimlaneLayout,
+  getOrderedSwimlanes,
+  getSwimlaneLabel,
+  inferSwimlaneValueType,
+  SwimlaneValueType,
+} from "./swimlanes";
+import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
   CONFIG_KEY_COLUMNS,
@@ -36,6 +45,8 @@ import {
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
   CONFIG_KEY_ADD_TO_TOP,
+  CONFIG_KEY_SWIMLANE_PROPERTY,
+  CONFIG_KEY_SWIMLANES,
   VIEW_TYPE,
 } from "./constants";
 
@@ -70,6 +81,10 @@ export class KanbanView extends BasesView implements HoverParent {
   private isFirstRender = true;
   /** Debounce timer for render calls. */
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Avoid rebuilding swimlanes for every keystroke in the property setting. */
+  private swimlanePropertyTimer: ReturnType<typeof setTimeout> | null = null;
+  private activeSwimlaneProperty: string | null = null;
+  private hasInitializedSwimlaneProperty = false;
   /** Local drop intent retained until Bases publishes the matching groups. */
   private optimisticMoves = new Map<string, string>();
   private optimisticColumnOrders = new Map<string, string[]>();
@@ -97,8 +112,10 @@ export class KanbanView extends BasesView implements HoverParent {
       onCardDrop: (
         filePath: string,
         targetColumn: string,
+        targetLane: string,
         orderedPaths: string[],
-      ) => this.handleCardDrop(filePath, targetColumn, orderedPaths),
+      ) =>
+        this.handleCardDrop(filePath, targetColumn, targetLane, orderedPaths),
       onColumnReorder: (orderedNames: string[]) =>
         this.handleColumnReorder(orderedNames),
       getSelectedCards: () => this.selectedCards,
@@ -110,6 +127,8 @@ export class KanbanView extends BasesView implements HoverParent {
   onunload(): void {
     this.dragDropManager.destroy();
     if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    if (this.swimlanePropertyTimer)
+      window.clearTimeout(this.swimlanePropertyTimer);
   }
 
   public focus(): void {
@@ -178,6 +197,13 @@ export class KanbanView extends BasesView implements HoverParent {
             type: "toggle" as const,
             displayName: "Add new cards to top",
             default: false,
+          },
+          {
+            key: CONFIG_KEY_SWIMLANE_PROPERTY,
+            type: "text" as const,
+            displayName: "Swimlane property",
+            default: "",
+            placeholder: "E.g. priority (leave empty to disable)",
           },
         ],
       },
@@ -271,6 +297,86 @@ export class KanbanView extends BasesView implements HoverParent {
       return "cover";
     }
     return typeof val === "string" && val.trim() !== "" ? val.trim() : null;
+  }
+
+  public getSwimlaneProperty(): string | null {
+    const value = this.config?.get(CONFIG_KEY_SWIMLANE_PROPERTY);
+    const next =
+      typeof value === "string" && value.trim() ? value.trim() : null;
+    if (!this.hasInitializedSwimlaneProperty) {
+      this.activeSwimlaneProperty = next;
+      this.hasInitializedSwimlaneProperty = true;
+      return next;
+    }
+    if (next !== this.activeSwimlaneProperty) {
+      if (this.swimlanePropertyTimer) {
+        window.clearTimeout(this.swimlanePropertyTimer);
+      }
+      this.swimlanePropertyTimer = window.setTimeout(() => {
+        this.swimlanePropertyTimer = null;
+        this.activeSwimlaneProperty = next;
+        this.scheduleRender();
+      }, 500);
+    }
+    return this.activeSwimlaneProperty;
+  }
+
+  public getSwimlaneValue(entry: BasesEntry): string {
+    const property = this.getSwimlaneProperty();
+    const file = entry.file;
+    if (!property || !(file instanceof TFile)) return "(No value)";
+    const raw: unknown =
+      this.app.metadataCache.getFileCache(file)?.frontmatter?.[property];
+    return getSwimlaneLabel(raw);
+  }
+
+  public getSwimlanes(entries: BasesEntry[]): string[] {
+    const values = entries.map((entry) => this.getSwimlaneValue(entry));
+    const configured = this.config?.get(CONFIG_KEY_SWIMLANES) as
+      string[] | undefined;
+    return getOrderedSwimlanes(values, configured ?? []);
+  }
+
+  public getSwimlaneValueType(targetLane?: string): SwimlaneValueType {
+    const property = this.getSwimlaneProperty();
+    if (!property) return "other";
+    const values: unknown[] = [];
+    for (const entry of this.data?.data ?? []) {
+      if (!(entry.file instanceof TFile)) continue;
+      values.push(
+        this.app.metadataCache.getFileCache(entry.file)?.frontmatter?.[
+          property
+        ],
+      );
+    }
+    return inferSwimlaneValueType(values, targetLane);
+  }
+
+  public saveSwimlanes(lanes: string[]): void {
+    this.config?.set(CONFIG_KEY_SWIMLANES, lanes);
+    this.scheduleRender();
+  }
+
+  public async deleteSwimlane(laneName: string): Promise<void> {
+    const property = this.getSwimlaneProperty();
+    if (!property || laneName === "(No value)") return;
+
+    const configured = this.config?.get(CONFIG_KEY_SWIMLANES) as
+      string[] | undefined;
+    await this.applyBatchUpdate(() =>
+      deleteSwimlaneOperation({
+        lane: laneName,
+        property,
+        entries: this.data?.data ?? [],
+        getLane: (entry) => this.getSwimlaneValue(entry),
+        getFile: (entry) => (entry.file instanceof TFile ? entry.file : null),
+        configuredLanes: configured ?? [],
+        saveLanes: (lanes) => this.config?.set(CONFIG_KEY_SWIMLANES, lanes),
+        processFrontMatter: (file, update) =>
+          this.app.fileManager.processFrontMatter(file, update),
+      }),
+    );
+    this.scheduleRender();
   }
 
   public isLeafAttached(leaf: WorkspaceLeaf): boolean {
@@ -566,6 +672,7 @@ export class KanbanView extends BasesView implements HoverParent {
     this.ensureFileNameInOrder();
     this.selectedCards.clear();
     const scrollState = this.captureScrollState();
+    const swimlaneProperty = this.getSwimlaneProperty();
 
     // Index stable DOM nodes before rebuilding the lightweight board shell.
     // Columns are detached as complete subtrees, preserving their card lists,
@@ -579,15 +686,17 @@ export class KanbanView extends BasesView implements HoverParent {
     });
 
     this.columnElCache.clear();
-    this.containerEl
-      .querySelectorAll<HTMLElement>(".base-board-column")
-      .forEach((el) => {
-        const name = el.dataset.columnName;
-        if (name) {
-          this.columnElCache.set(name, el);
-          el.remove();
-        }
-      });
+    if (!swimlaneProperty) {
+      this.containerEl
+        .querySelectorAll<HTMLElement>(".base-board-column")
+        .forEach((el) => {
+          const name = el.dataset.columnName;
+          if (name) {
+            this.columnElCache.set(name, el);
+            el.remove();
+          }
+        });
+    }
 
     this.containerEl.empty();
 
@@ -635,6 +744,11 @@ export class KanbanView extends BasesView implements HoverParent {
 
     this.tags.renderFilterBar(this.containerEl);
 
+    const entries = (this.data?.data ?? []).filter(
+      (entry) => entry.file instanceof TFile,
+    );
+    const lanes = swimlaneProperty ? this.getSwimlanes(entries) : [];
+
     columns.forEach((columnName, idx) => {
       const group = this.getGroupForColumn(columnName);
       this.columnManager.renderColumn(
@@ -643,12 +757,124 @@ export class KanbanView extends BasesView implements HoverParent {
         group,
         idx,
         this.columnElCache.get(columnName),
+        lanes,
       );
     });
 
     this.columnManager.renderAddColumnButton(boardEl);
+    if (swimlaneProperty) {
+      this.renderSwimlaneMatrix(boardEl, columns, lanes);
+    }
     this.dragDropManager.initBoard(boardEl);
     this.restoreScrollState(boardEl, scrollState);
+  }
+
+  private renderSwimlaneMatrix(
+    boardEl: HTMLElement,
+    columns: string[],
+    lanes: string[],
+  ): void {
+    const sourceColumns = Array.from(
+      boardEl.querySelectorAll<HTMLElement>(":scope > .base-board-column"),
+    );
+    const addColumnButton = boardEl.querySelector<HTMLElement>(
+      ":scope > .base-board-add-column-btn",
+    );
+    const columnByName = new Map(
+      sourceColumns.map((column) => [column.dataset.columnName ?? "", column]),
+    );
+
+    boardEl.empty();
+    boardEl.addClass("base-board-board--swimlanes");
+
+    const headerRow = boardEl.createDiv({ cls: "base-board-column-headers" });
+    for (const columnName of columns) {
+      const source = columnByName.get(columnName);
+      if (!source) continue;
+      const headerCell = headerRow.createDiv({
+        cls: "base-board-column-header-cell",
+      });
+      headerCell.dataset.columnName = columnName;
+      headerCell.classList.toggle(
+        "base-board-column--collapsed",
+        source.classList.contains("base-board-column--collapsed"),
+      );
+      const color = source.style.getPropertyValue("--column-color");
+      if (color) headerCell.style.setProperty("--column-color", color);
+      const accent = source.querySelector<HTMLElement>(
+        ".base-board-column-accent",
+      );
+      if (accent) headerCell.appendChild(accent);
+      const header = source.querySelector<HTMLElement>(
+        ".base-board-column-header",
+      );
+      if (header) headerCell.appendChild(header);
+    }
+    if (addColumnButton) headerRow.appendChild(addColumnButton);
+
+    const layout = buildSwimlaneLayout(
+      columns,
+      lanes,
+      (columnName, laneName) => {
+        const source = columnByName.get(columnName);
+        const sourceLanes = Array.from(
+          source?.querySelectorAll<HTMLElement>(
+            ":scope > .base-board-lanes > .base-board-lane",
+          ) ?? [],
+        );
+        const sourceLane = sourceLanes.find(
+          (lane) => lane.dataset.laneName === laneName,
+        );
+        return (
+          sourceLane?.querySelector<HTMLElement>(".base-board-cards") ?? null
+        );
+      },
+    );
+
+    for (const { lane: laneName, cells } of layout) {
+      const laneSection = boardEl.createDiv({ cls: "base-board-lane" });
+      laneSection.dataset.laneName = laneName;
+      const firstSource = columnByName.get(columns[0] ?? "");
+      const firstLane = firstSource?.querySelectorAll<HTMLElement>(
+        ":scope > .base-board-lanes > .base-board-lane",
+      );
+      const sourceLane = Array.from(firstLane ?? []).find(
+        (lane) => lane.dataset.laneName === laneName,
+      );
+      const laneHeading = laneSection.createDiv({
+        cls: "base-board-swimlane-heading",
+      });
+      const title = sourceLane?.querySelector<HTMLElement>(
+        ".base-board-lane-title",
+      );
+      if (title) laneHeading.appendChild(title);
+      else laneHeading.createSpan({ text: laneName });
+
+      const row = laneSection.createDiv({ cls: "base-board-swimlane-row" });
+
+      for (const { column: columnName, content: cards } of cells) {
+        const source = columnByName.get(columnName);
+        const cell = row.createDiv({
+          cls: "base-board-column base-board-swimlane-cell",
+        });
+        cell.dataset.columnName = columnName;
+        cell.classList.toggle(
+          "base-board-column--collapsed",
+          source?.classList.contains("base-board-column--collapsed") ?? false,
+        );
+        cell.classList.toggle(
+          "base-board-column--wip-overflow",
+          source?.classList.contains("base-board-column--wip-overflow") ??
+            false,
+        );
+        const color = source?.style.getPropertyValue("--column-color");
+        if (color) cell.style.setProperty("--column-color", color);
+        if (cards) cell.appendChild(cards);
+        else cell.createDiv({ cls: "base-board-cards" });
+      }
+    }
+
+    this.columnManager.renderAddSwimlaneButton(boardEl);
   }
 
   private captureScrollState(): BoardScrollState {
@@ -743,12 +969,14 @@ export class KanbanView extends BasesView implements HoverParent {
   private async handleCardDrop(
     filePath: string,
     targetColumnName: string,
+    targetLaneName: string,
     orderedPaths: string[],
   ): Promise<void> {
     const groupByProp = this.getGroupByProperty();
     if (!groupByProp) {
       throw new Error("Cannot move a card without a group by property");
     }
+    const swimlaneProp = this.getSwimlaneProperty();
 
     // Snapshot the selection NOW, before any async work or re-render can clear it
     const selectedSnapshot = new Set(this.selectedCards);
@@ -785,11 +1013,29 @@ export class KanbanView extends BasesView implements HoverParent {
           const file = this.app.vault.getAbstractFileByPath(fp);
           if (!file || !(file instanceof TFile)) return Promise.resolve();
           const sourceColumn = this.getCardSourceColumn(fp);
-          if (sourceColumn === targetColumnName) return Promise.resolve();
+          const sourceEntry = (this.data?.data ?? []).find(
+            (entry) => entry.file?.path === fp,
+          );
+          const laneChanged =
+            !!swimlaneProp &&
+            sourceEntry &&
+            this.getSwimlaneValue(sourceEntry) !== targetLaneName;
+          if (sourceColumn === targetColumnName && !laneChanged)
+            return Promise.resolve();
           return this.app.fileManager.processFrontMatter(
             file,
             (fm: Record<string, unknown>) => {
-              this.applyGroupByValue(fm, groupByProp, targetColumnName);
+              applyCardMoveProperties(
+                fm,
+                sourceColumn,
+                targetColumnName,
+                groupByProp,
+                (frontmatter, property, column) =>
+                  this.applyGroupByValue(frontmatter, property, column),
+                swimlaneProp,
+                targetLaneName,
+                this.getSwimlaneValueType(targetLaneName),
+              );
             },
           );
         });

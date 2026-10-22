@@ -1,0 +1,20 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/08-numeric-swimlanes")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "Numeric swimlane values"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"
+    swimlaneProperty: priority
+    boardSwimlanes:
+      - "1"
+      - "2"
+      - "3"

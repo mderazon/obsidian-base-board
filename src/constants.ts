@@ -37,6 +37,11 @@ export const CONFIG_KEY_COVER_PROPERTY = "cardCoverProperty";
 /** Key used by BasesViewConfig.set/get to persist if new cards should be added to the top in the .base file. */
 export const CONFIG_KEY_ADD_TO_TOP = "newCardsToTop";
 
+/** Frontmatter property used to split each column into swimlanes. */
+export const CONFIG_KEY_SWIMLANE_PROPERTY = "swimlaneProperty";
+/** Persisted swimlane order in the Bases view configuration. */
+export const CONFIG_KEY_SWIMLANES = "boardSwimlanes";
+
 /** The Base Board-specific view-config keys. A `.base` view carrying any of
  * these was configured by Base Board, which lets the migration auto-identify
  * legacy `type: kanban` views that are really Base Board boards. */
@@ -49,7 +54,16 @@ export const BASE_BOARD_CONFIG_KEYS = [
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
   CONFIG_KEY_ADD_TO_TOP,
+  CONFIG_KEY_SWIMLANE_PROPERTY,
+  CONFIG_KEY_SWIMLANES,
 ];
+
+/** Whether a serialized view carries any Base Board-specific configuration. */
+export function hasBaseBoardConfig(view: Record<string, unknown>): boolean {
+  return BASE_BOARD_CONFIG_KEYS.some((key) =>
+    Object.prototype.hasOwnProperty.call(view, key),
+  );
+}
 
 /**
  * Regex matching characters that are invalid in file/folder names.

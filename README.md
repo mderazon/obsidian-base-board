@@ -14,6 +14,7 @@
 ## Key Features
 
 - **Property-Based Columns**: Instantly generate columns from any frontmatter property.
+- **Swimlanes**: Set a swimlane property in the Base Board view options to arrange the board into horizontal lanes across all columns. Move cards between lanes and columns by dragging; reorder or delete lanes from their headings.
 - **Intuitive Drag & Drop**: Move cards between columns to update their properties automatically, and reorder cards within a column.
 - **Inline Power**: Rename cards or column titles directly on the board.
 - **Native Editing Modal**: Open any card into a fully-functional Obsidian editor floating directly over your workspace.

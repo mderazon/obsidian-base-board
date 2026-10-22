@@ -15,6 +15,7 @@ import {
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
+import { applyNewCardProperties } from "./swimlanes";
 import { relativeLuminance } from "./color-utils";
 import { isLinkableUrlValue } from "./value-utils";
 import type { OrderValue } from "./order";
@@ -633,9 +634,32 @@ export class CardManager {
     // The trigger button may be in the header OR in the footer, so we walk
     // up to the column element and then down into .base-board-cards.
     const columnEl = btnEl.closest(".base-board-column");
-    const cardsEl =
-      (columnEl?.querySelector(".base-board-cards") as HTMLElement | null) ??
-      btnEl.parentElement!;
+    let cardsEl = columnEl?.querySelector<HTMLElement>(".base-board-cards");
+    let targetLane: string | null =
+      columnEl?.closest<HTMLElement>(".base-board-lane")?.dataset.laneName ??
+      null;
+    if (!cardsEl) {
+      const boardEl = btnEl.closest<HTMLElement>(".base-board-board");
+      const cells = Array.from(
+        boardEl?.querySelectorAll<HTMLElement>(
+          ".base-board-lane .base-board-swimlane-cell",
+        ) ?? [],
+      ).filter((cell) => cell.dataset.columnName === columnName);
+      const defaultCell = cells.find(
+        (cell) =>
+          cell.closest<HTMLElement>(".base-board-lane")?.dataset.laneName ===
+          "(No value)",
+      );
+      const targetCell = defaultCell ?? cells[0];
+      targetLane =
+        targetCell?.closest<HTMLElement>(".base-board-lane")?.dataset
+          .laneName ?? null;
+      cardsEl =
+        targetCell?.querySelector<HTMLElement>(".base-board-cards") ??
+        cells[0]?.querySelector<HTMLElement>(".base-board-cards") ??
+        null;
+    }
+    cardsEl ??= btnEl.parentElement!;
 
     btnEl.classList.add("base-board-hidden");
 
@@ -665,7 +689,7 @@ export class CardManager {
       inputWrapper.remove();
       btnEl.classList.remove("base-board-hidden");
       if (name) {
-        await this.createNewCard(name, columnName, targetOrder);
+        await this.createNewCard(name, columnName, targetOrder, targetLane);
       }
     };
 
@@ -689,6 +713,7 @@ export class CardManager {
     title: string,
     columnName: string,
     targetOrder: OrderValue,
+    targetLane: string | null,
   ): Promise<void> {
     const groupByProp = this.view.getGroupByProperty();
     if (!groupByProp) {
@@ -698,16 +723,21 @@ export class CardManager {
 
     const overrides = (fm: Record<string, unknown>) => {
       const newItemProps = this.view.config?.get("newItemProperties");
-      if (newItemProps && typeof newItemProps === "object") {
-        const props = newItemProps as Record<string, unknown>;
-        for (const k of Object.keys(props)) {
-          if (k !== "__proto__" && k !== "constructor") {
-            fm[k] = props[k];
-          }
-        }
-      }
-      this.view.applyGroupByValue(fm, groupByProp, columnName);
-      fm[ORDER_PROPERTY] = targetOrder;
+      applyNewCardProperties(
+        fm,
+        newItemProps && typeof newItemProps === "object"
+          ? (newItemProps as Record<string, unknown>)
+          : undefined,
+        groupByProp,
+        columnName,
+        (frontmatter, property, column) =>
+          this.view.applyGroupByValue(frontmatter, property, column),
+        ORDER_PROPERTY,
+        targetOrder,
+        this.view.getSwimlaneProperty(),
+        targetLane,
+        this.view.getSwimlaneValueType(targetLane ?? undefined),
+      );
     };
 
     try {

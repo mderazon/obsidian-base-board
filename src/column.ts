@@ -13,6 +13,7 @@ import { NO_VALUE_COLUMN } from "./constants";
 import { ColorPickerModal } from "./tags";
 import { WipLimitModal } from "./modals";
 import { generateOrderKey, isOrderKey, OrderValue } from "./order";
+import { moveSwimlane } from "./swimlanes";
 
 export class ColumnManager {
   private view: KanbanView;
@@ -27,6 +28,7 @@ export class ColumnManager {
     group: BasesEntryGroup | null,
     columnIndex: number,
     existingColumnEl?: HTMLElement,
+    swimlanes: string[] = [],
   ): void {
     const isNoValue = columnName === NO_VALUE_COLUMN;
     const entries = this.view.getEntriesForColumn(columnName, group);
@@ -63,8 +65,9 @@ export class ColumnManager {
 
     const columnEl =
       existingColumnEl ?? boardEl.createDiv({ cls: "base-board-column" });
-    const existingCardsEl =
-      columnEl.querySelector<HTMLElement>(".base-board-cards");
+    const existingCardsEl = columnEl.querySelector<HTMLElement>(
+      ".base-board-lanes, :scope > .base-board-cards",
+    );
     existingCardsEl?.remove();
     columnEl.empty();
     columnEl.className = "base-board-column";
@@ -216,28 +219,104 @@ export class ColumnManager {
       );
     });
 
-    // ---- Cards container ----
-    const cardsEl =
-      existingCardsEl ?? columnEl.createDiv({ cls: "base-board-cards" });
-    columnEl.appendChild(cardsEl);
+    // ---- Cards, optionally grouped into swimlane drop targets ----
+    if (swimlanes.length === 0) {
+      const cardsEl = columnEl.createDiv({ cls: "base-board-cards" });
+      this.renderLaneCards(cardsEl, visibleCards, columnName);
+      return;
+    }
 
-    // Cards render even when collapsed (CSS hides them) so the column stays a
-    // valid drop target that expands on drag-over.
+    const lanesEl = columnEl.createDiv({ cls: "base-board-lanes" });
+    lanesEl.empty();
+    columnEl.appendChild(lanesEl);
+    const laneNames = swimlanes;
+    for (const [laneIndex, laneName] of laneNames.entries()) {
+      const laneEntries = swimlanes.length
+        ? visibleCards.filter(
+            (entry) => this.view.getSwimlaneValue(entry) === laneName,
+          )
+        : visibleCards;
+      const laneEl = lanesEl.createDiv({ cls: "base-board-lane" });
+      laneEl.dataset.laneName = laneName;
+      if (swimlanes.length) {
+        const title = laneEl.createDiv({ cls: "base-board-lane-title" });
+        title.createSpan({ text: laneName });
+        const reorderActions = [
+          ...(laneIndex > 0
+            ? ([[-1, "arrow-up", "Move swimlane up"]] as const)
+            : []),
+          ...(laneIndex < laneNames.length - 1
+            ? ([[1, "arrow-down", "Move swimlane down"]] as const)
+            : []),
+        ];
+        for (const [delta, icon, label] of reorderActions) {
+          const button = title.createSpan({
+            cls: "base-board-lane-reorder",
+            attr: { "aria-label": label, role: "button", tabindex: "0" },
+          });
+          setIcon(button, icon);
+          button.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.view.saveSwimlanes(
+              moveSwimlane(
+                this.view.getSwimlanes(this.view.data?.data ?? []),
+                laneName,
+                delta,
+              ),
+            );
+          });
+        }
+        if (laneName !== "(No value)") {
+          const deleteButton = title.createSpan({
+            cls: "base-board-lane-reorder base-board-lane-delete",
+            attr: {
+              "aria-label": `Delete swimlane ${laneName}`,
+              role: "button",
+              tabindex: "0",
+            },
+          });
+          setIcon(deleteButton, "trash-2");
+          deleteButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            void this.view.deleteSwimlane(laneName).catch((error: unknown) => {
+              new Notice(`Could not delete swimlane: ${String(error)}`);
+            });
+          });
+          deleteButton.addEventListener("keydown", (event: KeyboardEvent) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              event.stopPropagation();
+              void this.view
+                .deleteSwimlane(laneName)
+                .catch((error: unknown) => {
+                  new Notice(`Could not delete swimlane: ${String(error)}`);
+                });
+            }
+          });
+        }
+      }
+      const cardsEl = laneEl.createDiv({ cls: "base-board-cards" });
+      this.renderLaneCards(cardsEl, laneEntries, columnName);
+    }
+  }
+
+  private renderLaneCards(
+    cardsEl: HTMLElement,
+    entries: BasesEntry[],
+    columnName: string,
+  ): void {
     const visiblePaths = new Set(
-      visibleCards.map((entry) => entry.file?.path ?? ""),
+      entries.map((entry) => entry.file?.path ?? ""),
     );
-
-    visibleCards.forEach((entry) => {
+    entries.forEach((entry) => {
       const filePath = entry.file?.path ?? "";
-      const cachedCardEl = this.view.cardElCache.get(filePath);
       this.view.cardManager.renderCard(
         cardsEl,
         entry,
         columnName,
-        cachedCardEl,
+        this.view.cardElCache.get(filePath),
       );
     });
-
     cardsEl.querySelectorAll<HTMLElement>(".base-board-card").forEach((el) => {
       if (!visiblePaths.has(el.dataset.filePath ?? "")) el.remove();
     });
@@ -335,6 +414,29 @@ export class ColumnManager {
     setIcon(addBtn.createSpan(), "plus");
     addBtn.createSpan({ text: "Add column" });
     addBtn.addEventListener("click", () => this.promptAddColumn());
+  }
+
+  public renderAddSwimlaneButton(boardEl: HTMLElement): void {
+    const addBtn = boardEl.createDiv({ cls: "base-board-add-swimlane-btn" });
+    setIcon(addBtn.createSpan(), "plus");
+    addBtn.createSpan({ text: "Add swimlane" });
+    addBtn.addEventListener("click", () => this.promptAddSwimlane());
+  }
+
+  public promptAddSwimlane(): void {
+    new InputModal(
+      this.view.app,
+      "Add swimlane",
+      "Swimlane name…",
+      (name: string) => {
+        const lanes = this.view.getSwimlanes(this.view.data?.data ?? []);
+        if (lanes.includes(name)) {
+          new Notice(`Swimlane "${name}" already exists.`);
+          return;
+        }
+        this.view.saveSwimlanes([...lanes, name]);
+      },
+    ).open();
   }
 
   public promptAddColumn(): void {

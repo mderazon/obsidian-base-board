@@ -1,0 +1,22 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/11-collapsed-column")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "Swimlanes with one collapsed column"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"
+    collapsedColumns:
+      In Progress: true
+    swimlaneProperty: priority
+    boardSwimlanes:
+      - "Urgent"
+      - "Normal"
+      - "Low"

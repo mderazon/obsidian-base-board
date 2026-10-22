@@ -1,0 +1,40 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/02-empty-swimlane-board")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "Empty board with configured swimlanes"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"
+    swimlaneProperty: priority
+    boardSwimlanes:
+      - "Urgent"
+      - "Normal"
+      - "Low"
+    columnColors:
+      Backlog: "#e36b5d"
+      In Progress: "#e6ad3c"
+      Done: "#4caa78"
+    tagColors:
+      bug: "#d9534f"
+      backend: "#527da8"
+      cleanup: "#8d7aa8"
+      design: "#b36b9a"
+      docs: "#4c8d79"
+      feature: "#4778c7"
+      frontend: "#d28b3c"
+      i18n: "#5a9ca8"
+      maintenance: "#858c45"
+      planning: "#8c7ac1"
+      release: "#308c61"
+      review: "#ae7442"
+      triage: "#c16a50"
+      unassigned: "#777777"
+      urgent: "#c43838"

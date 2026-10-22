@@ -1,0 +1,23 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/06-empty-cells")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "Empty cells and configured lanes with no cards"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"
+      - "Blocked"
+    swimlaneProperty: priority
+    boardSwimlanes:
+      - "Critical"
+      - "High"
+      - "Normal"
+      - "Low"
+      - "Someday"

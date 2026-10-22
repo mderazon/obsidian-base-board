@@ -29,6 +29,159 @@
   align-items: flex-start;
 }
 
+.base-board-board--swimlanes {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: auto;
+  gap: 0;
+  padding: 0 12px 12px;
+}
+
+.base-board-column-headers,
+.base-board-swimlane-row {
+  display: flex;
+  flex: 0 0 auto;
+  width: max-content;
+  align-items: stretch;
+}
+
+.base-board-column-headers {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-top: 12px;
+  gap: 12px;
+  background: var(--background-primary);
+  /* Keep header cards at their natural height instead of stretching to fill
+     the available board height. */
+  align-items: flex-start;
+}
+
+.base-board-column-header-cell {
+  flex: 0 0 280px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.base-board-column-header-cell > .base-board-column-header {
+  flex: 0 0 auto;
+}
+
+.base-board-board--swimlanes
+  .base-board-column-header-cell
+  > .base-board-column-header {
+  border-bottom: 0;
+}
+
+.base-board-column-header-cell[style*="--column-color"] {
+  background-color: color-mix(
+    in srgb,
+    var(--column-color) 4%,
+    var(--background-secondary)
+  );
+}
+
+.base-board-column-header-cell[style*="--column-color"]
+  .base-board-column-count {
+  background-color: color-mix(
+    in srgb,
+    var(--column-color) 15%,
+    var(--background-secondary)
+  );
+  color: var(--column-color);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: var(--font-semibold);
+}
+
+.base-board-column-headers > .base-board-column-placeholder {
+  min-height: 40px;
+  align-self: center;
+}
+
+.base-board-column-header-cell.base-board-column--collapsed,
+.base-board-swimlane-cell.base-board-column--collapsed {
+  flex-basis: 44px;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+}
+
+.base-board-board--swimlanes
+  .base-board-column-headers
+  > .base-board-column-header-cell.base-board-column--collapsed
+  {
+  align-self: flex-start;
+  height: fit-content;
+}
+
+.base-board-board--swimlanes
+  .base-board-column-headers
+  > .base-board-column-header-cell.base-board-column--collapsed
+  > .base-board-column-header {
+  /* In a regular board, collapsed headers fill the whole column height. The
+     swimlane board has a shared header row, so keep this cell content-sized. */
+  height: auto;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.base-board-board--swimlanes > .base-board-lane {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
+  gap: 0;
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.base-board-swimlane-heading {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.base-board-swimlane-heading .base-board-lane-title {
+  position: static;
+  width: auto;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+}
+
+.base-board-board--swimlanes .base-board-swimlane-cell {
+  flex: 0 0 280px;
+  width: 280px;
+  max-height: none;
+  min-height: 100px;
+  overflow: visible;
+  border-radius: var(--radius-m);
+  box-sizing: border-box;
+}
+
+.base-board-board--swimlanes .base-board-swimlane-cell .base-board-cards {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.base-board-board--swimlanes
+  .base-board-swimlane-cell.base-board-column--collapsed
+  > .base-board-cards {
+  display: none;
+}
+
 /* Utility — used to hide the + button while inline card creation input is open */
 .base-board-column-header .base-board-hidden {
   display: none;
@@ -65,6 +218,70 @@
   transition:
     opacity 0.15s ease,
     transform 0.15s ease;
+}
+
+.base-board-lanes {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.base-board-lane {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.base-board-board--swimlanes .base-board-swimlane-row {
+  flex-direction: row;
+  align-items: stretch;
+  width: max-content;
+  gap: 12px;
+}
+
+.base-board-lane-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 10px 3px;
+  color: var(--text-muted);
+  background: var(--background-secondary-alt);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+}
+
+.base-board-lane-reorder {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  opacity: 0.35;
+}
+
+.base-board-lane-title:hover .base-board-lane-reorder {
+  opacity: 0.9;
+}
+
+.base-board-lane-delete:hover {
+  color: var(--text-error);
+}
+
+.base-board-lane-reorder svg {
+  width: 13px;
+  height: 13px;
+}
+
+.base-board-lane .base-board-cards {
+  flex: 0 0 auto;
+  min-height: 44px;
+  overflow-y: visible;
 }
 
 .base-board-column--collapsed {
@@ -345,6 +562,7 @@
   font-size: 11px;
 }
 
+.base-board-column--collapsed > .base-board-lanes,
 .base-board-column--collapsed > .base-board-cards {
   display: none;
 }
@@ -357,26 +575,38 @@
   max-height: 100%;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-header {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-header {
   flex-direction: row;
   padding: 10px 12px;
   height: auto;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-drag-handle,
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-header-spacer,
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-add-card,
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-more-btn {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-drag-handle,
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-header-spacer,
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-add-card,
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-more-btn {
   display: flex;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded .base-board-column-title {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  .base-board-column-title {
   writing-mode: horizontal-tb;
   transform: none;
   max-height: none;
 }
 
-.base-board-column--collapsed.base-board-column--drag-expanded > .base-board-cards {
+.base-board-column--collapsed.base-board-column--drag-expanded
+  > .base-board-lanes {
+  display: flex;
+}
+
+.base-board-column--collapsed.base-board-column--drag-expanded
+  > .base-board-cards {
   display: flex;
 }
 
@@ -708,6 +938,32 @@
     border-color 0.15s ease;
   white-space: nowrap;
   align-self: flex-start;
+}
+
+.base-board-add-swimlane-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  margin: 12px 0 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-m);
+  border: 1px dashed var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.base-board-add-swimlane-btn:hover {
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
 }
 
 .base-board-add-column-btn:hover {

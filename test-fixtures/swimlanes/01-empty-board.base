@@ -1,0 +1,16 @@
+filters:
+  and:
+    - file.inFolder("test-fixtures/swimlanes/Data/01-empty-board")
+    - file.ext == "md"
+views:
+  - type: base-board
+    name: Empty board without swimlanes
+    groupBy:
+      property: status
+      direction: ASC
+    boardColumns:
+      - Backlog
+      - In Progress
+      - Done
+    order:
+      - file.name

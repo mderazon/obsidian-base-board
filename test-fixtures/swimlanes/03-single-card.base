@@ -1,0 +1,15 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/03-single-card")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "Single card without swimlanes"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"

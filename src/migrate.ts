@@ -7,11 +7,7 @@ import {
   parseYaml,
   stringifyYaml,
 } from "obsidian";
-import {
-  BASE_BOARD_CONFIG_KEYS,
-  LEGACY_VIEW_TYPE,
-  VIEW_TYPE,
-} from "./constants";
+import { hasBaseBoardConfig, LEGACY_VIEW_TYPE, VIEW_TYPE } from "./constants";
 
 /**
  * One legacy view found in a `.base` file: which file, its index in the
@@ -41,9 +37,7 @@ async function findLegacyViews(app: App): Promise<LegacyView[]> {
     const views = Array.isArray(doc.views) ? doc.views : [];
     views.forEach((view, viewIndex) => {
       if (!view || view.type !== LEGACY_VIEW_TYPE) return;
-      const confident = BASE_BOARD_CONFIG_KEYS.some((k) =>
-        Object.prototype.hasOwnProperty.call(view, k),
-      );
+      const confident = hasBaseBoardConfig(view);
       found.push({
         file,
         viewIndex,

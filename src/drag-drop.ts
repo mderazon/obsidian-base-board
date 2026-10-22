@@ -9,6 +9,7 @@ export interface DragDropCallbacks {
   onCardDrop: (
     filePath: string,
     targetColumnName: string,
+    targetLaneName: string,
     orderedFilePaths: string[],
   ) => Promise<void>;
   /** Column header was dragged to a new position. */
@@ -115,7 +116,9 @@ export class DragDropManager {
       );
       if (isInteractive) return;
 
-      const columnEl = headerEl.closest(".base-board-column");
+      const columnEl = headerEl.closest(
+        ".base-board-column-header-cell, .base-board-column",
+      );
       if (!(columnEl instanceof HTMLElement)) return;
       this.dragType = "column";
       this.draggedEl = columnEl;
@@ -325,7 +328,10 @@ export class DragDropManager {
     if (!cardsContainer) {
       const columnEl = (e.target as HTMLElement).closest(".base-board-column");
       if (columnEl instanceof HTMLElement) {
-        const qc = columnEl.querySelector(".base-board-cards");
+        const laneEl = (e.target as HTMLElement).closest(".base-board-lane");
+        const qc =
+          laneEl?.querySelector(".base-board-cards") ??
+          columnEl.querySelector(".base-board-cards");
         if (qc instanceof HTMLElement) {
           cardsContainer = qc;
         }
@@ -393,14 +399,21 @@ export class DragDropManager {
   private handleColumnDragOver(e: DragEvent): void {
     if (!this.boardEl) return;
 
+    const headersRow = this.boardEl.querySelector<HTMLElement>(
+      ".base-board-column-headers",
+    );
+    const container = headersRow ?? this.boardEl;
+
     if (!this.placeholderEl) {
-      this.placeholderEl = this.boardEl.createDiv();
+      this.placeholderEl = container.createDiv();
       this.placeholderEl.className = "base-board-column-placeholder";
     }
 
     const afterElement = this.getDragAfterElement(
-      this.boardEl,
-      ".base-board-column:not(.base-board-column--dragging)",
+      container,
+      headersRow
+        ? ".base-board-column-header-cell:not(.base-board-column--dragging)"
+        : ".base-board-column:not(.base-board-column--dragging)",
       e.clientX,
       "horizontal",
     );
@@ -408,23 +421,23 @@ export class DragDropManager {
     // Skip DOM mutation if placeholder is already in the right spot
     const desiredNext =
       afterElement ??
-      this.boardEl.querySelector(".base-board-add-column-btn") ??
+      container.querySelector(".base-board-add-column-btn") ??
       null;
     if (
       this.placeholderEl.nextElementSibling === desiredNext &&
-      this.placeholderEl.parentElement === this.boardEl
+      this.placeholderEl.parentElement === container
     ) {
       return;
     }
 
     if (afterElement) {
-      this.boardEl.insertBefore(this.placeholderEl, afterElement);
+      container.insertBefore(this.placeholderEl, afterElement);
     } else {
-      const addBtn = this.boardEl.querySelector(".base-board-add-column-btn");
+      const addBtn = container.querySelector(".base-board-add-column-btn");
       if (addBtn) {
-        this.boardEl.insertBefore(this.placeholderEl, addBtn);
+        container.insertBefore(this.placeholderEl, addBtn);
       } else {
-        this.boardEl.appendChild(this.placeholderEl);
+        container.appendChild(this.placeholderEl);
       }
     }
   }
@@ -559,13 +572,21 @@ export class DragDropManager {
     const draggedColumnName = this.draggedEl?.dataset.columnName;
     if (!draggedColumnName) return;
 
+    const headersRow = this.boardEl.querySelector<HTMLElement>(
+      ".base-board-column-headers",
+    );
+    const container = headersRow ?? this.boardEl;
+    const selector = headersRow
+      ? ".base-board-column-header-cell"
+      : ".base-board-column";
+
     // Collect column names in DOM order (placeholder marks the new position)
     const orderedNames: string[] = [];
-    for (const child of Array.from(this.boardEl.children)) {
+    for (const child of Array.from(container.children)) {
       if (child === this.placeholderEl) {
         orderedNames.push(draggedColumnName);
       } else if (
-        child.classList.contains("base-board-column") &&
+        child.matches(selector) &&
         !child.classList.contains("base-board-column--dragging")
       ) {
         const name = (child as HTMLElement).dataset.columnName;
@@ -592,7 +613,16 @@ export class DragDropManager {
     const targetColumnName = columnEl.dataset.columnName;
     if (!targetColumnName) return;
 
-    const cardsContainer = columnEl.querySelector(".base-board-cards");
+    const targetLaneName =
+      (e.target as HTMLElement).closest<HTMLElement>(".base-board-lane")
+        ?.dataset.laneName ?? "";
+
+    const cardsContainer =
+      (e.target as HTMLElement).closest<HTMLElement>(".base-board-cards") ??
+      (e.target as HTMLElement)
+        .closest<HTMLElement>(".base-board-lane")
+        ?.querySelector(".base-board-cards") ??
+      columnEl.querySelector(".base-board-cards");
 
     // Build ordered file paths from DOM
     const orderedPaths: string[] = [];
@@ -654,7 +684,12 @@ export class DragDropManager {
     this.onDragEnd();
 
     try {
-      await this.callbacks.onCardDrop(filePath, targetColumnName, orderedPaths);
+      await this.callbacks.onCardDrop(
+        filePath,
+        targetColumnName,
+        targetLaneName,
+        orderedPaths,
+      );
     } catch (error) {
       this.clearDropHighlight();
       for (const position of originalPositions.reverse()) {

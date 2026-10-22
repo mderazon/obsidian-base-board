@@ -1,0 +1,20 @@
+filters:
+  and:
+    - 'file.inFolder("test-fixtures/swimlanes/Data/09-boolean-swimlanes")'
+    - 'file.ext == "md"'
+
+views:
+  - type: base-board
+    name: "Boolean swimlane values"
+    groupBy:
+      property: note.status
+      direction: ASC
+    boardColumns:
+      - "Backlog"
+      - "In Progress"
+      - "Done"
+    swimlaneProperty: priority
+    boardSwimlanes:
+      - "true"
+      - "false"
+      - "(No value)"
